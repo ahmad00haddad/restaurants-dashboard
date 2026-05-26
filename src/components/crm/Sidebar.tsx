@@ -1,5 +1,12 @@
 import { SEGMENT_META, STATUS_META, type Segment, type Status } from "@/lib/restaurants";
-import { Film, Filter, Tag, Activity } from "lucide-react";
+import { Film, Filter, Tag, Activity, Star, Phone, Globe, ArrowUpDown } from "lucide-react";
+
+export type SortKey = "rank" | "rating" | "name" | "updated";
+export interface ExtraFilters {
+  favorites: boolean;
+  hasPhone: boolean;
+  hasWebsite: boolean;
+}
 
 interface Props {
   segments: Set<Segment>;
@@ -11,6 +18,11 @@ interface Props {
   toggleStatus: (s: Status) => void;
   segmentCounts: Record<Segment, number>;
   statusCounts: Record<Status, number>;
+  extra: ExtraFilters;
+  setExtra: (e: ExtraFilters) => void;
+  favCount: number;
+  sort: SortKey;
+  setSort: (s: SortKey) => void;
   onReset: () => void;
 }
 
@@ -34,12 +46,11 @@ export function CrmSidebar(props: Props) {
       <div className="flex-1 overflow-y-auto scrollbar-thin px-5 py-5 space-y-7">
         <Section icon={<Filter className="w-3.5 h-3.5" />} title="الشريحة">
           {(Object.keys(SEGMENT_META) as Segment[]).map((s) => {
-            const active = props.segments.has(s);
             const meta = SEGMENT_META[s];
             return (
               <FilterRow
                 key={s}
-                active={active}
+                active={props.segments.has(s)}
                 onClick={() => props.toggleSegment(s)}
                 label={meta.label}
                 count={props.segmentCounts[s]}
@@ -50,35 +61,75 @@ export function CrmSidebar(props: Props) {
         </Section>
 
         <Section icon={<Activity className="w-3.5 h-3.5" />} title="حالة التواصل">
-          {(Object.keys(STATUS_META) as Status[]).map((s) => {
-            const active = props.statuses.has(s);
-            return (
-              <FilterRow
-                key={s}
-                active={active}
-                onClick={() => props.toggleStatus(s)}
-                label={STATUS_META[s].label}
-                count={props.statusCounts[s]}
-                dot={STATUS_META[s].dot}
-              />
-            );
-          })}
+          {(Object.keys(STATUS_META) as Status[]).map((s) => (
+            <FilterRow
+              key={s}
+              active={props.statuses.has(s)}
+              onClick={() => props.toggleStatus(s)}
+              label={STATUS_META[s].label}
+              count={props.statusCounts[s]}
+              dot={STATUS_META[s].dot}
+            />
+          ))}
+        </Section>
+
+        <Section icon={<Filter className="w-3.5 h-3.5" />} title="فلاتر سريعة">
+          <FilterRow
+            active={props.extra.favorites}
+            onClick={() =>
+              props.setExtra({ ...props.extra, favorites: !props.extra.favorites })
+            }
+            label="المفضلة فقط"
+            count={props.favCount}
+            icon={<Star className="w-3 h-3 fill-current text-gold" />}
+          />
+          <FilterRow
+            active={props.extra.hasPhone}
+            onClick={() =>
+              props.setExtra({ ...props.extra, hasPhone: !props.extra.hasPhone })
+            }
+            label="يحتوي رقم هاتف"
+            icon={<Phone className="w-3 h-3" />}
+          />
+          <FilterRow
+            active={props.extra.hasWebsite}
+            onClick={() =>
+              props.setExtra({ ...props.extra, hasWebsite: !props.extra.hasWebsite })
+            }
+            label="لديه موقع/سوشال"
+            icon={<Globe className="w-3 h-3 text-emerald" />}
+          />
+        </Section>
+
+        <Section icon={<ArrowUpDown className="w-3.5 h-3.5" />} title="ترتيب حسب">
+          {(
+            [
+              { k: "rank", l: "الأعلى ترتيباً" },
+              { k: "rating", l: "التقييم" },
+              { k: "name", l: "الاسم" },
+              { k: "updated", l: "آخر تحديث" },
+            ] as { k: SortKey; l: string }[]
+          ).map(({ k, l }) => (
+            <FilterRow
+              key={k}
+              active={props.sort === k}
+              onClick={() => props.setSort(k)}
+              label={l}
+            />
+          ))}
         </Section>
 
         <Section icon={<Tag className="w-3.5 h-3.5" />} title="الفئة">
           <div className="max-h-72 overflow-y-auto scrollbar-thin pl-1 space-y-1">
-            {props.allCategories.map((c) => {
-              const active = props.categories.has(c.name);
-              return (
-                <FilterRow
-                  key={c.name}
-                  active={active}
-                  onClick={() => props.toggleCategory(c.name)}
-                  label={c.name}
-                  count={c.count}
-                />
-              );
-            })}
+            {props.allCategories.map((c) => (
+              <FilterRow
+                key={c.name}
+                active={props.categories.has(c.name)}
+                onClick={() => props.toggleCategory(c.name)}
+                label={c.name}
+                count={c.count}
+              />
+            ))}
           </div>
         </Section>
       </div>
@@ -122,13 +173,15 @@ function FilterRow({
   count,
   accent,
   dot,
+  icon,
 }: {
   active: boolean;
   onClick: () => void;
   label: string;
-  count: number;
+  count?: number;
   accent?: string;
   dot?: string;
+  icon?: React.ReactNode;
 }) {
   const accentClasses =
     accent === "gold"
@@ -147,10 +200,13 @@ function FilterRow({
       }`}
     >
       <span className="flex items-center gap-2 truncate">
+        {icon}
         {dot && <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />}
         <span className="truncate">{label}</span>
       </span>
-      <span className="text-[11px] tabular-nums opacity-80">{count}</span>
+      {count != null && (
+        <span className="text-[11px] tabular-nums opacity-80">{count}</span>
+      )}
     </button>
   );
 }
