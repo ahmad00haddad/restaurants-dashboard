@@ -1,17 +1,22 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   RESTAURANTS,
+  downloadCSV,
+  exportRestaurantsCSV,
   type Restaurant,
   type Segment,
   type Status,
 } from "@/lib/restaurants";
-import { useStatusStore } from "@/hooks/useStatusStore";
-import { CrmSidebar } from "@/components/crm/Sidebar";
+import { useCrmStore } from "@/hooks/useCrmStore";
+import { useToast } from "@/hooks/useToast";
+import { CrmSidebar, type ExtraFilters, type SortKey } from "@/components/crm/Sidebar";
 import { AnalyticsBar } from "@/components/crm/Analytics";
 import { RestaurantTable } from "@/components/crm/RestaurantTable";
+import { KanbanBoard } from "@/components/crm/KanbanBoard";
+import { BulkActionBar } from "@/components/crm/BulkActionBar";
 import { ActionPanel } from "@/components/crm/ActionPanel";
-import { Search } from "lucide-react";
+import { Search, LayoutGrid, List, Sparkles, Download } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -28,16 +33,27 @@ export const Route = createFileRoute("/")({
 });
 
 const PAGE_SIZE = 25;
+const DAILY_GOAL = 20;
 
 function Dashboard() {
-  const { getStatus, setStatus, map } = useStatusStore();
+  const {
+    getStatus, setStatus, setStatusBulk, getState, update, toggleFavorite, store, todayCount,
+  } = useCrmStore();
+  const toast = useToast();
 
   const [segments, setSegments] = useState<Set<Segment>>(new Set());
   const [categories, setCategories] = useState<Set<string>>(new Set());
   const [statuses, setStatuses] = useState<Set<Status>>(new Set());
+  const [extra, setExtra] = useState<ExtraFilters>({
+    favorites: false, hasPhone: false, hasWebsite: false,
+  });
+  const [sort, setSort] = useState<SortKey>("rank");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [view, setView] = useState<"table" | "kanban">("table");
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const segmentCounts = useMemo(() => {
     const c = { premium: 0, medium: 0, testing: 0 } as Record<Segment, number>;
@@ -47,9 +63,14 @@ function Dashboard() {
 
   const statusCounts = useMemo(() => {
     const c = { new: 0, email: 0, whatsapp: 0, meeting: 0 } as Record<Status, number>;
-    for (const r of RESTAURANTS) c[(map[r.id] ?? "new") as Status]++;
+    for (const r of RESTAURANTS) c[(store[r.id]?.status ?? "new") as Status]++;
     return c;
-  }, [map]);
+  }, [store]);
+
+  const favCount = useMemo(
+    () => Object.values(store).filter((s) => s.favorite).length,
+    [store],
+  );
 
   const allCategories = useMemo(() => {
     const m = new Map<string, number>();
@@ -61,22 +82,60 @@ function Dashboard() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return RESTAURANTS.filter((r) => {
+    const arr = RESTAURANTS.filter((r) => {
       if (segments.size && !segments.has(r.segment)) return false;
       if (categories.size && !categories.has(r.category)) return false;
       if (statuses.size && !statuses.has(getStatus(r.id))) return false;
+      if (extra.favorites && !store[r.id]?.favorite) return false;
+      if (extra.hasPhone && !r.phone) return false;
+      if (extra.hasWebsite && !r.website) return false;
       if (q) {
         const hay = `${r.title} ${r.category} ${r.street ?? ""} ${r.phone ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [segments, categories, statuses, search, getStatus]);
+    const sorted = [...arr];
+    switch (sort) {
+      case "rating":
+        sorted.sort((a, b) => b.rating - a.rating);
+        break;
+      case "name":
+        sorted.sort((a, b) => a.title.localeCompare(b.title, "ar"));
+        break;
+      case "updated":
+        sorted.sort(
+          (a, b) => (store[b.id]?.updatedAt ?? 0) - (store[a.id]?.updatedAt ?? 0),
+        );
+        break;
+      default:
+        sorted.sort((a, b) => a.rank - b.rank);
+    }
+    return sorted;
+  }, [segments, categories, statuses, extra, sort, search, getStatus, store]);
 
-  // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [segments, categories, statuses, search]);
+  }, [segments, categories, statuses, extra, sort, search]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.key === "/") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      } else if (e.key === "Escape") {
+        if (selectedId) setSelectedId(null);
+        else if (selectedIds.size) setSelectedIds(new Set());
+      } else if (e.key.toLowerCase() === "k") {
+        setView((v) => (v === "table" ? "kanban" : "table"));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedId, selectedIds]);
 
   const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -90,9 +149,50 @@ function Dashboard() {
 
   const toggle = <T,>(set: Set<T>, setSet: (s: Set<T>) => void, v: T) => {
     const n = new Set(set);
-    if (n.has(v)) n.delete(v);
-    else n.add(v);
+    if (n.has(v)) n.delete(v); else n.add(v);
     setSet(n);
+  };
+
+  const toggleSelect = (id: string) => {
+    const n = new Set(selectedIds);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    setSelectedIds(n);
+  };
+
+  const pageIds = pageRows.map((r) => r.id);
+  const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+  const toggleSelectAll = () => {
+    const n = new Set(selectedIds);
+    if (allSelected) pageIds.forEach((id) => n.delete(id));
+    else pageIds.forEach((id) => n.add(id));
+    setSelectedIds(n);
+  };
+
+  const bulkStatus = (s: Status) => {
+    setStatusBulk([...selectedIds], s);
+    toast.push(`تم تحديث ${selectedIds.size} مطعم`, "success");
+    setSelectedIds(new Set());
+  };
+
+  const exportSelected = () => {
+    const ids = selectedIds.size ? selectedIds : new Set(filtered.map((r) => r.id));
+    const rows = RESTAURANTS.filter((r) => ids.has(r.id));
+    downloadCSV(`faii-restaurants-${Date.now()}.csv`, exportRestaurantsCSV(rows));
+    toast.push(`تم تصدير ${rows.length} مطعم`, "success");
+  };
+
+  const smartSuggest = () => {
+    // Top premium with phone, not yet contacted
+    const candidates = RESTAURANTS.filter(
+      (r) => r.segment === "premium" && r.phone && (store[r.id]?.status ?? "new") === "new",
+    )
+      .sort((a, b) => b.rating - a.rating || a.rank - b.rank)
+      .slice(0, 10);
+    setSelectedIds(new Set(candidates.map((r) => r.id)));
+    setSegments(new Set(["premium"]));
+    setExtra({ ...extra, hasPhone: true });
+    setStatuses(new Set(["new"]));
+    toast.push(`🔥 تم اقتراح أفضل ${candidates.length} لِيد للبدء بهم`, "info");
   };
 
   return (
@@ -107,10 +207,16 @@ function Dashboard() {
         toggleStatus={(s) => toggle(statuses, setStatuses, s)}
         segmentCounts={segmentCounts}
         statusCounts={statusCounts}
+        extra={extra}
+        setExtra={setExtra}
+        favCount={favCount}
+        sort={sort}
+        setSort={setSort}
         onReset={() => {
           setSegments(new Set());
           setCategories(new Set());
           setStatuses(new Set());
+          setExtra({ favorites: false, hasPhone: false, hasWebsite: false });
           setSearch("");
         }}
       />
@@ -139,17 +245,20 @@ function Dashboard() {
             premium={segmentCounts.premium}
             contacted={contactedCount}
             meetings={statusCounts.meeting}
+            today={todayCount}
+            goal={DAILY_GOAL}
           />
         </header>
 
         <div className="px-6 lg:px-8 py-5 flex-1 min-h-0 flex flex-col gap-4">
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1 max-w-md">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex-1 min-w-[240px] max-w-md">
               <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
+                ref={searchRef}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="ابحث عن مطعم، فئة، رقم..."
+                placeholder="ابحث عن مطعم، فئة، رقم... (اضغط /)"
                 className="w-full pr-9 pl-4 py-2.5 rounded-lg bg-card border border-border focus:border-gold/50 outline-none text-sm placeholder:text-muted-foreground"
               />
             </div>
@@ -159,27 +268,100 @@ function Dashboard() {
               </span>{" "}
               نتيجة
             </div>
+
+            <div className="flex-1" />
+
+            <button
+              onClick={smartSuggest}
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-gold-soft border border-gold/40 text-gold hover:bg-gold/20"
+            >
+              <Sparkles className="w-3.5 h-3.5" /> اقتراح ذكي
+            </button>
+            <button
+              onClick={exportSelected}
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-card border border-border text-foreground hover:border-emerald/50"
+              title="تصدير القائمة الحالية أو المحددة"
+            >
+              <Download className="w-3.5 h-3.5" /> تصدير
+            </button>
+
+            <div className="inline-flex rounded-lg border border-border bg-card p-1">
+              <ViewBtn active={view === "table"} onClick={() => setView("table")}>
+                <List className="w-3.5 h-3.5" /> جدول
+              </ViewBtn>
+              <ViewBtn active={view === "kanban"} onClick={() => setView("kanban")}>
+                <LayoutGrid className="w-3.5 h-3.5" /> Pipeline
+              </ViewBtn>
+            </div>
           </div>
 
-          <RestaurantTable
-            rows={pageRows}
-            selectedId={selectedId}
-            onSelect={(r) => setSelectedId(r.id === selectedId ? null : r.id)}
-            getStatus={getStatus}
-            page={page}
-            pageSize={PAGE_SIZE}
-            total={filtered.length}
-            onPage={setPage}
+          <BulkActionBar
+            count={selectedIds.size}
+            onClear={() => setSelectedIds(new Set())}
+            onBulkStatus={bulkStatus}
+            onExport={exportSelected}
           />
+
+          {view === "table" ? (
+            <RestaurantTable
+              rows={pageRows}
+              selectedId={selectedId}
+              onSelect={(r) => setSelectedId(r.id === selectedId ? null : r.id)}
+              getStatus={getStatus}
+              isFavorite={(id) => !!store[id]?.favorite}
+              hasNotes={(id) => !!store[id]?.notes?.trim()}
+              followUp={(id) => store[id]?.followUp}
+              toggleFavorite={(id) => {
+                toggleFavorite(id);
+                toast.push(
+                  store[id]?.favorite ? "أُزيلت من المفضلة" : "أُضيفت للمفضلة",
+                  "info",
+                );
+              }}
+              selectedIds={selectedIds}
+              toggleSelect={toggleSelect}
+              toggleSelectAll={toggleSelectAll}
+              allSelected={allSelected}
+              page={page}
+              pageSize={PAGE_SIZE}
+              total={filtered.length}
+              onPage={setPage}
+            />
+          ) : (
+            <KanbanBoard
+              rows={filtered}
+              getStatus={getStatus}
+              isFavorite={(id) => !!store[id]?.favorite}
+              onSelect={(r) => setSelectedId(r.id === selectedId ? null : r.id)}
+              selectedId={selectedId}
+            />
+          )}
         </div>
       </main>
 
       <ActionPanel
         restaurant={selected}
-        status={selected ? getStatus(selected.id) : "new"}
+        state={selected ? getState(selected.id) : {}}
         onStatusChange={(s) => selected && setStatus(selected.id, s)}
+        onToggleFavorite={() => selected && toggleFavorite(selected.id)}
+        onUpdate={(patch) => selected && update(selected.id, patch)}
         onClose={() => setSelectedId(null)}
       />
     </div>
+  );
+}
+
+function ViewBtn({
+  active, onClick, children,
+}: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs transition-all ${
+        active ? "bg-gold text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
