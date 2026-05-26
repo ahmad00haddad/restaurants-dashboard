@@ -77,9 +77,71 @@ export function cleanPhone(phone: string | null): string {
   return phone.replace(/\D/g, "");
 }
 
+/** Normalize Jordanian numbers to international E.164 (no +) for wa.me. */
+export function normalizeJordanianPhone(phone: string | null): string {
+  let d = cleanPhone(phone);
+  if (!d) return "";
+  if (d.startsWith("00")) d = d.slice(2);
+  if (d.startsWith("962")) return d;
+  if (d.startsWith("0")) return "962" + d.slice(1);
+  if (d.startsWith("7") && d.length === 9) return "962" + d;
+  return d;
+}
+
 export function waLink(phone: string | null, msg: string): string {
-  const clean = cleanPhone(phone);
+  const clean = normalizeJordanianPhone(phone);
   return `https://wa.me/${clean}?text=${encodeURIComponent(msg)}`;
+}
+
+export function exportRestaurantsCSV(rows: Restaurant[]): string {
+  const headers = [
+    "rank",
+    "title",
+    "category",
+    "segment",
+    "rating",
+    "phone",
+    "phone_intl",
+    "website",
+    "address",
+    "street",
+    "city",
+  ];
+  const esc = (v: unknown) => {
+    const s = v == null ? "" : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const lines = [headers.join(",")];
+  for (const r of rows) {
+    lines.push(
+      [
+        r.rank,
+        r.title,
+        r.category,
+        r.segment,
+        r.rating,
+        r.phone ?? "",
+        normalizeJordanianPhone(r.phone),
+        r.website ?? "",
+        r.address ?? "",
+        r.street ?? "",
+        r.city ?? "",
+      ]
+        .map(esc)
+        .join(","),
+    );
+  }
+  return "\uFEFF" + lines.join("\n");
+}
+
+export function downloadCSV(filename: string, content: string) {
+  const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export function buildWhatsAppMessage(r: Restaurant): string {
