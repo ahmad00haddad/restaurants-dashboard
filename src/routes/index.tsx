@@ -16,6 +16,9 @@ import { RestaurantTable } from "@/components/crm/RestaurantTable";
 import { KanbanBoard } from "@/components/crm/KanbanBoard";
 import { BulkActionBar } from "@/components/crm/BulkActionBar";
 import { ActionPanel } from "@/components/crm/ActionPanel";
+import { CommandPalette } from "@/components/crm/CommandPalette";
+import { FollowUpsDrawer } from "@/components/crm/FollowUpsDrawer";
+import { TopNav } from "@/components/crm/TopNav";
 import { Search, LayoutGrid, List, Sparkles, Download } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -38,12 +41,14 @@ const DAILY_GOAL = 20;
 function Dashboard() {
   const {
     getStatus, setStatus, setStatusBulk, getState, update, toggleFavorite, store, todayCount,
+    addTag, removeTag, allTags, importStore, exportStore, clearAll,
   } = useCrmStore();
   const toast = useToast();
 
   const [segments, setSegments] = useState<Set<Segment>>(new Set());
   const [categories, setCategories] = useState<Set<string>>(new Set());
   const [statuses, setStatuses] = useState<Set<Status>>(new Set());
+  const [tags, setTags] = useState<Set<string>>(new Set());
   const [extra, setExtra] = useState<ExtraFilters>({
     favorites: false, hasPhone: false, hasWebsite: false,
   });
@@ -53,7 +58,10 @@ function Dashboard() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [view, setView] = useState<"table" | "kanban">("table");
+  const [cmdOpen, setCmdOpen] = useState(false);
+  const [followUpsOpen, setFollowUpsOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const segmentCounts = useMemo(() => {
     const c = { premium: 0, medium: 0, testing: 0 } as Record<Segment, number>;
@@ -80,6 +88,17 @@ function Dashboard() {
       .sort((a, b) => b.count - a.count);
   }, []);
 
+  const today = new Date().toISOString().slice(0, 10);
+  const followUps = useMemo(() => {
+    let total = 0, overdue = 0;
+    for (const s of Object.values(store)) {
+      if (!s.followUp) continue;
+      total++;
+      if (s.followUp < today) overdue++;
+    }
+    return { total, overdue };
+  }, [store, today]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const arr = RESTAURANTS.filter((r) => {
@@ -89,6 +108,10 @@ function Dashboard() {
       if (extra.favorites && !store[r.id]?.favorite) return false;
       if (extra.hasPhone && !r.phone) return false;
       if (extra.hasWebsite && !r.website) return false;
+      if (tags.size) {
+        const t = store[r.id]?.tags ?? [];
+        if (!t.some((x) => tags.has(x))) return false;
+      }
       if (q) {
         const hay = `${r.title} ${r.category} ${r.street ?? ""} ${r.phone ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
@@ -97,45 +120,41 @@ function Dashboard() {
     });
     const sorted = [...arr];
     switch (sort) {
-      case "rating":
-        sorted.sort((a, b) => b.rating - a.rating);
-        break;
-      case "name":
-        sorted.sort((a, b) => a.title.localeCompare(b.title, "ar"));
-        break;
+      case "rating": sorted.sort((a, b) => b.rating - a.rating); break;
+      case "name": sorted.sort((a, b) => a.title.localeCompare(b.title, "ar")); break;
       case "updated":
-        sorted.sort(
-          (a, b) => (store[b.id]?.updatedAt ?? 0) - (store[a.id]?.updatedAt ?? 0),
-        );
-        break;
-      default:
-        sorted.sort((a, b) => a.rank - b.rank);
+        sorted.sort((a, b) => (store[b.id]?.updatedAt ?? 0) - (store[a.id]?.updatedAt ?? 0)); break;
+      default: sorted.sort((a, b) => a.rank - b.rank);
     }
     return sorted;
-  }, [segments, categories, statuses, extra, sort, search, getStatus, store]);
+  }, [segments, categories, statuses, tags, extra, sort, search, getStatus, store]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [segments, categories, statuses, extra, sort, search]);
+  useEffect(() => { setPage(1); }, [segments, categories, statuses, tags, extra, sort, search]);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
-      if (e.key === "/") {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        searchRef.current?.focus();
-      } else if (e.key === "Escape") {
-        if (selectedId) setSelectedId(null);
+        setCmdOpen(true);
+        return;
+      }
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.key === "/") { e.preventDefault(); searchRef.current?.focus(); }
+      else if (e.key === "Escape") {
+        if (cmdOpen) setCmdOpen(false);
+        else if (followUpsOpen) setFollowUpsOpen(false);
+        else if (selectedId) setSelectedId(null);
         else if (selectedIds.size) setSelectedIds(new Set());
       } else if (e.key.toLowerCase() === "k") {
         setView((v) => (v === "table" ? "kanban" : "table"));
+      } else if (e.key.toLowerCase() === "f") {
+        setFollowUpsOpen((v) => !v);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedId, selectedIds]);
+  }, [selectedId, selectedIds, cmdOpen, followUpsOpen]);
 
   const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -144,8 +163,7 @@ function Dashboard() {
     [selectedId],
   );
 
-  const contactedCount =
-    statusCounts.email + statusCounts.whatsapp + statusCounts.meeting;
+  const contactedCount = statusCounts.email + statusCounts.whatsapp + statusCounts.meeting;
 
   const toggle = <T,>(set: Set<T>, setSet: (s: Set<T>) => void, v: T) => {
     const n = new Set(set);
@@ -182,7 +200,6 @@ function Dashboard() {
   };
 
   const smartSuggest = () => {
-    // Top premium with phone, not yet contacted
     const candidates = RESTAURANTS.filter(
       (r) => r.segment === "premium" && r.phone && (store[r.id]?.status ?? "new") === "new",
     )
@@ -193,6 +210,42 @@ function Dashboard() {
     setExtra({ ...extra, hasPhone: true });
     setStatuses(new Set(["new"]));
     toast.push(`🔥 تم اقتراح أفضل ${candidates.length} لِيد للبدء بهم`, "info");
+  };
+
+  const handleBackup = () => {
+    const data = exportStore();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `faii-crm-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.push("تم تنزيل نسخة احتياطية", "success");
+  };
+
+  const handleRestore = () => fileRef.current?.click();
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    try {
+      const text = await f.text();
+      const data = JSON.parse(text);
+      if (typeof data !== "object" || !data) throw new Error("bad");
+      importStore(data);
+      toast.push("تم استرجاع البيانات بنجاح", "success");
+    } catch {
+      toast.push("الملف غير صالح", "error");
+    } finally {
+      e.target.value = "";
+    }
+  };
+
+  const handleClearAll = () => {
+    if (confirm("سيتم حذف جميع بيانات CRM المحلية (حالات، ملاحظات، مفضلة، وسوم). هل أنت متأكد؟")) {
+      clearAll();
+      toast.push("تم مسح جميع بيانات CRM", "info");
+    }
   };
 
   return (
@@ -212,33 +265,41 @@ function Dashboard() {
         favCount={favCount}
         sort={sort}
         setSort={setSort}
+        tags={tags}
+        toggleTag={(t) => toggle(tags, setTags, t)}
+        allTags={allTags}
         onReset={() => {
           setSegments(new Set());
           setCategories(new Set());
           setStatuses(new Set());
+          setTags(new Set());
           setExtra({ favorites: false, hasPhone: false, hasWebsite: false });
           setSearch("");
         }}
+        onBackup={handleBackup}
+        onRestore={handleRestore}
+        onClearAll={handleClearAll}
       />
+
+      <input ref={fileRef} type="file" accept="application/json" onChange={onFile} className="hidden" />
 
       <main className="flex-1 min-w-0 flex flex-col">
         <header className="px-6 lg:px-8 py-6 border-b border-border bg-gradient-hero">
-          <div className="flex items-center justify-between gap-6 mb-5">
+          <div className="flex items-center justify-between gap-6 mb-5 flex-wrap">
             <div>
               <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight">
                 لوحة تواصل المطاعم
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
-                ١٬٠٠٠ مطعم في إربد — مُصنّفة آلياً حسب الشريحة والفئة، مع رسائل تواصل
-                جاهزة لكل مطعم.
+                ١٬٠٠٠ مطعم في إربد — مُصنّفة آلياً حسب الشريحة والفئة، مع رسائل وأسعار جاهزة.
               </p>
             </div>
-            <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-full bg-card border border-border">
-              <span className="w-2 h-2 rounded-full bg-emerald animate-pulse" />
-              <span className="text-xs text-muted-foreground">
-                CRM متصل ومُحدّث محلياً
-              </span>
-            </div>
+            <TopNav
+              followUpsCount={followUps.total}
+              overdueCount={followUps.overdue}
+              onOpenFollowUps={() => setFollowUpsOpen(true)}
+              onOpenCommand={() => setCmdOpen(true)}
+            />
           </div>
           <AnalyticsBar
             total={RESTAURANTS.length}
@@ -258,7 +319,7 @@ function Dashboard() {
                 ref={searchRef}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="ابحث عن مطعم، فئة، رقم... (اضغط /)"
+                placeholder="ابحث عن مطعم، فئة، رقم... (/)"
                 className="w-full pr-9 pl-4 py-2.5 rounded-lg bg-card border border-border focus:border-gold/50 outline-none text-sm placeholder:text-muted-foreground"
               />
             </div>
@@ -311,12 +372,10 @@ function Dashboard() {
               isFavorite={(id) => !!store[id]?.favorite}
               hasNotes={(id) => !!store[id]?.notes?.trim()}
               followUp={(id) => store[id]?.followUp}
+              tags={(id) => store[id]?.tags ?? []}
               toggleFavorite={(id) => {
                 toggleFavorite(id);
-                toast.push(
-                  store[id]?.favorite ? "أُزيلت من المفضلة" : "أُضيفت للمفضلة",
-                  "info",
-                );
+                toast.push(store[id]?.favorite ? "أُزيلت من المفضلة" : "أُضيفت للمفضلة", "info");
               }}
               selectedIds={selectedIds}
               toggleSelect={toggleSelect}
@@ -345,7 +404,21 @@ function Dashboard() {
         onStatusChange={(s) => selected && setStatus(selected.id, s)}
         onToggleFavorite={() => selected && toggleFavorite(selected.id)}
         onUpdate={(patch) => selected && update(selected.id, patch)}
+        onAddTag={(t) => selected && addTag(selected.id, t)}
+        onRemoveTag={(t) => selected && removeTag(selected.id, t)}
         onClose={() => setSelectedId(null)}
+      />
+
+      <CommandPalette
+        open={cmdOpen}
+        onClose={() => setCmdOpen(false)}
+        onPick={(r) => setSelectedId(r.id)}
+      />
+      <FollowUpsDrawer
+        open={followUpsOpen}
+        onClose={() => setFollowUpsOpen(false)}
+        store={store}
+        onPick={(r) => setSelectedId(r.id)}
       />
     </div>
   );
