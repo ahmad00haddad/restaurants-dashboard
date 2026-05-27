@@ -16,6 +16,7 @@ interface Props {
   isFavorite: (id: string) => boolean;
   hasNotes: (id: string) => boolean;
   followUp: (id: string) => string | undefined;
+  tags: (id: string) => string[];
   toggleFavorite: (id: string) => void;
   selectedIds: Set<string>;
   toggleSelect: (id: string) => void;
@@ -100,7 +101,7 @@ export function RestaurantTable(p: Props) {
                   </td>
                   <td className="px-3 py-3 text-muted-foreground tabular-nums">{r.rank}</td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-foreground">{r.title}</span>
                       {p.hasNotes(r.id) && (
                         <span title="يحتوي ملاحظات" className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-soft text-emerald">
@@ -118,6 +119,11 @@ export function RestaurantTable(p: Props) {
                           {fu}
                         </span>
                       )}
+                      {p.tags(r.id).slice(0, 3).map((t) => (
+                        <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-accent text-muted-foreground border border-border">
+                          #{t}
+                        </span>
+                      ))}
                     </div>
                     <div className="text-xs text-muted-foreground truncate max-w-[280px]">
                       {r.street || r.address || ""}
