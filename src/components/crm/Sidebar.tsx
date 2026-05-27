@@ -1,5 +1,8 @@
 import { SEGMENT_META, STATUS_META, type Segment, type Status } from "@/lib/restaurants";
-import { Film, Filter, Tag, Activity, Star, Phone, Globe, ArrowUpDown } from "lucide-react";
+import {
+  Film, Filter, Tag, Activity, Star, Phone, Globe, ArrowUpDown,
+  Download, Upload, Trash2,
+} from "lucide-react";
 
 export type SortKey = "rank" | "rating" | "name" | "updated";
 export interface ExtraFilters {
@@ -23,7 +26,13 @@ interface Props {
   favCount: number;
   sort: SortKey;
   setSort: (s: SortKey) => void;
+  tags: Set<string>;
+  toggleTag: (t: string) => void;
+  allTags: { name: string; count: number }[];
   onReset: () => void;
+  onBackup: () => void;
+  onRestore: () => void;
+  onClearAll: () => void;
 }
 
 export function CrmSidebar(props: Props) {
@@ -76,26 +85,20 @@ export function CrmSidebar(props: Props) {
         <Section icon={<Filter className="w-3.5 h-3.5" />} title="فلاتر سريعة">
           <FilterRow
             active={props.extra.favorites}
-            onClick={() =>
-              props.setExtra({ ...props.extra, favorites: !props.extra.favorites })
-            }
+            onClick={() => props.setExtra({ ...props.extra, favorites: !props.extra.favorites })}
             label="المفضلة فقط"
             count={props.favCount}
             icon={<Star className="w-3 h-3 fill-current text-gold" />}
           />
           <FilterRow
             active={props.extra.hasPhone}
-            onClick={() =>
-              props.setExtra({ ...props.extra, hasPhone: !props.extra.hasPhone })
-            }
+            onClick={() => props.setExtra({ ...props.extra, hasPhone: !props.extra.hasPhone })}
             label="يحتوي رقم هاتف"
             icon={<Phone className="w-3 h-3" />}
           />
           <FilterRow
             active={props.extra.hasWebsite}
-            onClick={() =>
-              props.setExtra({ ...props.extra, hasWebsite: !props.extra.hasWebsite })
-            }
+            onClick={() => props.setExtra({ ...props.extra, hasWebsite: !props.extra.hasWebsite })}
             label="لديه موقع/سوشال"
             icon={<Globe className="w-3 h-3 text-emerald" />}
           />
@@ -110,14 +113,25 @@ export function CrmSidebar(props: Props) {
               { k: "updated", l: "آخر تحديث" },
             ] as { k: SortKey; l: string }[]
           ).map(({ k, l }) => (
-            <FilterRow
-              key={k}
-              active={props.sort === k}
-              onClick={() => props.setSort(k)}
-              label={l}
-            />
+            <FilterRow key={k} active={props.sort === k} onClick={() => props.setSort(k)} label={l} />
           ))}
         </Section>
+
+        {props.allTags.length > 0 && (
+          <Section icon={<Tag className="w-3.5 h-3.5" />} title="الوسوم">
+            <div className="max-h-48 overflow-y-auto scrollbar-thin pl-1 space-y-1">
+              {props.allTags.map((t) => (
+                <FilterRow
+                  key={t.name}
+                  active={props.tags.has(t.name)}
+                  onClick={() => props.toggleTag(t.name)}
+                  label={t.name}
+                  count={t.count}
+                />
+              ))}
+            </div>
+          </Section>
+        )}
 
         <Section icon={<Tag className="w-3.5 h-3.5" />} title="الفئة">
           <div className="max-h-72 overflow-y-auto scrollbar-thin pl-1 space-y-1">
@@ -134,32 +148,45 @@ export function CrmSidebar(props: Props) {
         </Section>
       </div>
 
-      <div className="border-t border-border p-4">
+      <div className="border-t border-border p-4 space-y-2">
         <button
           onClick={props.onReset}
           className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-2 rounded-md border border-border hover:border-border-strong"
         >
           إعادة ضبط الفلاتر
         </button>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={props.onBackup}
+            title="نسخة احتياطية JSON"
+            className="inline-flex items-center justify-center gap-1 text-[11px] py-2 rounded-md border border-border hover:border-emerald/40 text-muted-foreground hover:text-emerald"
+          >
+            <Download className="w-3 h-3" /> نسخ احتياطي
+          </button>
+          <button
+            onClick={props.onRestore}
+            title="استرجاع من ملف"
+            className="inline-flex items-center justify-center gap-1 text-[11px] py-2 rounded-md border border-border hover:border-gold/40 text-muted-foreground hover:text-gold"
+          >
+            <Upload className="w-3 h-3" /> استرجاع
+          </button>
+        </div>
+        <button
+          onClick={props.onClearAll}
+          className="w-full inline-flex items-center justify-center gap-1 text-[11px] text-muted-foreground hover:text-destructive py-1.5"
+        >
+          <Trash2 className="w-3 h-3" /> مسح جميع بيانات CRM
+        </button>
       </div>
     </aside>
   );
 }
 
-function Section({
-  icon,
-  title,
-  children,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  children: React.ReactNode;
-}) {
+function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
   return (
     <div>
       <div className="flex items-center gap-2 text-[11px] tracking-widest uppercase text-muted-foreground mb-3">
-        {icon}
-        <span>{title}</span>
+        {icon}<span>{title}</span>
       </div>
       <div className="space-y-1">{children}</div>
     </div>
@@ -167,36 +194,21 @@ function Section({
 }
 
 function FilterRow({
-  active,
-  onClick,
-  label,
-  count,
-  accent,
-  dot,
-  icon,
+  active, onClick, label, count, accent, dot, icon,
 }: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  count?: number;
-  accent?: string;
-  dot?: string;
-  icon?: React.ReactNode;
+  active: boolean; onClick: () => void; label: string;
+  count?: number; accent?: string; dot?: string; icon?: React.ReactNode;
 }) {
   const accentClasses =
-    accent === "gold"
-      ? "border-gold/40 bg-gold-soft text-gold"
-      : accent === "emerald"
-      ? "border-emerald/40 bg-emerald-soft text-emerald"
-      : "border-border-strong bg-accent text-foreground";
+    accent === "gold" ? "border-gold/40 bg-gold-soft text-gold" :
+    accent === "emerald" ? "border-emerald/40 bg-emerald-soft text-emerald" :
+    "border-border-strong bg-accent text-foreground";
 
   return (
     <button
       onClick={onClick}
       className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm border transition-all ${
-        active
-          ? accentClasses
-          : "border-transparent text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+        active ? accentClasses : "border-transparent text-muted-foreground hover:bg-accent/50 hover:text-foreground"
       }`}
     >
       <span className="flex items-center gap-2 truncate">
@@ -204,9 +216,7 @@ function FilterRow({
         {dot && <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />}
         <span className="truncate">{label}</span>
       </span>
-      {count != null && (
-        <span className="text-[11px] tabular-nums opacity-80">{count}</span>
-      )}
+      {count != null && <span className="text-[11px] tabular-nums opacity-80">{count}</span>}
     </button>
   );
 }

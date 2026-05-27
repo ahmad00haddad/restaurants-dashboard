@@ -9,20 +9,18 @@ import {
   type Restaurant,
   type Status,
 } from "@/lib/restaurants";
+import {
+  SERVICES,
+  SERVICE_BY_KEY,
+  buildProposal,
+  buildServiceMessage,
+  priceFor,
+  type ServiceKey,
+} from "@/lib/services";
 import type { RestaurantState } from "@/hooks/useCrmStore";
 import {
-  X,
-  Phone,
-  Globe,
-  MapPin,
-  Star,
-  MessageCircle,
-  Mail,
-  Copy,
-  CheckCircle2,
-  Calendar,
-  StickyNote,
-  History,
+  X, Phone, Globe, MapPin, Star, MessageCircle, Mail, Copy, CheckCircle2,
+  Calendar, StickyNote, History, Sparkles, Tag, FileText, Plus,
 } from "lucide-react";
 import { useToast } from "@/hooks/useToast";
 
@@ -32,28 +30,32 @@ interface Props {
   onStatusChange: (s: Status) => void;
   onToggleFavorite: () => void;
   onUpdate: (patch: Partial<RestaurantState>) => void;
+  onAddTag: (tag: string) => void;
+  onRemoveTag: (tag: string) => void;
   onClose: () => void;
 }
 
+type Tab = "whatsapp" | "email" | "proposal";
+
 export function ActionPanel({
-  restaurant,
-  state,
-  onStatusChange,
-  onToggleFavorite,
-  onUpdate,
-  onClose,
+  restaurant, state, onStatusChange, onToggleFavorite, onUpdate, onAddTag, onRemoveTag, onClose,
 }: Props) {
-  const [tab, setTab] = useState<"whatsapp" | "email">("whatsapp");
+  const [tab, setTab] = useState<Tab>("whatsapp");
   const [copied, setCopied] = useState(false);
+  const [serviceKey, setServiceKey] = useState<ServiceKey | null>(null);
+  const [proposalServices, setProposalServices] = useState<Set<ServiceKey>>(new Set(["reel"]));
+  const [tagInput, setTagInput] = useState("");
   const toast = useToast();
 
   const messages = useMemo(() => {
     if (!restaurant) return null;
-    return {
-      whatsapp: buildWhatsAppMessage(restaurant),
-      email: buildEmailMessage(restaurant),
-    };
-  }, [restaurant]);
+    const wa = serviceKey
+      ? buildServiceMessage(restaurant, serviceKey)
+      : buildWhatsAppMessage(restaurant);
+    const baseEmail = buildEmailMessage(restaurant);
+    const proposal = buildProposal(restaurant, [...proposalServices]);
+    return { whatsapp: wa, email: baseEmail, proposal };
+  }, [restaurant, serviceKey, proposalServices]);
 
   if (!restaurant) {
     return (
@@ -63,11 +65,12 @@ export function ActionPanel({
         </div>
         <div className="font-semibold text-foreground">اختر مطعماً</div>
         <div className="text-xs text-muted-foreground mt-2 leading-6">
-          عند اختيار أي مطعم من الجدول، تظهر هنا تفاصيله ورسائل تواصل مخصصة جاهزة للإرسال،
-          مع ملاحظات ومتابعة وسجل النشاط.
+          تظهر هنا تفاصيل المطعم، باقات الخدمات بأسعار مخصصة لشريحته، رسائل تواصل،
+          عرض سعر جاهز للنسخ، ووسوم وملاحظات داخلية.
         </div>
         <div className="mt-6 text-[10px] tracking-widest uppercase text-muted-foreground/60">
-          اضغط <kbd className="px-1.5 py-0.5 rounded bg-surface-2 border border-border mx-1">/</kbd> للبحث السريع
+          اضغط <kbd className="px-1.5 py-0.5 rounded bg-surface-2 border border-border mx-1">/</kbd> للبحث،
+          <kbd className="px-1.5 py-0.5 rounded bg-surface-2 border border-border mx-1">⌘K</kbd> للوحة الأوامر
         </div>
       </aside>
     );
@@ -75,14 +78,17 @@ export function ActionPanel({
 
   const seg = SEGMENT_META[restaurant.segment];
   const status = (state.status ?? "new") as Status;
-  const currentMsg = tab === "whatsapp" ? messages!.whatsapp : messages!.email.body;
+  const currentMsg =
+    tab === "whatsapp" ? messages!.whatsapp :
+    tab === "email" ? messages!.email.body :
+    messages!.proposal;
   const intlPhone = normalizeJordanianPhone(restaurant.phone);
 
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(currentMsg);
       setCopied(true);
-      toast.push("تم نسخ الرسالة", "success");
+      toast.push("تم نسخ المحتوى", "success");
       setTimeout(() => setCopied(false), 1500);
     } catch {}
   };
@@ -104,28 +110,34 @@ export function ActionPanel({
     toast.push("تم تجهيز الإيميل");
   };
 
+  const toggleProposalService = (k: ServiceKey) => {
+    const n = new Set(proposalServices);
+    if (n.has(k)) n.delete(k); else n.add(k);
+    if (n.size === 0) n.add(k); // keep at least one
+    setProposalServices(n);
+  };
+
+  const addTagSubmit = () => {
+    const t = tagInput.trim();
+    if (!t) return;
+    onAddTag(t);
+    setTagInput("");
+  };
+
   return (
-    <aside className="hidden xl:flex w-96 shrink-0 flex-col border-r border-border bg-surface/80">
+    <aside className="hidden xl:flex w-[26rem] shrink-0 flex-col border-r border-border bg-surface/80">
       <div className="px-5 py-4 border-b border-border flex items-start justify-between gap-3 bg-gradient-hero">
         <div className="min-w-0">
-          <div className="text-[10px] tracking-widest uppercase text-muted-foreground">
-            تفاصيل المطعم
-          </div>
-          <h2 className="text-lg font-bold text-foreground truncate mt-0.5">
-            {restaurant.title}
-          </h2>
+          <div className="text-[10px] tracking-widest uppercase text-muted-foreground">تفاصيل المطعم</div>
+          <h2 className="text-lg font-bold text-foreground truncate mt-0.5">{restaurant.title}</h2>
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            <span
-              className={`text-[11px] px-2 py-0.5 rounded-md border ${
-                restaurant.segment === "premium"
-                  ? "bg-gold-soft text-gold border-gold/30"
-                  : restaurant.segment === "medium"
-                  ? "bg-emerald-soft text-emerald border-emerald/30"
-                  : "bg-accent text-muted-foreground border-border"
-              }`}
-            >
-              {seg.label}
-            </span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-md border ${
+              restaurant.segment === "premium"
+                ? "bg-gold-soft text-gold border-gold/30"
+                : restaurant.segment === "medium"
+                ? "bg-emerald-soft text-emerald border-emerald/30"
+                : "bg-accent text-muted-foreground border-border"
+            }`}>{seg.label}</span>
             <span className="text-xs text-muted-foreground">{restaurant.category}</span>
           </div>
         </div>
@@ -139,10 +151,7 @@ export function ActionPanel({
           >
             <Star className={`w-4 h-4 ${state.favorite ? "fill-current" : ""}`} />
           </button>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-md hover:bg-accent flex items-center justify-center text-muted-foreground"
-          >
+          <button onClick={onClose} className="w-8 h-8 rounded-md hover:bg-accent flex items-center justify-center text-muted-foreground">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -153,10 +162,7 @@ export function ActionPanel({
         <div className="space-y-2.5 text-sm">
           {restaurant.phone && (
             <InfoRow icon={<Phone className="w-4 h-4" />} label="هاتف">
-              <a
-                href={`tel:${restaurant.phone.replace(/\s/g, "")}`}
-                className="text-foreground tabular-nums hover:text-gold"
-              >
+              <a href={`tel:${restaurant.phone.replace(/\s/g, "")}`} className="text-foreground tabular-nums hover:text-gold">
                 {restaurant.phone}
               </a>
             </InfoRow>
@@ -168,12 +174,8 @@ export function ActionPanel({
           )}
           {restaurant.website && (
             <InfoRow icon={<Globe className="w-4 h-4" />} label="الموقع">
-              <a
-                href={restaurant.website}
-                target="_blank"
-                rel="noreferrer"
-                className="text-emerald hover:underline truncate inline-block max-w-[200px]"
-              >
+              <a href={restaurant.website} target="_blank" rel="noreferrer"
+                className="text-emerald hover:underline truncate inline-block max-w-[200px]">
                 {restaurant.website.replace(/^https?:\/\//, "")}
               </a>
             </InfoRow>
@@ -184,9 +186,7 @@ export function ActionPanel({
                 href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
                   restaurant.address + " " + (restaurant.city ?? "إربد"),
                 )}`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-foreground hover:text-gold"
+                target="_blank" rel="noreferrer" className="text-foreground hover:text-gold"
               >
                 {restaurant.address}
               </a>
@@ -199,9 +199,7 @@ export function ActionPanel({
 
         {/* Status selector */}
         <div>
-          <div className="text-[11px] tracking-widest uppercase text-muted-foreground mb-2">
-            تحديث الحالة
-          </div>
+          <div className="text-[11px] tracking-widest uppercase text-muted-foreground mb-2">تحديث الحالة</div>
           <div className="grid grid-cols-2 gap-1.5">
             {(Object.keys(STATUS_META) as Status[]).map((s) => {
               const meta = STATUS_META[s];
@@ -211,8 +209,7 @@ export function ActionPanel({
                   key={s}
                   onClick={() => onStatusChange(s)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-md border text-xs transition-all ${
-                    active
-                      ? "border-gold/40 bg-gold-soft text-foreground"
+                    active ? "border-gold/40 bg-gold-soft text-foreground"
                       : "border-border text-muted-foreground hover:border-border-strong hover:text-foreground"
                   }`}
                 >
@@ -221,6 +218,76 @@ export function ActionPanel({
                 </button>
               );
             })}
+          </div>
+        </div>
+
+        {/* Service packages */}
+        <div>
+          <div className="text-[11px] tracking-widest uppercase text-muted-foreground mb-2 flex items-center gap-1.5">
+            <Sparkles className="w-3 h-3 text-gold" /> باقات الخدمات والأسعار
+          </div>
+          <div className="grid grid-cols-1 gap-1.5">
+            {SERVICES.map((s) => {
+              const active = serviceKey === s.key;
+              const price = priceFor(restaurant, s.key);
+              return (
+                <button
+                  key={s.key}
+                  onClick={() => setServiceKey(active ? null : s.key)}
+                  className={`flex items-center justify-between gap-2 px-3 py-2 rounded-md border text-xs transition-all text-right ${
+                    active
+                      ? "border-gold/50 bg-gold-soft"
+                      : "border-border bg-background hover:border-border-strong"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-base">{s.emoji}</span>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-foreground truncate">{s.label}</div>
+                      <div className="text-[10px] text-muted-foreground truncate">{s.short}</div>
+                    </div>
+                  </div>
+                  <div className="tabular-nums text-gold font-bold whitespace-nowrap">
+                    {price.toLocaleString("ar")} د.أ
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          {serviceKey && (
+            <div className="mt-2 text-[10px] text-muted-foreground leading-5">
+              📦 {SERVICE_BY_KEY[serviceKey].deliverables.join(" • ")}
+              <br />⏱️ {SERVICE_BY_KEY[serviceKey].duration}
+            </div>
+          )}
+        </div>
+
+        {/* Tags */}
+        <div>
+          <div className="text-[11px] tracking-widest uppercase text-muted-foreground mb-2 flex items-center gap-1.5">
+            <Tag className="w-3 h-3" /> الوسوم
+          </div>
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {(state.tags ?? []).map((t) => (
+              <span key={t} className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full bg-emerald-soft border border-emerald/30 text-emerald">
+                {t}
+                <button onClick={() => onRemoveTag(t)} className="hover:text-foreground">
+                  <X className="w-2.5 h-2.5" />
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-1.5">
+            <input
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTagSubmit())}
+              placeholder="وسم جديد..."
+              className="flex-1 px-3 py-1.5 rounded-md bg-background border border-border text-xs focus:border-gold/50 outline-none"
+            />
+            <button onClick={addTagSubmit} className="px-2 rounded-md border border-border hover:border-gold/50">
+              <Plus className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
 
@@ -237,10 +304,7 @@ export function ActionPanel({
               className="flex-1 px-3 py-2 rounded-md bg-background border border-border text-sm text-foreground focus:border-gold/50 outline-none"
             />
             {state.followUp && (
-              <button
-                onClick={() => onUpdate({ followUp: undefined })}
-                className="px-3 rounded-md border border-border text-xs text-muted-foreground hover:text-foreground"
-              >
+              <button onClick={() => onUpdate({ followUp: undefined })} className="px-3 rounded-md border border-border text-xs text-muted-foreground hover:text-foreground">
                 إزالة
               </button>
             )}
@@ -261,25 +325,12 @@ export function ActionPanel({
           />
         </div>
 
-        {/* Message generator */}
+        {/* Message generator with tabs */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <div className="text-[11px] tracking-widest uppercase text-muted-foreground">
-              رسالة تواصل مخصصة
-            </div>
-            <button
-              onClick={copy}
-              className="text-[11px] inline-flex items-center gap-1 text-muted-foreground hover:text-gold"
-            >
-              {copied ? (
-                <>
-                  <CheckCircle2 className="w-3 h-3 text-emerald" /> نُسخت
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3 h-3" /> نسخ
-                </>
-              )}
+            <div className="text-[11px] tracking-widest uppercase text-muted-foreground">المحتوى الجاهز</div>
+            <button onClick={copy} className="text-[11px] inline-flex items-center gap-1 text-muted-foreground hover:text-gold">
+              {copied ? <><CheckCircle2 className="w-3 h-3 text-emerald" /> نُسخت</> : <><Copy className="w-3 h-3" /> نسخ</>}
             </button>
           </div>
 
@@ -290,15 +341,38 @@ export function ActionPanel({
             <TabBtn active={tab === "email"} onClick={() => setTab("email")}>
               <Mail className="w-3.5 h-3.5" /> إيميل
             </TabBtn>
+            <TabBtn active={tab === "proposal"} onClick={() => setTab("proposal")}>
+              <FileText className="w-3.5 h-3.5" /> عرض سعر
+            </TabBtn>
           </div>
 
           {tab === "email" && (
             <div className="mb-2 px-3 py-2 rounded-md bg-surface-2 border border-border">
-              <div className="text-[10px] uppercase text-muted-foreground tracking-widest">
-                العنوان
+              <div className="text-[10px] uppercase text-muted-foreground tracking-widest">العنوان</div>
+              <div className="text-xs text-foreground mt-0.5">{messages!.email.subject}</div>
+            </div>
+          )}
+
+          {tab === "proposal" && (
+            <div className="mb-2 p-2 rounded-md bg-surface-2 border border-border">
+              <div className="text-[10px] uppercase text-muted-foreground tracking-widest mb-1.5">
+                اختر الباقات للعرض
               </div>
-              <div className="text-xs text-foreground mt-0.5">
-                {messages!.email.subject}
+              <div className="flex flex-wrap gap-1">
+                {SERVICES.map((s) => {
+                  const active = proposalServices.has(s.key);
+                  return (
+                    <button
+                      key={s.key}
+                      onClick={() => toggleProposalService(s.key)}
+                      className={`text-[10px] px-2 py-1 rounded-full border ${
+                        active ? "bg-gold text-primary-foreground border-gold font-semibold" : "border-border text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {s.emoji} {s.short}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -315,26 +389,17 @@ export function ActionPanel({
               <History className="w-3 h-3" /> سجل النشاط
             </div>
             <div className="space-y-1.5">
-              {[...state.history]
-                .slice(-5)
-                .reverse()
-                .map((h, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between text-[11px] px-3 py-1.5 rounded bg-surface-2/50 border border-border"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <span className={`w-1.5 h-1.5 rounded-full ${STATUS_META[h.status].dot}`} />
-                      {STATUS_META[h.status].label}
-                    </span>
-                    <span className="text-muted-foreground tabular-nums">
-                      {new Date(h.at).toLocaleString("ar-JO", {
-                        dateStyle: "short",
-                        timeStyle: "short",
-                      })}
-                    </span>
-                  </div>
-                ))}
+              {[...state.history].slice(-5).reverse().map((h, i) => (
+                <div key={i} className="flex items-center justify-between text-[11px] px-3 py-1.5 rounded bg-surface-2/50 border border-border">
+                  <span className="flex items-center gap-1.5">
+                    <span className={`w-1.5 h-1.5 rounded-full ${STATUS_META[h.status].dot}`} />
+                    {STATUS_META[h.status].label}
+                  </span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {new Date(h.at).toLocaleString("ar-JO", { dateStyle: "short", timeStyle: "short" })}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -350,17 +415,11 @@ export function ActionPanel({
           فتح واتساب مع الرسالة الجاهزة
         </button>
         <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={sendEmail}
-            className="inline-flex items-center justify-center gap-1.5 py-2 rounded-md bg-accent text-foreground text-xs hover:bg-accent/70"
-          >
+          <button onClick={sendEmail} className="inline-flex items-center justify-center gap-1.5 py-2 rounded-md bg-accent text-foreground text-xs hover:bg-accent/70">
             <Mail className="w-3.5 h-3.5" /> إرسال إيميل
           </button>
           <button
-            onClick={() => {
-              onStatusChange("meeting");
-              toast.push("🎉 تم تسجيل اجتماع");
-            }}
+            onClick={() => { onStatusChange("meeting"); toast.push("🎉 تم تسجيل اجتماع"); }}
             className="inline-flex items-center justify-center gap-1.5 py-2 rounded-md bg-gold text-primary-foreground text-xs font-semibold hover:opacity-90"
           >
             <Calendar className="w-3.5 h-3.5" /> حجز اجتماع
@@ -371,42 +430,23 @@ export function ActionPanel({
   );
 }
 
-function InfoRow({
-  icon,
-  label,
-  children,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  children: React.ReactNode;
-}) {
+function InfoRow({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-3 px-3 py-2 rounded-md bg-surface-2/50 border border-border">
       <div className="flex items-center gap-2 text-muted-foreground text-xs">
-        {icon}
-        <span>{label}</span>
+        {icon}<span>{label}</span>
       </div>
       <div className="text-sm text-left">{children}</div>
     </div>
   );
 }
 
-function TabBtn({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
+function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
       onClick={onClick}
       className={`flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 rounded text-xs transition-all ${
-        active
-          ? "bg-card text-foreground shadow-sm"
-          : "text-muted-foreground hover:text-foreground"
+        active ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
       }`}
     >
       {children}
