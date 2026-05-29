@@ -23,7 +23,7 @@ function InsightsPage() {
     const c = { premium: 0, medium: 0, testing: 0 } as Record<Segment, number>;
     for (const r of RESTAURANTS) c[r.segment]++;
     return c;
-  }, []);
+  }, [RESTAURANTS]);
 
   const statusCounts = useMemo(() => {
     const c = { new: 0, email: 0, whatsapp: 0, meeting: 0 } as Record<Status, number>;
