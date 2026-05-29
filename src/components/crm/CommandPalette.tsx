@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, ArrowLeft, Sparkles } from "lucide-react";
-import { RESTAURANTS, SEGMENT_META, type Restaurant } from "@/lib/restaurants";
+import { SEGMENT_META, type Restaurant } from "@/lib/restaurants";
+import { useRestaurants } from "@/hooks/useRestaurants";
 
 interface Props {
   open: boolean;
@@ -12,6 +13,7 @@ export function CommandPalette({ open, onClose, onPick }: Props) {
   const [q, setQ] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const restaurants = useRestaurants();
 
   useEffect(() => {
     if (open) {
@@ -23,11 +25,11 @@ export function CommandPalette({ open, onClose, onPick }: Props) {
 
   const results = useMemo(() => {
     const s = q.trim().toLowerCase();
-    if (!s) return RESTAURANTS.slice(0, 8);
-    return RESTAURANTS.filter((r) =>
+    if (!s) return restaurants.slice(0, 8);
+    return restaurants.filter((r) =>
       `${r.title} ${r.category} ${r.phone ?? ""}`.toLowerCase().includes(s),
     ).slice(0, 12);
-  }, [q]);
+  }, [q, restaurants]);
 
   useEffect(() => {
     if (!open) return;

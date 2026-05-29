@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  RESTAURANTS,
   downloadCSV,
   exportRestaurantsCSV,
   leadScore,
@@ -9,6 +8,7 @@ import {
   type Segment,
   type Status,
 } from "@/lib/restaurants";
+import { useRestaurants } from "@/hooks/useRestaurants";
 import { useCrmStore } from "@/hooks/useCrmStore";
 import { useSettings } from "@/hooks/useSettings";
 import { useToast } from "@/hooks/useToast";
@@ -42,6 +42,7 @@ const PAGE_SIZE = 25;
 const DAILY_GOAL = 20;
 
 function Dashboard() {
+  const RESTAURANTS = useRestaurants();
   const {
     getStatus, setStatus, setStatusBulk, getState, update, toggleFavorite, store, todayCount,
     addTag, removeTag, allTags, importStore, exportStore, clearAll,
@@ -72,13 +73,13 @@ function Dashboard() {
     const c = { premium: 0, medium: 0, testing: 0 } as Record<Segment, number>;
     for (const r of RESTAURANTS) c[r.segment]++;
     return c;
-  }, []);
+  }, [RESTAURANTS]);
 
   const statusCounts = useMemo(() => {
     const c = { new: 0, email: 0, whatsapp: 0, meeting: 0 } as Record<Status, number>;
     for (const r of RESTAURANTS) c[(store[r.id]?.status ?? "new") as Status]++;
     return c;
-  }, [store]);
+  }, [store, RESTAURANTS]);
 
   const favCount = useMemo(
     () => Object.values(store).filter((s) => s.favorite).length,
@@ -102,7 +103,7 @@ function Dashboard() {
     return [...m.entries()]
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count);
-  }, []);
+  }, [RESTAURANTS]);
 
   const today = new Date().toISOString().slice(0, 10);
   const followUps = useMemo(() => {
@@ -144,7 +145,7 @@ function Dashboard() {
       default: sorted.sort((a, b) => a.rank - b.rank);
     }
     return sorted;
-  }, [segments, categories, statuses, tags, extra, sort, search, getStatus, store]);
+  }, [segments, categories, statuses, tags, extra, sort, search, getStatus, store, RESTAURANTS]);
 
   useEffect(() => { setPage(1); }, [segments, categories, statuses, tags, extra, sort, search]);
 
@@ -177,7 +178,7 @@ function Dashboard() {
 
   const selected: Restaurant | null = useMemo(
     () => (selectedId ? RESTAURANTS.find((r) => r.id === selectedId) ?? null : null),
-    [selectedId],
+    [selectedId, RESTAURANTS],
   );
 
   const contactedCount = statusCounts.email + statusCounts.whatsapp + statusCounts.meeting;

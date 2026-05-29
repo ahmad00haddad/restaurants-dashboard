@@ -32,12 +32,12 @@ const CATEGORY_RULES: Array<{ kw: RegExp; label: string }> = [
   { kw: /(steak|ستيك|seafood|سمك|بحري)/i, label: "ستيك ومأكولات بحرية" },
 ];
 
-function detectCategory(title: string): string {
+export function detectCategory(title: string): string {
   for (const r of CATEGORY_RULES) if (r.kw.test(title)) return r.label;
   return "مطعم عام";
 }
 
-function detectSegment(r: RawRestaurant): Segment {
+export function detectSegment(r: RawRestaurant): Segment {
   const hasSite = !!r.website && !/facebook\.com|instagram\.com/i.test(r.website);
   const hasSocial = !!r.website;
   if (hasSite && r.rank <= 150) return "premium";
@@ -45,19 +45,76 @@ function detectSegment(r: RawRestaurant): Segment {
   return "testing";
 }
 
-function rating(rank: number): number {
-  // Higher rank (smaller number) → higher rating. Deterministic.
-  const base = 4.9 - (rank / 1000) * 1.1;
+export function ratingFromRank(rank: number): number {
+  const base = 4.9 - (Math.min(1000, Math.max(1, rank)) / 1000) * 1.1;
   return Math.round(base * 10) / 10;
 }
 
+/** Seed list computed once from JSON. Live editable list lives in useRestaurants. */
 export const RESTAURANTS: Restaurant[] = (raw as RawRestaurant[]).map((r, i) => ({
   ...r,
   id: `r-${r.rank}-${i}`,
   segment: detectSegment(r),
   category: detectCategory(r.title),
-  rating: rating(r.rank),
+  rating: ratingFromRank(r.rank),
 }));
+
+/** Normalize an Arabic/English title for duplicate matching. */
+export function normalizeTitle(t: string): string {
+  return (t || "")
+    .toLowerCase()
+    .replace(/[\u064B-\u065F\u0670]/g, "")       // diacritics
+    .replace(/[إأآٱا]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/ؤ/g, "و")
+    .replace(/ئ/g, "ي")
+    .replace(/\s+/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+/** Find clusters of duplicate restaurants by normalized title OR same normalized phone. */
+export function findDuplicateGroups(list: Restaurant[]): Restaurant[][] {
+  const parent = new Map<number, number>();
+  const find = (x: number): number => {
+    let p = parent.get(x)!;
+    while (p !== parent.get(p)) p = parent.get(p)!;
+    parent.set(x, p);
+    return p;
+  };
+  const union = (a: number, b: number) => {
+    const ra = find(a), rb = find(b);
+    if (ra !== rb) parent.set(ra, rb);
+  };
+  list.forEach((_, i) => parent.set(i, i));
+
+  const byTitle = new Map<string, number[]>();
+  const byPhone = new Map<string, number[]>();
+  list.forEach((r, i) => {
+    const t = normalizeTitle(r.title);
+    if (t.length >= 3) {
+      const arr = byTitle.get(t) ?? [];
+      arr.push(i); byTitle.set(t, arr);
+    }
+    const p = normalizeJordanianPhone(r.phone);
+    if (p && p.length >= 8) {
+      const arr = byPhone.get(p) ?? [];
+      arr.push(i); byPhone.set(p, arr);
+    }
+  });
+  for (const arr of byTitle.values()) for (let i = 1; i < arr.length; i++) union(arr[0], arr[i]);
+  for (const arr of byPhone.values()) for (let i = 1; i < arr.length; i++) union(arr[0], arr[i]);
+
+  const groups = new Map<number, number[]>();
+  list.forEach((_, i) => {
+    const r = find(i);
+    const g = groups.get(r) ?? [];
+    g.push(i); groups.set(r, g);
+  });
+  return [...groups.values()]
+    .filter((g) => g.length > 1)
+    .map((g) => g.map((i) => list[i]).sort((a, b) => a.rank - b.rank));
+}
 
 /** Lead Score 0-100: priority signal combining segment, rating, contact channels, rank. */
 export function leadScore(r: Restaurant): number {

@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useCrmStore } from "@/hooks/useCrmStore";
-import { RESTAURANTS, SEGMENT_META, STATUS_META, type Status, type Segment } from "@/lib/restaurants";
+import { useRestaurants } from "@/hooks/useRestaurants";
+import { SEGMENT_META, STATUS_META, type Status, type Segment } from "@/lib/restaurants";
 import { ArrowRight, BarChart3, Calendar, Crown, Send, Target, TrendingUp, Tag } from "lucide-react";
 
 export const Route = createFileRoute("/insights")({
@@ -16,18 +17,19 @@ export const Route = createFileRoute("/insights")({
 
 function InsightsPage() {
   const { store } = useCrmStore();
+  const RESTAURANTS = useRestaurants();
 
   const segmentCounts = useMemo(() => {
     const c = { premium: 0, medium: 0, testing: 0 } as Record<Segment, number>;
     for (const r of RESTAURANTS) c[r.segment]++;
     return c;
-  }, []);
+  }, [RESTAURANTS]);
 
   const statusCounts = useMemo(() => {
     const c = { new: 0, email: 0, whatsapp: 0, meeting: 0 } as Record<Status, number>;
     for (const r of RESTAURANTS) c[(store[r.id]?.status ?? "new") as Status]++;
     return c;
-  }, [store]);
+  }, [store, RESTAURANTS]);
 
   const categories = useMemo(() => {
     const m = new Map<string, { total: number; contacted: number }>();
@@ -41,7 +43,7 @@ function InsightsPage() {
     return [...m.entries()]
       .map(([name, v]) => ({ name, ...v }))
       .sort((a, b) => b.total - a.total);
-  }, [store]);
+  }, [store, RESTAURANTS]);
 
   const weekly = useMemo(() => {
     // last 7 days activity
@@ -94,12 +96,13 @@ function InsightsPage() {
 
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = useMemo(() => {
+    type Row = { r: (typeof RESTAURANTS)[number]; fu: string };
     return RESTAURANTS
-      .map((r) => ({ r, fu: store[r.id]?.followUp }))
-      .filter((x): x is { r: typeof x.r; fu: string } => !!x.fu)
+      .map((r): { r: (typeof RESTAURANTS)[number]; fu: string | undefined } => ({ r, fu: store[r.id]?.followUp }))
+      .filter((x): x is Row => !!x.fu)
       .sort((a, b) => a.fu.localeCompare(b.fu))
       .slice(0, 8);
-  }, [store]);
+  }, [store, RESTAURANTS]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
