@@ -144,6 +144,20 @@ export function ActionPanel({
                 : "bg-accent text-muted-foreground border-border"
             }`}>{seg.label}</span>
             <span className="text-xs text-muted-foreground">{restaurant.category}</span>
+            {(() => {
+              const sc = leadScore(restaurant);
+              const tier = scoreTier(sc);
+              const cls = tier.color === "gold"
+                ? "bg-gold-soft text-gold border-gold/30"
+                : tier.color === "emerald"
+                ? "bg-emerald-soft text-emerald border-emerald/30"
+                : "bg-accent text-muted-foreground border-border";
+              return (
+                <span title={`Lead Score ${sc}/100`} className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border ${cls}`}>
+                  <Flame className="w-3 h-3" /> {tier.label} · {sc}
+                </span>
+              );
+            })()}
           </div>
         </div>
         <div className="flex items-center gap-1">
