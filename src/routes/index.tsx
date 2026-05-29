@@ -46,6 +46,7 @@ function Dashboard() {
     getStatus, setStatus, setStatusBulk, getState, update, toggleFavorite, store, todayCount,
     addTag, removeTag, allTags, importStore, exportStore, clearAll,
   } = useCrmStore();
+  const { settings, update: updateSettings, reset: resetSettings } = useSettings();
   const toast = useToast();
 
   const [segments, setSegments] = useState<Set<Segment>>(new Set());
@@ -63,6 +64,7 @@ function Dashboard() {
   const [view, setView] = useState<"table" | "kanban">("table");
   const [cmdOpen, setCmdOpen] = useState(false);
   const [followUpsOpen, setFollowUpsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
