@@ -42,6 +42,7 @@ const PAGE_SIZE = 25;
 const DAILY_GOAL = 20;
 
 function Dashboard() {
+  const RESTAURANTS = useRestaurants();
   const {
     getStatus, setStatus, setStatusBulk, getState, update, toggleFavorite, store, todayCount,
     addTag, removeTag, allTags, importStore, exportStore, clearAll,
