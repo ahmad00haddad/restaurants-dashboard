@@ -6,6 +6,8 @@ import {
   buildWhatsAppMessage,
   normalizeJordanianPhone,
   waLink,
+  leadScore,
+  scoreTier,
   type Restaurant,
   type Status,
 } from "@/lib/restaurants";
@@ -15,18 +17,21 @@ import {
   buildProposal,
   buildServiceMessage,
   priceFor,
+  openPrintableProposal,
   type ServiceKey,
 } from "@/lib/services";
 import type { RestaurantState } from "@/hooks/useCrmStore";
+import type { Settings } from "@/hooks/useSettings";
 import {
   X, Phone, Globe, MapPin, Star, MessageCircle, Mail, Copy, CheckCircle2,
-  Calendar, StickyNote, History, Sparkles, Tag, FileText, Plus,
+  Calendar, StickyNote, History, Sparkles, Tag, FileText, Plus, Printer, DollarSign, Flame,
 } from "lucide-react";
 import { useToast } from "@/hooks/useToast";
 
 interface Props {
   restaurant: Restaurant | null;
   state: RestaurantState;
+  settings: Settings;
   onStatusChange: (s: Status) => void;
   onToggleFavorite: () => void;
   onUpdate: (patch: Partial<RestaurantState>) => void;
@@ -38,7 +43,7 @@ interface Props {
 type Tab = "whatsapp" | "email" | "proposal";
 
 export function ActionPanel({
-  restaurant, state, onStatusChange, onToggleFavorite, onUpdate, onAddTag, onRemoveTag, onClose,
+  restaurant, state, settings, onStatusChange, onToggleFavorite, onUpdate, onAddTag, onRemoveTag, onClose,
 }: Props) {
   const [tab, setTab] = useState<Tab>("whatsapp");
   const [copied, setCopied] = useState(false);
@@ -50,12 +55,12 @@ export function ActionPanel({
   const messages = useMemo(() => {
     if (!restaurant) return null;
     const wa = serviceKey
-      ? buildServiceMessage(restaurant, serviceKey)
-      : buildWhatsAppMessage(restaurant);
-    const baseEmail = buildEmailMessage(restaurant);
-    const proposal = buildProposal(restaurant, [...proposalServices]);
+      ? buildServiceMessage(restaurant, serviceKey, settings)
+      : buildWhatsAppMessage(restaurant, settings);
+    const baseEmail = buildEmailMessage(restaurant, settings);
+    const proposal = buildProposal(restaurant, [...proposalServices], settings);
     return { whatsapp: wa, email: baseEmail, proposal };
-  }, [restaurant, serviceKey, proposalServices]);
+  }, [restaurant, serviceKey, proposalServices, settings]);
 
   if (!restaurant) {
     return (
