@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useCrmStore } from "@/hooks/useCrmStore";
-import { RESTAURANTS, SEGMENT_META, STATUS_META, type Status, type Segment } from "@/lib/restaurants";
+import { useRestaurants } from "@/hooks/useRestaurants";
+import { SEGMENT_META, STATUS_META, type Status, type Segment } from "@/lib/restaurants";
 import { ArrowRight, BarChart3, Calendar, Crown, Send, Target, TrendingUp, Tag } from "lucide-react";
 
 export const Route = createFileRoute("/insights")({
