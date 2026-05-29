@@ -79,7 +79,7 @@ function Dashboard() {
     const c = { new: 0, email: 0, whatsapp: 0, meeting: 0 } as Record<Status, number>;
     for (const r of RESTAURANTS) c[(store[r.id]?.status ?? "new") as Status]++;
     return c;
-  }, [store]);
+  }, [store, RESTAURANTS]);
 
   const favCount = useMemo(
     () => Object.values(store).filter((s) => s.favorite).length,
