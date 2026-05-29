@@ -17,6 +17,7 @@ export const Route = createFileRoute("/insights")({
 
 function InsightsPage() {
   const { store } = useCrmStore();
+  const RESTAURANTS = useRestaurants();
 
   const segmentCounts = useMemo(() => {
     const c = { premium: 0, medium: 0, testing: 0 } as Record<Segment, number>;
