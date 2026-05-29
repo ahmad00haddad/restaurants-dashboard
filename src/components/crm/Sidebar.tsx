@@ -4,7 +4,7 @@ import {
   Download, Upload, Trash2,
 } from "lucide-react";
 
-export type SortKey = "rank" | "rating" | "name" | "updated";
+export type SortKey = "score" | "rank" | "rating" | "name" | "updated";
 export interface ExtraFilters {
   favorites: boolean;
   hasPhone: boolean;
@@ -107,6 +107,7 @@ export function CrmSidebar(props: Props) {
         <Section icon={<ArrowUpDown className="w-3.5 h-3.5" />} title="ترتيب حسب">
           {(
             [
+              { k: "score", l: "Lead Score (الأقوى)" },
               { k: "rank", l: "الأعلى ترتيباً" },
               { k: "rating", l: "التقييم" },
               { k: "name", l: "الاسم" },
