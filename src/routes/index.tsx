@@ -103,7 +103,7 @@ function Dashboard() {
     return [...m.entries()]
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count);
-  }, []);
+  }, [RESTAURANTS]);
 
   const today = new Date().toISOString().slice(0, 10);
   const followUps = useMemo(() => {
