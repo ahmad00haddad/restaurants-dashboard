@@ -178,7 +178,7 @@ function Dashboard() {
 
   const selected: Restaurant | null = useMemo(
     () => (selectedId ? RESTAURANTS.find((r) => r.id === selectedId) ?? null : null),
-    [selectedId],
+    [selectedId, RESTAURANTS],
   );
 
   const contactedCount = statusCounts.email + statusCounts.whatsapp + statusCounts.meeting;
