@@ -136,6 +136,7 @@ function Dashboard() {
     });
     const sorted = [...arr];
     switch (sort) {
+      case "score": sorted.sort((a, b) => leadScore(b) - leadScore(a)); break;
       case "rating": sorted.sort((a, b) => b.rating - a.rating); break;
       case "name": sorted.sort((a, b) => a.title.localeCompare(b.title, "ar")); break;
       case "updated":
