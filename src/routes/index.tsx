@@ -85,6 +85,17 @@ function Dashboard() {
     [store],
   );
 
+  const revenueStats = useMemo(() => {
+    let revenue = 0, pipeline = 0;
+    for (const s of Object.values(store)) {
+      const v = s.dealValue ?? 0;
+      if (!v) continue;
+      if (s.status === "meeting") revenue += v;
+      else if (s.status === "whatsapp" || s.status === "email") pipeline += v;
+    }
+    return { revenue, pipeline };
+  }, [store]);
+
   const allCategories = useMemo(() => {
     const m = new Map<string, number>();
     for (const r of RESTAURANTS) m.set(r.category, (m.get(r.category) ?? 0) + 1);
