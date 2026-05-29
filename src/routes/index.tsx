@@ -20,6 +20,7 @@ import { BulkActionBar } from "@/components/crm/BulkActionBar";
 import { ActionPanel } from "@/components/crm/ActionPanel";
 import { CommandPalette } from "@/components/crm/CommandPalette";
 import { FollowUpsDrawer } from "@/components/crm/FollowUpsDrawer";
+import { SettingsDialog } from "@/components/crm/SettingsDialog";
 import { TopNav } from "@/components/crm/TopNav";
 import { Search, LayoutGrid, List, Sparkles, Download } from "lucide-react";
 
