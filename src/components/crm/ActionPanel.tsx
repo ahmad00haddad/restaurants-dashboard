@@ -330,6 +330,27 @@ export function ActionPanel({
           </div>
         </div>
 
+        {/* Deal value */}
+        <div>
+          <div className="text-[11px] tracking-widest uppercase text-muted-foreground mb-2 flex items-center gap-1.5">
+            <DollarSign className="w-3 h-3 text-gold" /> قيمة الصفقة المتوقعة ({settings.currency})
+          </div>
+          <input
+            type="number"
+            min={0}
+            value={state.dealValue ?? ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              onUpdate({ dealValue: v === "" ? undefined : Math.max(0, Number(v)) });
+            }}
+            placeholder="مثال: 1200"
+            className="w-full px-3 py-2 rounded-md bg-background border border-border text-sm text-foreground focus:border-gold/50 outline-none tabular-nums"
+          />
+          <div className="text-[10px] text-muted-foreground mt-1">
+            تُحتسب ضمن الإيرادات عند تحويل الحالة إلى "اجتماع".
+          </div>
+        </div>
+
         {/* Notes */}
         <div>
           <div className="text-[11px] tracking-widest uppercase text-muted-foreground mb-2 flex items-center gap-1.5">
