@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { LayoutDashboard, BarChart3, Bell, CalendarClock, Settings as SettingsIcon } from "lucide-react";
+import { LayoutDashboard, BarChart3, Bell, CalendarClock, Settings as SettingsIcon, Database } from "lucide-react";
 
 interface Props {
   followUpsCount: number;
@@ -20,6 +20,9 @@ export function TopNav({ followUpsCount, overdueCount, onOpenFollowUps, onOpenCo
       </NavLink>
       <NavLink to="/insights" active={path.startsWith("/insights")} icon={<BarChart3 className="w-3.5 h-3.5" />}>
         التحليلات
+      </NavLink>
+      <NavLink to="/manage" active={path.startsWith("/manage")} icon={<Database className="w-3.5 h-3.5" />}>
+        إدارة البيانات
       </NavLink>
       <div className="w-px h-5 bg-border mx-1" />
       <button
