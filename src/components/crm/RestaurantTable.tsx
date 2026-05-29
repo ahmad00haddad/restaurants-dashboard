@@ -63,7 +63,7 @@ export function RestaurantTable(p: Props) {
           <tbody>
             {p.rows.length === 0 && (
               <tr>
-                <td colSpan={9} className="text-center py-16 text-muted-foreground">
+                <td colSpan={10} className="text-center py-16 text-muted-foreground">
                   لا توجد نتائج تطابق الفلاتر الحالية
                 </td>
               </tr>
