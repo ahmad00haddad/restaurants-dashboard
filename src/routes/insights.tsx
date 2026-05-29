@@ -72,6 +72,17 @@ function InsightsPage() {
   const convRate = totalContacted > 0 ? ((statusCounts.meeting / totalContacted) * 100).toFixed(1) : "0";
   const reachPct = ((totalContacted / RESTAURANTS.length) * 100).toFixed(1);
 
+  const { revenueTotal, pipelineTotal } = useMemo(() => {
+    let r = 0, p = 0;
+    for (const s of Object.values(store)) {
+      const v = s.dealValue ?? 0;
+      if (!v) continue;
+      if (s.status === "meeting") r += v;
+      else if (s.status === "whatsapp" || s.status === "email") p += v;
+    }
+    return { revenueTotal: r, pipelineTotal: p };
+  }, [store]);
+
   // Top tags
   const tagCounts = useMemo(() => {
     const m = new Map<string, number>();
@@ -108,11 +119,13 @@ function InsightsPage() {
 
       <main className="px-6 lg:px-12 py-8 space-y-8 max-w-7xl mx-auto">
         {/* Headline KPIs */}
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <Kpi icon={<Send className="w-4 h-4" />} label="إجمالي التواصل" value={totalContacted} sub={`${reachPct}٪ من القاعدة`} tone="emerald" />
           <Kpi icon={<Crown className="w-4 h-4" />} label="Premium" value={segmentCounts.premium} sub="عميل عالي القيمة" tone="gold" />
           <Kpi icon={<Target className="w-4 h-4" />} label="نسبة التحويل" value={`${convRate}%`} sub="اجتماع / تواصل" tone="gold" />
-          <Kpi icon={<Calendar className="w-4 h-4" />} label="اجتماعات محجوزة" value={statusCounts.meeting} sub="فرصة بيع نشطة" tone="emerald" />
+          <Kpi icon={<Calendar className="w-4 h-4" />} label="اجتماعات" value={statusCounts.meeting} sub="فرصة بيع نشطة" tone="emerald" />
+          <Kpi icon={<TrendingUp className="w-4 h-4" />} label="إيرادات محققة" value={`${revenueTotal.toLocaleString("ar")} د.أ`} sub="من صفقات الاجتماعات" tone="gold" />
+          <Kpi icon={<TrendingUp className="w-4 h-4" />} label="حجم الـ Pipeline" value={`${pipelineTotal.toLocaleString("ar")} د.أ`} sub="فرص قيد التواصل" tone="emerald" />
         </section>
 
         {/* Pipeline funnel */}
