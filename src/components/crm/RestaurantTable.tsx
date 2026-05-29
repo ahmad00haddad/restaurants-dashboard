@@ -225,3 +225,21 @@ function PagerBtn({
     </button>
   );
 }
+
+function ScoreCell({ score }: { score: number }) {
+  const tier = scoreTier(score);
+  const barCls =
+    tier.color === "gold" ? "bg-gold" : tier.color === "emerald" ? "bg-emerald" : "bg-muted-foreground/50";
+  const txtCls =
+    tier.color === "gold" ? "text-gold" : tier.color === "emerald" ? "text-emerald" : "text-muted-foreground";
+  return (
+    <div className="flex items-center gap-2 min-w-[88px]" title={`Lead Score ${score}/100 — ${tier.label}`}>
+      <div className="flex-1 h-1.5 rounded-full bg-surface-2 overflow-hidden">
+        <div className={`h-full rounded-full ${barCls}`} style={{ width: `${score}%` }} />
+      </div>
+      <span className={`text-xs tabular-nums font-semibold ${txtCls} inline-flex items-center gap-0.5`}>
+        <Flame className="w-3 h-3" /> {score}
+      </span>
+    </div>
+  );
+}
