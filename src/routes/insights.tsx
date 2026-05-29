@@ -96,12 +96,13 @@ function InsightsPage() {
 
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = useMemo(() => {
+    type Row = { r: (typeof RESTAURANTS)[number]; fu: string };
     return RESTAURANTS
-      .map((r) => ({ r, fu: store[r.id]?.followUp }))
-      .filter((x): x is { r: typeof x.r; fu: string } => !!x.fu)
+      .map((r): { r: (typeof RESTAURANTS)[number]; fu: string | undefined } => ({ r, fu: store[r.id]?.followUp }))
+      .filter((x): x is Row => !!x.fu)
       .sort((a, b) => a.fu.localeCompare(b.fu))
       .slice(0, 8);
-  }, [store, RESTAURANTS, today]);
+  }, [store, RESTAURANTS]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
