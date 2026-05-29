@@ -422,6 +422,7 @@ function Dashboard() {
       <ActionPanel
         restaurant={selected}
         state={selected ? getState(selected.id) : {}}
+        settings={settings}
         onStatusChange={(s) => selected && setStatus(selected.id, s)}
         onToggleFavorite={() => selected && toggleFavorite(selected.id)}
         onUpdate={(patch) => selected && update(selected.id, patch)}
@@ -440,6 +441,13 @@ function Dashboard() {
         onClose={() => setFollowUpsOpen(false)}
         store={store}
         onPick={(r) => setSelectedId(r.id)}
+      />
+      <SettingsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        settings={settings}
+        onSave={updateSettings}
+        onReset={resetSettings}
       />
     </div>
   );
