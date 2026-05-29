@@ -454,15 +454,22 @@ export function ActionPanel({
           <MessageCircle className="w-4 h-4" />
           فتح واتساب مع الرسالة الجاهزة
         </button>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <button onClick={sendEmail} className="inline-flex items-center justify-center gap-1.5 py-2 rounded-md bg-accent text-foreground text-xs hover:bg-accent/70">
-            <Mail className="w-3.5 h-3.5" /> إرسال إيميل
+            <Mail className="w-3.5 h-3.5" /> إيميل
+          </button>
+          <button
+            onClick={() => openPrintableProposal(restaurant, [...proposalServices], settings)}
+            className="inline-flex items-center justify-center gap-1.5 py-2 rounded-md bg-accent text-foreground text-xs hover:bg-accent/70"
+            title="عرض سعر للطباعة/PDF"
+          >
+            <Printer className="w-3.5 h-3.5" /> طباعة
           </button>
           <button
             onClick={() => { onStatusChange("meeting"); toast.push("🎉 تم تسجيل اجتماع"); }}
             className="inline-flex items-center justify-center gap-1.5 py-2 rounded-md bg-gold text-primary-foreground text-xs font-semibold hover:opacity-90"
           >
-            <Calendar className="w-3.5 h-3.5" /> حجز اجتماع
+            <Calendar className="w-3.5 h-3.5" /> اجتماع
           </button>
         </div>
       </div>
