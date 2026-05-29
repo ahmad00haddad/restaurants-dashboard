@@ -138,6 +138,9 @@ export function RestaurantTable(p: Props) {
                     <SegmentBadge segment={r.segment} label={seg.label} />
                   </td>
                   <td className="px-4 py-3">
+                    <ScoreCell score={leadScore(r)} />
+                  </td>
+                  <td className="px-4 py-3">
                     <div className="flex items-center gap-1 text-gold">
                       <Star className="w-3.5 h-3.5 fill-current" />
                       <span className="tabular-nums text-foreground">{r.rating}</span>
