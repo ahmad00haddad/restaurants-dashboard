@@ -316,6 +316,7 @@ function Dashboard() {
               overdueCount={followUps.overdue}
               onOpenFollowUps={() => setFollowUpsOpen(true)}
               onOpenCommand={() => setCmdOpen(true)}
+              onOpenSettings={() => setSettingsOpen(true)}
             />
           </div>
           <AnalyticsBar
@@ -325,6 +326,9 @@ function Dashboard() {
             meetings={statusCounts.meeting}
             today={todayCount}
             goal={DAILY_GOAL}
+            revenue={revenueStats.revenue}
+            pipeline={revenueStats.pipeline}
+            currency={settings.currency}
           />
         </header>
 
