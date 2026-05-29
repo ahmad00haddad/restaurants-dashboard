@@ -101,7 +101,7 @@ function InsightsPage() {
       .filter((x): x is { r: typeof x.r; fu: string } => !!x.fu)
       .sort((a, b) => a.fu.localeCompare(b.fu))
       .slice(0, 8);
-  }, [store]);
+  }, [store, RESTAURANTS, today]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
