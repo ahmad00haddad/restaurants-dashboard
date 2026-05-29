@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  RESTAURANTS,
   downloadCSV,
   exportRestaurantsCSV,
   leadScore,
@@ -9,6 +8,7 @@ import {
   type Segment,
   type Status,
 } from "@/lib/restaurants";
+import { useRestaurants } from "@/hooks/useRestaurants";
 import { useCrmStore } from "@/hooks/useCrmStore";
 import { useSettings } from "@/hooks/useSettings";
 import { useToast } from "@/hooks/useToast";
