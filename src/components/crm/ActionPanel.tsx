@@ -6,6 +6,8 @@ import {
   buildWhatsAppMessage,
   normalizeJordanianPhone,
   waLink,
+  leadScore,
+  scoreTier,
   type Restaurant,
   type Status,
 } from "@/lib/restaurants";
@@ -15,18 +17,21 @@ import {
   buildProposal,
   buildServiceMessage,
   priceFor,
+  openPrintableProposal,
   type ServiceKey,
 } from "@/lib/services";
 import type { RestaurantState } from "@/hooks/useCrmStore";
+import type { Settings } from "@/hooks/useSettings";
 import {
   X, Phone, Globe, MapPin, Star, MessageCircle, Mail, Copy, CheckCircle2,
-  Calendar, StickyNote, History, Sparkles, Tag, FileText, Plus,
+  Calendar, StickyNote, History, Sparkles, Tag, FileText, Plus, Printer, DollarSign, Flame,
 } from "lucide-react";
 import { useToast } from "@/hooks/useToast";
 
 interface Props {
   restaurant: Restaurant | null;
   state: RestaurantState;
+  settings: Settings;
   onStatusChange: (s: Status) => void;
   onToggleFavorite: () => void;
   onUpdate: (patch: Partial<RestaurantState>) => void;
@@ -38,7 +43,7 @@ interface Props {
 type Tab = "whatsapp" | "email" | "proposal";
 
 export function ActionPanel({
-  restaurant, state, onStatusChange, onToggleFavorite, onUpdate, onAddTag, onRemoveTag, onClose,
+  restaurant, state, settings, onStatusChange, onToggleFavorite, onUpdate, onAddTag, onRemoveTag, onClose,
 }: Props) {
   const [tab, setTab] = useState<Tab>("whatsapp");
   const [copied, setCopied] = useState(false);
@@ -50,12 +55,12 @@ export function ActionPanel({
   const messages = useMemo(() => {
     if (!restaurant) return null;
     const wa = serviceKey
-      ? buildServiceMessage(restaurant, serviceKey)
-      : buildWhatsAppMessage(restaurant);
-    const baseEmail = buildEmailMessage(restaurant);
-    const proposal = buildProposal(restaurant, [...proposalServices]);
+      ? buildServiceMessage(restaurant, serviceKey, settings)
+      : buildWhatsAppMessage(restaurant, settings);
+    const baseEmail = buildEmailMessage(restaurant, settings);
+    const proposal = buildProposal(restaurant, [...proposalServices], settings);
     return { whatsapp: wa, email: baseEmail, proposal };
-  }, [restaurant, serviceKey, proposalServices]);
+  }, [restaurant, serviceKey, proposalServices, settings]);
 
   if (!restaurant) {
     return (
@@ -139,6 +144,20 @@ export function ActionPanel({
                 : "bg-accent text-muted-foreground border-border"
             }`}>{seg.label}</span>
             <span className="text-xs text-muted-foreground">{restaurant.category}</span>
+            {(() => {
+              const sc = leadScore(restaurant);
+              const tier = scoreTier(sc);
+              const cls = tier.color === "gold"
+                ? "bg-gold-soft text-gold border-gold/30"
+                : tier.color === "emerald"
+                ? "bg-emerald-soft text-emerald border-emerald/30"
+                : "bg-accent text-muted-foreground border-border";
+              return (
+                <span title={`Lead Score ${sc}/100`} className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border ${cls}`}>
+                  <Flame className="w-3 h-3" /> {tier.label} · {sc}
+                </span>
+              );
+            })()}
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -311,6 +330,27 @@ export function ActionPanel({
           </div>
         </div>
 
+        {/* Deal value */}
+        <div>
+          <div className="text-[11px] tracking-widest uppercase text-muted-foreground mb-2 flex items-center gap-1.5">
+            <DollarSign className="w-3 h-3 text-gold" /> قيمة الصفقة المتوقعة ({settings.currency})
+          </div>
+          <input
+            type="number"
+            min={0}
+            value={state.dealValue ?? ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              onUpdate({ dealValue: v === "" ? undefined : Math.max(0, Number(v)) });
+            }}
+            placeholder="مثال: 1200"
+            className="w-full px-3 py-2 rounded-md bg-background border border-border text-sm text-foreground focus:border-gold/50 outline-none tabular-nums"
+          />
+          <div className="text-[10px] text-muted-foreground mt-1">
+            تُحتسب ضمن الإيرادات عند تحويل الحالة إلى "اجتماع".
+          </div>
+        </div>
+
         {/* Notes */}
         <div>
           <div className="text-[11px] tracking-widest uppercase text-muted-foreground mb-2 flex items-center gap-1.5">
@@ -414,15 +454,22 @@ export function ActionPanel({
           <MessageCircle className="w-4 h-4" />
           فتح واتساب مع الرسالة الجاهزة
         </button>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <button onClick={sendEmail} className="inline-flex items-center justify-center gap-1.5 py-2 rounded-md bg-accent text-foreground text-xs hover:bg-accent/70">
-            <Mail className="w-3.5 h-3.5" /> إرسال إيميل
+            <Mail className="w-3.5 h-3.5" /> إيميل
+          </button>
+          <button
+            onClick={() => openPrintableProposal(restaurant, [...proposalServices], settings)}
+            className="inline-flex items-center justify-center gap-1.5 py-2 rounded-md bg-accent text-foreground text-xs hover:bg-accent/70"
+            title="عرض سعر للطباعة/PDF"
+          >
+            <Printer className="w-3.5 h-3.5" /> طباعة
           </button>
           <button
             onClick={() => { onStatusChange("meeting"); toast.push("🎉 تم تسجيل اجتماع"); }}
             className="inline-flex items-center justify-center gap-1.5 py-2 rounded-md bg-gold text-primary-foreground text-xs font-semibold hover:opacity-90"
           >
-            <Calendar className="w-3.5 h-3.5" /> حجز اجتماع
+            <Calendar className="w-3.5 h-3.5" /> اجتماع
           </button>
         </div>
       </div>

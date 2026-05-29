@@ -10,6 +10,7 @@ export interface RestaurantState {
   notes?: string;
   followUp?: string; // ISO date YYYY-MM-DD
   tags?: string[];
+  dealValue?: number; // JOD value of the deal/opportunity
   updatedAt?: number;
   history?: { at: number; status: Status }[];
 }

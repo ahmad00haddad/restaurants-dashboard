@@ -4,11 +4,13 @@ import {
   RESTAURANTS,
   downloadCSV,
   exportRestaurantsCSV,
+  leadScore,
   type Restaurant,
   type Segment,
   type Status,
 } from "@/lib/restaurants";
 import { useCrmStore } from "@/hooks/useCrmStore";
+import { useSettings } from "@/hooks/useSettings";
 import { useToast } from "@/hooks/useToast";
 import { CrmSidebar, type ExtraFilters, type SortKey } from "@/components/crm/Sidebar";
 import { AnalyticsBar } from "@/components/crm/Analytics";
@@ -18,6 +20,7 @@ import { BulkActionBar } from "@/components/crm/BulkActionBar";
 import { ActionPanel } from "@/components/crm/ActionPanel";
 import { CommandPalette } from "@/components/crm/CommandPalette";
 import { FollowUpsDrawer } from "@/components/crm/FollowUpsDrawer";
+import { SettingsDialog } from "@/components/crm/SettingsDialog";
 import { TopNav } from "@/components/crm/TopNav";
 import { Search, LayoutGrid, List, Sparkles, Download } from "lucide-react";
 
@@ -43,6 +46,7 @@ function Dashboard() {
     getStatus, setStatus, setStatusBulk, getState, update, toggleFavorite, store, todayCount,
     addTag, removeTag, allTags, importStore, exportStore, clearAll,
   } = useCrmStore();
+  const { settings, update: updateSettings, reset: resetSettings } = useSettings();
   const toast = useToast();
 
   const [segments, setSegments] = useState<Set<Segment>>(new Set());
@@ -60,6 +64,7 @@ function Dashboard() {
   const [view, setView] = useState<"table" | "kanban">("table");
   const [cmdOpen, setCmdOpen] = useState(false);
   const [followUpsOpen, setFollowUpsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -79,6 +84,17 @@ function Dashboard() {
     () => Object.values(store).filter((s) => s.favorite).length,
     [store],
   );
+
+  const revenueStats = useMemo(() => {
+    let revenue = 0, pipeline = 0;
+    for (const s of Object.values(store)) {
+      const v = s.dealValue ?? 0;
+      if (!v) continue;
+      if (s.status === "meeting") revenue += v;
+      else if (s.status === "whatsapp" || s.status === "email") pipeline += v;
+    }
+    return { revenue, pipeline };
+  }, [store]);
 
   const allCategories = useMemo(() => {
     const m = new Map<string, number>();
@@ -120,6 +136,7 @@ function Dashboard() {
     });
     const sorted = [...arr];
     switch (sort) {
+      case "score": sorted.sort((a, b) => leadScore(b) - leadScore(a)); break;
       case "rating": sorted.sort((a, b) => b.rating - a.rating); break;
       case "name": sorted.sort((a, b) => a.title.localeCompare(b.title, "ar")); break;
       case "updated":
@@ -299,6 +316,7 @@ function Dashboard() {
               overdueCount={followUps.overdue}
               onOpenFollowUps={() => setFollowUpsOpen(true)}
               onOpenCommand={() => setCmdOpen(true)}
+              onOpenSettings={() => setSettingsOpen(true)}
             />
           </div>
           <AnalyticsBar
@@ -308,6 +326,9 @@ function Dashboard() {
             meetings={statusCounts.meeting}
             today={todayCount}
             goal={DAILY_GOAL}
+            revenue={revenueStats.revenue}
+            pipeline={revenueStats.pipeline}
+            currency={settings.currency}
           />
         </header>
 
@@ -401,6 +422,7 @@ function Dashboard() {
       <ActionPanel
         restaurant={selected}
         state={selected ? getState(selected.id) : {}}
+        settings={settings}
         onStatusChange={(s) => selected && setStatus(selected.id, s)}
         onToggleFavorite={() => selected && toggleFavorite(selected.id)}
         onUpdate={(patch) => selected && update(selected.id, patch)}
@@ -419,6 +441,13 @@ function Dashboard() {
         onClose={() => setFollowUpsOpen(false)}
         store={store}
         onPick={(r) => setSelectedId(r.id)}
+      />
+      <SettingsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        settings={settings}
+        onSave={updateSettings}
+        onReset={resetSettings}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import { Building2, Crown, Send, Target, Zap, TrendingUp } from "lucide-react";
+import { Building2, Crown, Send, Target, Zap, TrendingUp, DollarSign } from "lucide-react";
 
 interface Props {
   total: number;
@@ -7,20 +7,26 @@ interface Props {
   meetings: number;
   today: number;
   goal: number;
+  revenue: number;
+  pipeline: number;
+  currency: string;
 }
 
-export function AnalyticsBar({ total, premium, contacted, meetings, today, goal }: Props) {
+export function AnalyticsBar({ total, premium, contacted, meetings, today, goal, revenue, pipeline, currency }: Props) {
   const conv = contacted > 0 ? ((meetings / contacted) * 100).toFixed(1) : "0";
   const goalPct = Math.min(100, Math.round((today / goal) * 100));
+  const fmt = (n: number) => n.toLocaleString("ar");
   const cards = [
-    { icon: Building2, label: "إجمالي المطاعم", value: total.toLocaleString("ar"), tone: "default" as const },
-    { icon: Crown, label: "Premium", value: premium.toLocaleString("ar"), tone: "gold" as const },
-    { icon: Send, label: "تم التواصل", value: contacted.toLocaleString("ar"), tone: "emerald" as const },
+    { icon: Building2, label: "إجمالي المطاعم", value: fmt(total), tone: "default" as const },
+    { icon: Crown, label: "Premium", value: fmt(premium), tone: "gold" as const },
+    { icon: Send, label: "تم التواصل", value: fmt(contacted), tone: "emerald" as const },
     { icon: Target, label: "نسبة التحويل", value: `${conv}%`, tone: "gold" as const },
+    { icon: DollarSign, label: `إيرادات محققة (${currency})`, value: fmt(revenue), tone: "emerald" as const },
+    { icon: TrendingUp, label: `حجم الـ Pipeline (${currency})`, value: fmt(pipeline), tone: "gold" as const },
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+    <div className="grid grid-cols-2 lg:grid-cols-8 gap-3">
       {cards.map(({ icon: Icon, label, value, tone }) => (
         <Card key={label} tone={tone}>
           <div className="flex items-start justify-between">

@@ -1,14 +1,15 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { LayoutDashboard, BarChart3, Bell, CalendarClock } from "lucide-react";
+import { LayoutDashboard, BarChart3, Bell, CalendarClock, Settings as SettingsIcon } from "lucide-react";
 
 interface Props {
   followUpsCount: number;
   overdueCount: number;
   onOpenFollowUps: () => void;
   onOpenCommand: () => void;
+  onOpenSettings: () => void;
 }
 
-export function TopNav({ followUpsCount, overdueCount, onOpenFollowUps, onOpenCommand }: Props) {
+export function TopNav({ followUpsCount, overdueCount, onOpenFollowUps, onOpenCommand, onOpenSettings }: Props) {
   const loc = useLocation();
   const path = loc.pathname;
 
@@ -42,6 +43,13 @@ export function TopNav({ followUpsCount, overdueCount, onOpenFollowUps, onOpenCo
             {followUpsCount}
           </span>
         )}
+      </button>
+      <button
+        onClick={onOpenSettings}
+        title="الإعدادات"
+        className="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-accent text-muted-foreground hover:text-gold"
+      >
+        <SettingsIcon className="w-4 h-4" />
       </button>
     </div>
   );

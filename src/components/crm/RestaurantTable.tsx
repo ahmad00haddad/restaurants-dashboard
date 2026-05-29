@@ -1,4 +1,4 @@
-import { SEGMENT_META, STATUS_META, type Restaurant, type Status } from "@/lib/restaurants";
+import { SEGMENT_META, STATUS_META, leadScore, scoreTier, type Restaurant, type Status } from "@/lib/restaurants";
 import {
   Star,
   Globe,
@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CalendarClock,
+  Flame,
 } from "lucide-react";
 
 interface Props {
@@ -53,6 +54,7 @@ export function RestaurantTable(p: Props) {
               <th className="text-right font-medium px-4 py-3">المطعم</th>
               <th className="text-right font-medium px-4 py-3">الفئة</th>
               <th className="text-right font-medium px-4 py-3">الشريحة</th>
+              <th className="text-right font-medium px-4 py-3 whitespace-nowrap">Lead Score</th>
               <th className="text-right font-medium px-4 py-3">التقييم</th>
               <th className="text-right font-medium px-4 py-3">الهاتف</th>
               <th className="text-right font-medium px-4 py-3">الحالة</th>
@@ -61,7 +63,7 @@ export function RestaurantTable(p: Props) {
           <tbody>
             {p.rows.length === 0 && (
               <tr>
-                <td colSpan={9} className="text-center py-16 text-muted-foreground">
+                <td colSpan={10} className="text-center py-16 text-muted-foreground">
                   لا توجد نتائج تطابق الفلاتر الحالية
                 </td>
               </tr>
@@ -134,6 +136,9 @@ export function RestaurantTable(p: Props) {
                   </td>
                   <td className="px-4 py-3">
                     <SegmentBadge segment={r.segment} label={seg.label} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <ScoreCell score={leadScore(r)} />
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1 text-gold">
@@ -218,5 +223,23 @@ function PagerBtn({
     >
       {children}
     </button>
+  );
+}
+
+function ScoreCell({ score }: { score: number }) {
+  const tier = scoreTier(score);
+  const barCls =
+    tier.color === "gold" ? "bg-gold" : tier.color === "emerald" ? "bg-emerald" : "bg-muted-foreground/50";
+  const txtCls =
+    tier.color === "gold" ? "text-gold" : tier.color === "emerald" ? "text-emerald" : "text-muted-foreground";
+  return (
+    <div className="flex items-center gap-2 min-w-[88px]" title={`Lead Score ${score}/100 — ${tier.label}`}>
+      <div className="flex-1 h-1.5 rounded-full bg-surface-2 overflow-hidden">
+        <div className={`h-full rounded-full ${barCls}`} style={{ width: `${score}%` }} />
+      </div>
+      <span className={`text-xs tabular-nums font-semibold ${txtCls} inline-flex items-center gap-0.5`}>
+        <Flame className="w-3 h-3" /> {score}
+      </span>
+    </div>
   );
 }

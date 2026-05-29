@@ -59,6 +59,25 @@ export const RESTAURANTS: Restaurant[] = (raw as RawRestaurant[]).map((r, i) => 
   rating: rating(r.rank),
 }));
 
+/** Lead Score 0-100: priority signal combining segment, rating, contact channels, rank. */
+export function leadScore(r: Restaurant): number {
+  let s = 0;
+  if (r.segment === "premium") s += 40;
+  else if (r.segment === "medium") s += 25;
+  else s += 10;
+  s += Math.round(r.rating * 8);
+  if (r.phone) s += 15;
+  if (r.website) s += 10;
+  s += Math.max(0, 10 - Math.floor(r.rank / 100));
+  return Math.min(100, s);
+}
+
+export function scoreTier(score: number): { label: string; color: string } {
+  if (score >= 75) return { label: "ساخن", color: "gold" };
+  if (score >= 55) return { label: "دافئ", color: "emerald" };
+  return { label: "بارد", color: "muted" };
+}
+
 export const SEGMENT_META: Record<Segment, { label: string; color: string; desc: string }> = {
   premium: { label: "Premium", color: "gold", desc: "علامات تجارية قوية بميزانية لمشاريع احترافية" },
   medium: { label: "Medium", color: "emerald", desc: "مطاعم نامية تفهم قيمة المحتوى" },
@@ -144,10 +163,24 @@ export function downloadCSV(filename: string, content: string) {
   URL.revokeObjectURL(url);
 }
 
-export function buildWhatsAppMessage(r: Restaurant): string {
+export interface SenderInfo {
+  senderName?: string;
+  senderRole?: string;
+  signature?: string;
+  portfolioUrl?: string;
+}
+
+function signOff(info?: SenderInfo): string {
+  const sig = info?.signature || "FAII HOUSE";
+  const who = info?.senderName ? `${info.senderName}${info.senderRole ? " — " + info.senderRole : ""}\n` : "";
+  return `\n\n${who}${sig}`;
+}
+
+export function buildWhatsAppMessage(r: Restaurant, info?: SenderInfo): string {
   const name = r.title;
+  let body: string;
   if (r.segment === "premium") {
-    return `مرحباً ${name} 🎬
+    body = `مرحباً ${name} 🎬
 
 نحن FAII HOUSE — استوديو إنتاج سينمائي من إربد، متخصصون في تصوير المطاعم والكافيهات الراقية.
 
@@ -157,12 +190,9 @@ export function buildWhatsAppMessage(r: Restaurant): string {
 ✦ +140 علامة تجارية
 ✦ +8 سنوات خبرة
 
-نقترح جلسة قصيرة لمناقشة فكرة فيلم قصير مخصص لـ ${name} — هل يناسبكم هذا الأسبوع؟
-
-— فريق FAII HOUSE`;
-  }
-  if (r.segment === "medium") {
-    return `أهلاً ${name} 👋
+نقترح جلسة قصيرة لمناقشة فكرة فيلم قصير مخصص لـ ${name} — هل يناسبكم هذا الأسبوع؟`;
+  } else if (r.segment === "medium") {
+    body = `أهلاً ${name} 👋
 
 من فريق FAII HOUSE للإنتاج السينمائي في إربد.
 
@@ -171,27 +201,30 @@ export function buildWhatsAppMessage(r: Restaurant): string {
 نصمم كل مشروع خصيصاً لطبيعة المطعم، بميزانيات مرنة.
 
 نشاركك أعمالنا ونقترح فكرة سريعة تناسبكم — موافق؟`;
-  }
-  return `مرحباً ${name} 🌱
+  } else {
+    body = `مرحباً ${name} 🌱
 
 FAII HOUSE — تصوير فيديوغرافي سينمائي من إربد.
 
 عندنا باقة تجريبية مناسبة للمطاعم الناشئة في فئة "${r.category}" — فيديو قصير احترافي يساعدكم على رؤية أثر المحتوى البصري على جمهوركم.
 
 تحبّون نرسل التفاصيل؟`;
+  }
+  return body + signOff(info);
 }
 
-export function buildEmailMessage(r: Restaurant): { subject: string; body: string } {
+export function buildEmailMessage(r: Restaurant, info?: SenderInfo): { subject: string; body: string } {
   const subject =
     r.segment === "premium"
       ? `FAII HOUSE × ${r.title} — اقتراح فيلم سينمائي مخصص`
       : r.segment === "medium"
       ? `فكرة محتوى فيديو لـ ${r.title}`
       : `باقة تجريبية للمطاعم الناشئة — FAII HOUSE`;
-  const body = `${buildWhatsAppMessage(r)}
+  const portfolio = info?.portfolioUrl || "https://behance.net/ahmad00haddad";
+  const body = `${buildWhatsAppMessage(r, info)}
 
 —
 الموقع: https://faiihouse.lovable.app
-أعمالنا: https://behance.net/ahmad00haddad`;
+أعمالنا: ${portfolio}`;
   return { subject, body };
 }
