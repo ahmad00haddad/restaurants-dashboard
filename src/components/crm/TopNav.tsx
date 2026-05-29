@@ -70,19 +70,3 @@ function NavLink({
     </Link>
   );
 }
-
-function NavLink({
-  to, active, icon, children,
-}: { to: string; active: boolean; icon: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <Link
-      to={to}
-      className={`inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full transition-all ${
-        active ? "bg-gold text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground"
-      }`}
-    >
-      {icon}
-      {children}
-    </Link>
-  );
-}
