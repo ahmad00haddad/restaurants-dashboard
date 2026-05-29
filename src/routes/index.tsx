@@ -4,11 +4,13 @@ import {
   RESTAURANTS,
   downloadCSV,
   exportRestaurantsCSV,
+  leadScore,
   type Restaurant,
   type Segment,
   type Status,
 } from "@/lib/restaurants";
 import { useCrmStore } from "@/hooks/useCrmStore";
+import { useSettings } from "@/hooks/useSettings";
 import { useToast } from "@/hooks/useToast";
 import { CrmSidebar, type ExtraFilters, type SortKey } from "@/components/crm/Sidebar";
 import { AnalyticsBar } from "@/components/crm/Analytics";
