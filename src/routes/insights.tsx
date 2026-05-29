@@ -29,7 +29,7 @@ function InsightsPage() {
     const c = { new: 0, email: 0, whatsapp: 0, meeting: 0 } as Record<Status, number>;
     for (const r of RESTAURANTS) c[(store[r.id]?.status ?? "new") as Status]++;
     return c;
-  }, [store]);
+  }, [store, RESTAURANTS]);
 
   const categories = useMemo(() => {
     const m = new Map<string, { total: number; contacted: number }>();
