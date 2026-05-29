@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { CalendarClock, X, AlertCircle } from "lucide-react";
-import { RESTAURANTS, type Restaurant } from "@/lib/restaurants";
+import { type Restaurant } from "@/lib/restaurants";
+import { useRestaurants } from "@/hooks/useRestaurants";
 import type { RestaurantState } from "@/hooks/useCrmStore";
 
 interface Props {
@@ -11,16 +12,17 @@ interface Props {
 }
 
 export function FollowUpsDrawer({ open, onClose, store, onPick }: Props) {
+  const restaurants = useRestaurants();
   const items = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
     const list: { r: Restaurant; date: string; overdue: boolean }[] = [];
-    for (const r of RESTAURANTS) {
+    for (const r of restaurants) {
       const fu = store[r.id]?.followUp;
       if (!fu) continue;
       list.push({ r, date: fu, overdue: fu < today });
     }
     return list.sort((a, b) => a.date.localeCompare(b.date));
-  }, [store]);
+  }, [store, restaurants]);
 
   if (!open) return null;
 
