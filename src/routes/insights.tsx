@@ -43,7 +43,7 @@ function InsightsPage() {
     return [...m.entries()]
       .map(([name, v]) => ({ name, ...v }))
       .sort((a, b) => b.total - a.total);
-  }, [store]);
+  }, [store, RESTAURANTS]);
 
   const weekly = useMemo(() => {
     // last 7 days activity
