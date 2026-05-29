@@ -145,7 +145,7 @@ function Dashboard() {
       default: sorted.sort((a, b) => a.rank - b.rank);
     }
     return sorted;
-  }, [segments, categories, statuses, tags, extra, sort, search, getStatus, store]);
+  }, [segments, categories, statuses, tags, extra, sort, search, getStatus, store, RESTAURANTS]);
 
   useEffect(() => { setPage(1); }, [segments, categories, statuses, tags, extra, sort, search]);
 
