@@ -1,5 +1,7 @@
-import { Link, useLocation } from "@tanstack/react-router";
-import { LayoutDashboard, BarChart3, Bell, CalendarClock, Settings as SettingsIcon, Database } from "lucide-react";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
+import { LayoutDashboard, BarChart3, Bell, CalendarClock, Settings as SettingsIcon, Database, LogOut, User as UserIcon } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface Props {
   followUpsCount: number;
