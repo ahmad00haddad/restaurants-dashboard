@@ -14,9 +14,22 @@ interface Props {
 export function TopNav({ followUpsCount, overdueCount, onOpenFollowUps, onOpenCommand, onOpenSettings }: Props) {
   const loc = useLocation();
   const path = loc.pathname;
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+
+  const handleSignOut = async () => {
+    await qc.cancelQueries();
+    qc.clear();
+    await signOut();
+    navigate({ to: "/auth", replace: true });
+  };
+
+  const initial = (user?.user_metadata?.full_name || user?.email || "?").trim().charAt(0).toUpperCase();
 
   return (
     <div className="flex items-center gap-2 px-2 py-1.5 rounded-full bg-card border border-border">
+
       <NavLink to="/" active={path === "/"} icon={<LayoutDashboard className="w-3.5 h-3.5" />}>
         لوحة التواصل
       </NavLink>
