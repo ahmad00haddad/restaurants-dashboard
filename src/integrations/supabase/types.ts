@@ -14,7 +14,128 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      crm_states: {
+        Row: {
+          created_at: string
+          deal_value: number | null
+          favorite: boolean
+          follow_up: string | null
+          history: Json
+          id: string
+          notes: string | null
+          restaurant_id: string
+          status: Database["public"]["Enums"]["crm_status"]
+          tags: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          deal_value?: number | null
+          favorite?: boolean
+          follow_up?: string | null
+          history?: Json
+          id?: string
+          notes?: string | null
+          restaurant_id: string
+          status?: Database["public"]["Enums"]["crm_status"]
+          tags?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          deal_value?: number | null
+          favorite?: boolean
+          follow_up?: string | null
+          history?: Json
+          id?: string
+          notes?: string | null
+          restaurant_id?: string
+          status?: Database["public"]["Enums"]["crm_status"]
+          tags?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_states_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      restaurants: {
+        Row: {
+          address: string | null
+          city: string | null
+          created_at: string
+          created_by: string | null
+          external_id: string | null
+          id: string
+          phone: string | null
+          rank: number
+          street: string | null
+          title: string
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          external_id?: string | null
+          id?: string
+          phone?: string | null
+          rank?: number
+          street?: string | null
+          title: string
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          external_id?: string | null
+          id?: string
+          phone?: string | null
+          rank?: number
+          street?: string | null
+          title?: string
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +144,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      crm_status: "new" | "email" | "whatsapp" | "meeting"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +271,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      crm_status: ["new", "email", "whatsapp", "meeting"],
+    },
   },
 } as const
