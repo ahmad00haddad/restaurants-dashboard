@@ -24,7 +24,7 @@ import { SettingsDialog } from "@/components/crm/SettingsDialog";
 import { TopNav } from "@/components/crm/TopNav";
 import { Search, LayoutGrid, List, Sparkles, Download } from "lucide-react";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
     meta: [
       { title: "FAII HOUSE — Outreach CRM" },
@@ -309,7 +309,7 @@ function Dashboard() {
                 لوحة تواصل المطاعم
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
-                ١٬٠٠٠ مطعم في إربد — مُصنّفة آلياً حسب الشريحة والفئة، مع رسائل وأسعار جاهزة.
+                {RESTAURANTS.length.toLocaleString("ar")} مطعم في إربد — مُصنّفة آلياً حسب الشريحة والفئة، مع رسائل وأسعار جاهزة.
               </p>
             </div>
             <TopNav

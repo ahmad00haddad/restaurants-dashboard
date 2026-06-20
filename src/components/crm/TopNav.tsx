@@ -1,5 +1,7 @@
-import { Link, useLocation } from "@tanstack/react-router";
-import { LayoutDashboard, BarChart3, Bell, CalendarClock, Settings as SettingsIcon, Database } from "lucide-react";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
+import { LayoutDashboard, BarChart3, Bell, CalendarClock, Settings as SettingsIcon, Database, LogOut, User as UserIcon } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface Props {
   followUpsCount: number;
@@ -12,9 +14,22 @@ interface Props {
 export function TopNav({ followUpsCount, overdueCount, onOpenFollowUps, onOpenCommand, onOpenSettings }: Props) {
   const loc = useLocation();
   const path = loc.pathname;
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+
+  const handleSignOut = async () => {
+    await qc.cancelQueries();
+    qc.clear();
+    await signOut();
+    navigate({ to: "/auth", replace: true });
+  };
+
+  const initial = (user?.user_metadata?.full_name || user?.email || "?").trim().charAt(0).toUpperCase();
 
   return (
     <div className="flex items-center gap-2 px-2 py-1.5 rounded-full bg-card border border-border">
+
       <NavLink to="/" active={path === "/"} icon={<LayoutDashboard className="w-3.5 h-3.5" />}>
         لوحة التواصل
       </NavLink>
@@ -53,6 +68,20 @@ export function TopNav({ followUpsCount, overdueCount, onOpenFollowUps, onOpenCo
         className="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-accent text-muted-foreground hover:text-gold"
       >
         <SettingsIcon className="w-4 h-4" />
+      </button>
+      <div className="w-px h-5 bg-border mx-1" />
+      <div
+        title={user?.email ?? ""}
+        className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gold-soft border border-gold/30 text-gold text-xs font-bold"
+      >
+        {user ? initial : <UserIcon className="w-4 h-4" />}
+      </div>
+      <button
+        onClick={handleSignOut}
+        title="تسجيل الخروج"
+        className="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-destructive/15 text-muted-foreground hover:text-destructive-foreground"
+      >
+        <LogOut className="w-4 h-4" />
       </button>
     </div>
   );
