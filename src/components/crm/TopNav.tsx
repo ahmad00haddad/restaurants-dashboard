@@ -69,6 +69,20 @@ export function TopNav({ followUpsCount, overdueCount, onOpenFollowUps, onOpenCo
       >
         <SettingsIcon className="w-4 h-4" />
       </button>
+      <div className="w-px h-5 bg-border mx-1" />
+      <div
+        title={user?.email ?? ""}
+        className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gold-soft border border-gold/30 text-gold text-xs font-bold"
+      >
+        {user ? initial : <UserIcon className="w-4 h-4" />}
+      </div>
+      <button
+        onClick={handleSignOut}
+        title="تسجيل الخروج"
+        className="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-destructive/15 text-muted-foreground hover:text-destructive-foreground"
+      >
+        <LogOut className="w-4 h-4" />
+      </button>
     </div>
   );
 }
