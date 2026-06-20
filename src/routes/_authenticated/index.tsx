@@ -309,7 +309,7 @@ function Dashboard() {
                 لوحة تواصل المطاعم
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
-                ١٬٠٠٠ مطعم في إربد — مُصنّفة آلياً حسب الشريحة والفئة، مع رسائل وأسعار جاهزة.
+                {RESTAURANTS.length.toLocaleString("ar")} مطعم في إربد — مُصنّفة آلياً حسب الشريحة والفئة، مع رسائل وأسعار جاهزة.
               </p>
             </div>
             <TopNav
