@@ -1,128 +1,174 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useCallback, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import type { Status } from "@/lib/restaurants";
-
-const KEY = "faii.crm.v2";
-const LEGACY_KEY = "faii.status.v1";
 
 export interface RestaurantState {
   status?: Status;
   favorite?: boolean;
   notes?: string;
-  followUp?: string; // ISO date YYYY-MM-DD
+  followUp?: string; // YYYY-MM-DD
   tags?: string[];
-  dealValue?: number; // JOD value of the deal/opportunity
+  dealValue?: number;
   updatedAt?: number;
   history?: { at: number; status: Status }[];
 }
 
+interface DbRow {
+  restaurant_id: string;
+  status: Status;
+  favorite: boolean;
+  notes: string | null;
+  follow_up: string | null;
+  tags: string[];
+  deal_value: number | null;
+  history: unknown;
+  updated_at: string;
+}
+
 type Store = Record<string, RestaurantState>;
 
-function readStore(): Store {
-  if (typeof window === "undefined") return {};
-  try {
-    const v2 = localStorage.getItem(KEY);
-    if (v2) return JSON.parse(v2);
-    const legacy = localStorage.getItem(LEGACY_KEY);
-    if (legacy) {
-      const m: Record<string, Status> = JSON.parse(legacy);
-      const out: Store = {};
-      for (const [id, status] of Object.entries(m)) {
-        out[id] = { status, updatedAt: Date.now() };
-      }
-      localStorage.setItem(KEY, JSON.stringify(out));
-      return out;
-    }
-  } catch {}
-  return {};
+const QK = ["crm-states"] as const;
+
+function rowToState(row: DbRow): RestaurantState {
+  return {
+    status: row.status,
+    favorite: row.favorite,
+    notes: row.notes ?? undefined,
+    followUp: row.follow_up ?? undefined,
+    tags: row.tags ?? [],
+    dealValue: row.deal_value ?? undefined,
+    history: Array.isArray(row.history) ? (row.history as { at: number; status: Status }[]) : [],
+    updatedAt: new Date(row.updated_at).getTime(),
+  };
+}
+
+async function fetchAll(userId: string): Promise<Store> {
+  const { data, error } = await supabase
+    .from("crm_states")
+    .select("restaurant_id, status, favorite, notes, follow_up, tags, deal_value, history, updated_at")
+    .eq("user_id", userId);
+  if (error) throw error;
+  const out: Store = {};
+  for (const r of (data ?? []) as DbRow[]) out[r.restaurant_id] = rowToState(r);
+  return out;
+}
+
+async function upsertOne(userId: string, restaurantId: string, patch: Partial<RestaurantState> & { historyAppend?: { at: number; status: Status } }) {
+  // Load current row to merge (no race-safe RPC available)
+  const { data: cur } = await supabase
+    .from("crm_states")
+    .select("history, tags, status, favorite, notes, follow_up, deal_value")
+    .eq("user_id", userId)
+    .eq("restaurant_id", restaurantId)
+    .maybeSingle();
+
+  const baseHistory = Array.isArray(cur?.history) ? (cur!.history as { at: number; status: Status }[]) : [];
+  const history = patch.historyAppend ? [...baseHistory, patch.historyAppend] : (patch.history ?? baseHistory);
+
+  const payload = {
+    user_id: userId,
+    restaurant_id: restaurantId,
+    status: patch.status ?? cur?.status ?? "new",
+    favorite: patch.favorite ?? cur?.favorite ?? false,
+    notes: patch.notes ?? cur?.notes ?? null,
+    follow_up: patch.followUp ?? cur?.follow_up ?? null,
+    tags: patch.tags ?? cur?.tags ?? [],
+    deal_value: patch.dealValue ?? cur?.deal_value ?? null,
+    history,
+  };
+  const { error } = await supabase
+    .from("crm_states")
+    .upsert(payload, { onConflict: "user_id,restaurant_id" });
+  if (error) throw error;
 }
 
 export function useCrmStore() {
-  const [store, setStore] = useState<Store>({});
-  const [ready, setReady] = useState(false);
+  const qc = useQueryClient();
+  const userIdQuery = useQuery({
+    queryKey: ["auth-user-id"],
+    queryFn: async () => {
+      const { data } = await supabase.auth.getUser();
+      return data.user?.id ?? null;
+    },
+    staleTime: 5 * 60_000,
+  });
+  const userId = userIdQuery.data ?? null;
 
-  useEffect(() => {
-    setStore(readStore());
-    setReady(true);
-  }, []);
+  const { data: store = {} } = useQuery({
+    queryKey: QK,
+    queryFn: () => fetchAll(userId!),
+    enabled: !!userId,
+    staleTime: 30_000,
+  });
 
-  const persist = useCallback((next: Store) => {
-    try { localStorage.setItem(KEY, JSON.stringify(next)); } catch {}
-  }, []);
+  const ready = !userIdQuery.isLoading && (!userId || !!store);
 
-  const update = useCallback((id: string, patch: Partial<RestaurantState>) => {
-    setStore((prev) => {
-      const cur = prev[id] ?? {};
-      const next = { ...prev, [id]: { ...cur, ...patch, updatedAt: Date.now() } };
-      persist(next);
-      return next;
+  const optimistic = (id: string, patch: Partial<RestaurantState>) => {
+    qc.setQueryData<Store>(QK, (prev) => {
+      const cur = prev?.[id] ?? {};
+      return { ...(prev ?? {}), [id]: { ...cur, ...patch, updatedAt: Date.now() } };
     });
-  }, [persist]);
+  };
+
+  const persist = useCallback(
+    async (id: string, patch: Partial<RestaurantState> & { historyAppend?: { at: number; status: Status } }) => {
+      if (!userId) return;
+      optimistic(id, patch);
+      try {
+        await upsertOne(userId, id, patch);
+      } finally {
+        qc.invalidateQueries({ queryKey: QK });
+      }
+    },
+    [userId, qc],
+  );
 
   const setStatus = useCallback((id: string, status: Status) => {
-    setStore((prev) => {
-      const cur = prev[id] ?? {};
-      const history = [...(cur.history ?? []), { at: Date.now(), status }];
-      const next = { ...prev, [id]: { ...cur, status, history, updatedAt: Date.now() } };
-      persist(next);
-      return next;
-    });
+    persist(id, { status, historyAppend: { at: Date.now(), status } });
   }, [persist]);
 
-  const setStatusBulk = useCallback((ids: string[], status: Status) => {
-    setStore((prev) => {
-      const next = { ...prev };
-      const now = Date.now();
-      for (const id of ids) {
-        const cur = next[id] ?? {};
-        next[id] = { ...cur, status, updatedAt: now, history: [...(cur.history ?? []), { at: now, status }] };
-      }
-      persist(next);
-      return next;
-    });
+  const setStatusBulk = useCallback(async (ids: string[], status: Status) => {
+    for (const id of ids) await persist(id, { status, historyAppend: { at: Date.now(), status } });
+  }, [persist]);
+
+  const update = useCallback((id: string, patch: Partial<RestaurantState>) => {
+    persist(id, patch);
   }, [persist]);
 
   const toggleFavorite = useCallback((id: string) => {
-    setStore((prev) => {
-      const cur = prev[id] ?? {};
-      const next = { ...prev, [id]: { ...cur, favorite: !cur.favorite, updatedAt: Date.now() } };
-      persist(next);
-      return next;
-    });
-  }, [persist]);
+    const cur = store[id]?.favorite ?? false;
+    persist(id, { favorite: !cur });
+  }, [persist, store]);
 
   const addTag = useCallback((id: string, tag: string) => {
     const t = tag.trim();
     if (!t) return;
-    setStore((prev) => {
-      const cur = prev[id] ?? {};
-      const tags = Array.from(new Set([...(cur.tags ?? []), t]));
-      const next = { ...prev, [id]: { ...cur, tags, updatedAt: Date.now() } };
-      persist(next);
-      return next;
-    });
-  }, [persist]);
+    const tags = Array.from(new Set([...(store[id]?.tags ?? []), t]));
+    persist(id, { tags });
+  }, [persist, store]);
 
   const removeTag = useCallback((id: string, tag: string) => {
-    setStore((prev) => {
-      const cur = prev[id] ?? {};
-      const tags = (cur.tags ?? []).filter((x) => x !== tag);
-      const next = { ...prev, [id]: { ...cur, tags, updatedAt: Date.now() } };
-      persist(next);
-      return next;
-    });
-  }, [persist]);
+    const tags = (store[id]?.tags ?? []).filter((x) => x !== tag);
+    persist(id, { tags });
+  }, [persist, store]);
 
-  const importStore = useCallback((data: Store) => {
-    setStore(data);
-    persist(data);
-  }, [persist]);
+  const importStore = useCallback(async (data: Store) => {
+    if (!userId) return;
+    for (const [id, s] of Object.entries(data)) {
+      await upsertOne(userId, id, s);
+    }
+    qc.invalidateQueries({ queryKey: QK });
+  }, [userId, qc]);
 
   const exportStore = useCallback(() => store, [store]);
 
-  const clearAll = useCallback(() => {
-    setStore({});
-    persist({});
-  }, [persist]);
+  const clearAll = useCallback(async () => {
+    if (!userId) return;
+    const { error } = await supabase.from("crm_states").delete().eq("user_id", userId);
+    if (error) throw error;
+    qc.invalidateQueries({ queryKey: QK });
+  }, [userId, qc]);
 
   const getState = useCallback((id: string): RestaurantState => store[id] ?? {}, [store]);
   const getStatus = useCallback((id: string): Status => (store[id]?.status ?? "new") as Status, [store]);
@@ -137,7 +183,6 @@ export function useCrmStore() {
     return n;
   }, [store]);
 
-  // All distinct tags across the store
   const allTags = useMemo(() => {
     const map = new Map<string, number>();
     for (const s of Object.values(store)) {
