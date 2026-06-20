@@ -24,7 +24,7 @@ import { SettingsDialog } from "@/components/crm/SettingsDialog";
 import { TopNav } from "@/components/crm/TopNav";
 import { Search, LayoutGrid, List, Sparkles, Download } from "lucide-react";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
     meta: [
       { title: "FAII HOUSE — Outreach CRM" },

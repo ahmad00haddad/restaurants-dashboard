@@ -11,7 +11,7 @@ import {
 import { findDuplicateGroups, SEGMENT_META, type Restaurant } from "@/lib/restaurants";
 import { useToast } from "@/hooks/useToast";
 
-export const Route = createFileRoute("/manage")({
+export const Route = createFileRoute("/_authenticated/manage")({
   head: () => ({
     meta: [
       { title: "FAII HOUSE — إدارة قاعدة البيانات" },
