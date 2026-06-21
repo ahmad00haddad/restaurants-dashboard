@@ -208,7 +208,7 @@ function ManagePage() {
                 className="w-full pr-9 pl-4 py-2.5 rounded-lg bg-card border border-border focus:border-gold/50 outline-none text-sm"
               />
             </div>
-            <RestaurantTableManage rows={filtered} onEdit={setEditing} onDelete={handleDelete} />
+            <RestaurantTableManage rows={filtered} onEdit={setEditing} onDelete={handleDelete} onBulkDelete={handleBulkDelete} />
           </>
         )}
 
