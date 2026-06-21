@@ -32,6 +32,8 @@ function ManagePage() {
   const [q, setQ] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<Restaurant | null>(null);
+  const [importing, setImporting] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const duplicateGroups = useMemo(() => findDuplicateGroups(list), [list]);
   const duplicateCount = duplicateGroups.reduce((n, g) => n + g.length - 1, 0);
@@ -44,29 +46,78 @@ function ManagePage() {
     );
   }, [list, q]);
 
-  const handleDelete = (r: Restaurant) => {
+  const handleDelete = async (r: Restaurant) => {
     if (!confirm(`حذف "${r.title}" نهائياً من القاعدة؟`)) return;
-    deleteRestaurants([r.id]);
+    await deleteRestaurants([r.id]);
     toast.push("تم الحذف", "success");
   };
 
-  const handleAdd = (input: NewRestaurantInput) => {
-    addRestaurant(input);
+  const handleBulkDelete = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    if (!confirm(`حذف ${ids.length} مطعم نهائياً؟ لا يمكن التراجع.`)) return;
+    await deleteRestaurants(ids);
+    toast.push(`تم حذف ${ids.length} مطعم`, "success");
+  };
+
+  const handleAdd = async (input: NewRestaurantInput) => {
+    await addRestaurant(input);
     setShowAdd(false);
     toast.push("تمت إضافة المطعم الجديد ✓", "success");
   };
 
-  const handleEdit = (id: string, patch: NewRestaurantInput) => {
-    updateRestaurant(id, patch);
+  const handleEdit = async (id: string, patch: NewRestaurantInput) => {
+    await updateRestaurant(id, patch);
     setEditing(null);
     toast.push("تم حفظ التعديلات", "success");
   };
 
-  const handleRestoreAll = () => {
+  const handleRestoreAll = async () => {
     if (!confirm("سيتم استرجاع جميع المطاعم المحذوفة والتعديلات. هل أنت متأكد؟")) return;
-    restoreAllRestaurants();
+    await restoreAllRestaurants();
     toast.push("تم استرجاع البيانات الأصلية", "info");
   };
+
+  const handleExport = () => {
+    const rows = tab === "all" ? filtered : list;
+    const csv = restaurantsToCsv(rows);
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadCsv(`faii-restaurants-${stamp}.csv`, csv);
+    toast.push(`تم تصدير ${rows.length} مطعم إلى CSV`, "success");
+  };
+
+  const handleImportFile = async (file: File) => {
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const rows = parseCsv(text);
+      if (rows.length === 0) {
+        toast.push("لم نعثر على بيانات صالحة. تأكد من وجود عمود title.", "error");
+        return;
+      }
+      if (!confirm(`استيراد ${rows.length} مطعم إلى القاعدة؟`)) return;
+      let ok = 0;
+      for (const r of rows) {
+        try {
+          await addRestaurant({
+            title: r.title,
+            phone: r.phone || null,
+            website: r.website,
+            street: r.street || null,
+            address: r.address || null,
+            city: r.city || null,
+          });
+          ok++;
+        } catch {
+          /* skip row */
+        }
+      }
+      toast.push(`تم استيراد ${ok} من ${rows.length}`, ok > 0 ? "success" : "error");
+    } finally {
+      setImporting(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
 
   return (
     <div className="min-h-screen bg-background text-foreground">
