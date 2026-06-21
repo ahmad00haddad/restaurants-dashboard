@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   ArrowRight, Database, Copy, Plus, Search, Trash2, Pencil, Save, X,
-  AlertTriangle, RefreshCcw, CheckCircle2, Crown,
+  AlertTriangle, RefreshCcw, CheckCircle2, Crown, Download, Upload, Loader2,
 } from "lucide-react";
 import {
   useRestaurants, addRestaurant, updateRestaurant, deleteRestaurants,
@@ -10,6 +10,7 @@ import {
 } from "@/hooks/useRestaurants";
 import { findDuplicateGroups, SEGMENT_META, type Restaurant } from "@/lib/restaurants";
 import { useToast } from "@/hooks/useToast";
+import { restaurantsToCsv, downloadCsv, parseCsv } from "@/lib/csv";
 
 export const Route = createFileRoute("/_authenticated/manage")({
   head: () => ({
@@ -31,6 +32,8 @@ function ManagePage() {
   const [q, setQ] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<Restaurant | null>(null);
+  const [importing, setImporting] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const duplicateGroups = useMemo(() => findDuplicateGroups(list), [list]);
   const duplicateCount = duplicateGroups.reduce((n, g) => n + g.length - 1, 0);
@@ -43,29 +46,78 @@ function ManagePage() {
     );
   }, [list, q]);
 
-  const handleDelete = (r: Restaurant) => {
+  const handleDelete = async (r: Restaurant) => {
     if (!confirm(`حذف "${r.title}" نهائياً من القاعدة؟`)) return;
-    deleteRestaurants([r.id]);
+    await deleteRestaurants([r.id]);
     toast.push("تم الحذف", "success");
   };
 
-  const handleAdd = (input: NewRestaurantInput) => {
-    addRestaurant(input);
+  const handleBulkDelete = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    if (!confirm(`حذف ${ids.length} مطعم نهائياً؟ لا يمكن التراجع.`)) return;
+    await deleteRestaurants(ids);
+    toast.push(`تم حذف ${ids.length} مطعم`, "success");
+  };
+
+  const handleAdd = async (input: NewRestaurantInput) => {
+    await addRestaurant(input);
     setShowAdd(false);
     toast.push("تمت إضافة المطعم الجديد ✓", "success");
   };
 
-  const handleEdit = (id: string, patch: NewRestaurantInput) => {
-    updateRestaurant(id, patch);
+  const handleEdit = async (id: string, patch: NewRestaurantInput) => {
+    await updateRestaurant(id, patch);
     setEditing(null);
     toast.push("تم حفظ التعديلات", "success");
   };
 
-  const handleRestoreAll = () => {
+  const handleRestoreAll = async () => {
     if (!confirm("سيتم استرجاع جميع المطاعم المحذوفة والتعديلات. هل أنت متأكد؟")) return;
-    restoreAllRestaurants();
+    await restoreAllRestaurants();
     toast.push("تم استرجاع البيانات الأصلية", "info");
   };
+
+  const handleExport = () => {
+    const rows = tab === "all" ? filtered : list;
+    const csv = restaurantsToCsv(rows);
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadCsv(`faii-restaurants-${stamp}.csv`, csv);
+    toast.push(`تم تصدير ${rows.length} مطعم إلى CSV`, "success");
+  };
+
+  const handleImportFile = async (file: File) => {
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const rows = parseCsv(text);
+      if (rows.length === 0) {
+        toast.push("لم نعثر على بيانات صالحة. تأكد من وجود عمود title.", "error");
+        return;
+      }
+      if (!confirm(`استيراد ${rows.length} مطعم إلى القاعدة؟`)) return;
+      let ok = 0;
+      for (const r of rows) {
+        try {
+          await addRestaurant({
+            title: r.title,
+            phone: r.phone || null,
+            website: r.website,
+            street: r.street || null,
+            address: r.address || null,
+            city: r.city || null,
+          });
+          ok++;
+        } catch {
+          /* skip row */
+        }
+      }
+      toast.push(`تم استيراد ${ok} من ${rows.length}`, ok > 0 ? "success" : "error");
+    } finally {
+      setImporting(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -84,13 +136,36 @@ function ManagePage() {
               أضف مطاعم جديدة، عدّل البيانات الموجودة، احذف المكررات أو غير المناسبة.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImportFile(f); }}
+            />
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={importing}
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-border bg-card hover:border-gold/50 disabled:opacity-50"
+              title="استيراد من CSV (الأعمدة المطلوبة: title, phone, website, street, address, city)"
+            >
+              {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+              استيراد CSV
+            </button>
+            <button
+              onClick={handleExport}
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-border bg-card hover:border-gold/50"
+            >
+              <Download className="w-3.5 h-3.5" />
+              تصدير CSV
+            </button>
             <button
               onClick={handleRestoreAll}
               className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-border bg-card hover:border-emerald/50"
             >
               <RefreshCcw className="w-3.5 h-3.5" />
-              استرجاع كل البيانات
+              استرجاع الأصلية
             </button>
             <button
               onClick={() => setShowAdd(true)}
@@ -100,6 +175,7 @@ function ManagePage() {
               مطعم جديد
             </button>
           </div>
+
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
@@ -132,7 +208,7 @@ function ManagePage() {
                 className="w-full pr-9 pl-4 py-2.5 rounded-lg bg-card border border-border focus:border-gold/50 outline-none text-sm"
               />
             </div>
-            <RestaurantTableManage rows={filtered} onEdit={setEditing} onDelete={handleDelete} />
+            <RestaurantTableManage rows={filtered} onEdit={setEditing} onDelete={handleDelete} onBulkDelete={handleBulkDelete} />
           </>
         )}
 
@@ -214,18 +290,68 @@ function TabBtn({
 const PAGE = 30;
 
 function RestaurantTableManage({
-  rows, onEdit, onDelete,
-}: { rows: Restaurant[]; onEdit: (r: Restaurant) => void; onDelete: (r: Restaurant) => void }) {
+  rows, onEdit, onDelete, onBulkDelete,
+}: {
+  rows: Restaurant[];
+  onEdit: (r: Restaurant) => void;
+  onDelete: (r: Restaurant) => void;
+  onBulkDelete: (ids: string[]) => void;
+}) {
   const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const pages = Math.max(1, Math.ceil(rows.length / PAGE));
   const cur = rows.slice((page - 1) * PAGE, page * PAGE);
+  const allOnPageSelected = cur.length > 0 && cur.every((r) => selected.has(r.id));
+
+  const toggleOne = (id: string) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelected(next);
+  };
+  const togglePage = () => {
+    const next = new Set(selected);
+    if (allOnPageSelected) cur.forEach((r) => next.delete(r.id));
+    else cur.forEach((r) => next.add(r.id));
+    setSelected(next);
+  };
 
   return (
     <div className="rounded-2xl border border-border bg-card overflow-hidden">
+      {selected.size > 0 && (
+        <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-border bg-gold-soft/30">
+          <div className="text-xs text-foreground font-semibold">
+            تم تحديد {selected.size.toLocaleString("ar")} مطعم
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSelected(new Set())}
+              className="text-[11px] px-2.5 py-1.5 rounded-md border border-border bg-card hover:border-muted-foreground"
+            >
+              إلغاء التحديد
+            </button>
+            <button
+              onClick={() => { onBulkDelete([...selected]); setSelected(new Set()); }}
+              className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-md bg-destructive/15 border border-destructive/30 text-destructive-foreground hover:bg-destructive/25"
+            >
+              <Trash2 className="w-3 h-3" />
+              حذف المحدد
+            </button>
+          </div>
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-surface-2 text-muted-foreground text-[11px] uppercase tracking-wider">
             <tr>
+              <th className="text-right px-3 py-2.5 w-10">
+                <input
+                  type="checkbox"
+                  checked={allOnPageSelected}
+                  onChange={togglePage}
+                  className="accent-gold w-4 h-4 cursor-pointer"
+                  title="تحديد كل المطاعم في هذه الصفحة"
+                />
+              </th>
               <th className="text-right px-3 py-2.5 w-12">#</th>
               <th className="text-right px-3 py-2.5">المطعم</th>
               <th className="text-right px-3 py-2.5">الفئة</th>
@@ -238,8 +364,17 @@ function RestaurantTableManage({
           <tbody className="divide-y divide-border">
             {cur.map((r, i) => {
               const seg = SEGMENT_META[r.segment];
+              const isSel = selected.has(r.id);
               return (
-                <tr key={r.id} className="hover:bg-accent/30">
+                <tr key={r.id} className={`hover:bg-accent/30 ${isSel ? "bg-gold-soft/20" : ""}`}>
+                  <td className="px-3 py-2.5">
+                    <input
+                      type="checkbox"
+                      checked={isSel}
+                      onChange={() => toggleOne(r.id)}
+                      className="accent-gold w-4 h-4 cursor-pointer"
+                    />
+                  </td>
                   <td className="px-3 py-2.5 text-[11px] text-muted-foreground tabular-nums">
                     {((page - 1) * PAGE + i + 1).toLocaleString("ar")}
                   </td>
@@ -276,11 +411,12 @@ function RestaurantTableManage({
               );
             })}
             {cur.length === 0 && (
-              <tr><td colSpan={7} className="text-center py-10 text-sm text-muted-foreground">لا توجد نتائج</td></tr>
+              <tr><td colSpan={8} className="text-center py-10 text-sm text-muted-foreground">لا توجد نتائج</td></tr>
             )}
           </tbody>
         </table>
       </div>
+
       {pages > 1 && (
         <div className="flex items-center justify-between px-4 py-3 border-t border-border text-xs text-muted-foreground">
           <span>
