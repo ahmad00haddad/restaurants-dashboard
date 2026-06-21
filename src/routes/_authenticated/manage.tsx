@@ -290,18 +290,68 @@ function TabBtn({
 const PAGE = 30;
 
 function RestaurantTableManage({
-  rows, onEdit, onDelete,
-}: { rows: Restaurant[]; onEdit: (r: Restaurant) => void; onDelete: (r: Restaurant) => void }) {
+  rows, onEdit, onDelete, onBulkDelete,
+}: {
+  rows: Restaurant[];
+  onEdit: (r: Restaurant) => void;
+  onDelete: (r: Restaurant) => void;
+  onBulkDelete: (ids: string[]) => void;
+}) {
   const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const pages = Math.max(1, Math.ceil(rows.length / PAGE));
   const cur = rows.slice((page - 1) * PAGE, page * PAGE);
+  const allOnPageSelected = cur.length > 0 && cur.every((r) => selected.has(r.id));
+
+  const toggleOne = (id: string) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelected(next);
+  };
+  const togglePage = () => {
+    const next = new Set(selected);
+    if (allOnPageSelected) cur.forEach((r) => next.delete(r.id));
+    else cur.forEach((r) => next.add(r.id));
+    setSelected(next);
+  };
 
   return (
     <div className="rounded-2xl border border-border bg-card overflow-hidden">
+      {selected.size > 0 && (
+        <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-border bg-gold-soft/30">
+          <div className="text-xs text-foreground font-semibold">
+            تم تحديد {selected.size.toLocaleString("ar")} مطعم
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSelected(new Set())}
+              className="text-[11px] px-2.5 py-1.5 rounded-md border border-border bg-card hover:border-muted-foreground"
+            >
+              إلغاء التحديد
+            </button>
+            <button
+              onClick={() => { onBulkDelete([...selected]); setSelected(new Set()); }}
+              className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-md bg-destructive/15 border border-destructive/30 text-destructive-foreground hover:bg-destructive/25"
+            >
+              <Trash2 className="w-3 h-3" />
+              حذف المحدد
+            </button>
+          </div>
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-surface-2 text-muted-foreground text-[11px] uppercase tracking-wider">
             <tr>
+              <th className="text-right px-3 py-2.5 w-10">
+                <input
+                  type="checkbox"
+                  checked={allOnPageSelected}
+                  onChange={togglePage}
+                  className="accent-gold w-4 h-4 cursor-pointer"
+                  title="تحديد كل المطاعم في هذه الصفحة"
+                />
+              </th>
               <th className="text-right px-3 py-2.5 w-12">#</th>
               <th className="text-right px-3 py-2.5">المطعم</th>
               <th className="text-right px-3 py-2.5">الفئة</th>
@@ -314,8 +364,17 @@ function RestaurantTableManage({
           <tbody className="divide-y divide-border">
             {cur.map((r, i) => {
               const seg = SEGMENT_META[r.segment];
+              const isSel = selected.has(r.id);
               return (
-                <tr key={r.id} className="hover:bg-accent/30">
+                <tr key={r.id} className={`hover:bg-accent/30 ${isSel ? "bg-gold-soft/20" : ""}`}>
+                  <td className="px-3 py-2.5">
+                    <input
+                      type="checkbox"
+                      checked={isSel}
+                      onChange={() => toggleOne(r.id)}
+                      className="accent-gold w-4 h-4 cursor-pointer"
+                    />
+                  </td>
                   <td className="px-3 py-2.5 text-[11px] text-muted-foreground tabular-nums">
                     {((page - 1) * PAGE + i + 1).toLocaleString("ar")}
                   </td>
@@ -352,11 +411,12 @@ function RestaurantTableManage({
               );
             })}
             {cur.length === 0 && (
-              <tr><td colSpan={7} className="text-center py-10 text-sm text-muted-foreground">لا توجد نتائج</td></tr>
+              <tr><td colSpan={8} className="text-center py-10 text-sm text-muted-foreground">لا توجد نتائج</td></tr>
             )}
           </tbody>
         </table>
       </div>
+
       {pages > 1 && (
         <div className="flex items-center justify-between px-4 py-3 border-t border-border text-xs text-muted-foreground">
           <span>
