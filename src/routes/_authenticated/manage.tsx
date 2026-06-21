@@ -136,13 +136,36 @@ function ManagePage() {
               أضف مطاعم جديدة، عدّل البيانات الموجودة، احذف المكررات أو غير المناسبة.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImportFile(f); }}
+            />
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={importing}
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-border bg-card hover:border-gold/50 disabled:opacity-50"
+              title="استيراد من CSV (الأعمدة المطلوبة: title, phone, website, street, address, city)"
+            >
+              {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+              استيراد CSV
+            </button>
+            <button
+              onClick={handleExport}
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-border bg-card hover:border-gold/50"
+            >
+              <Download className="w-3.5 h-3.5" />
+              تصدير CSV
+            </button>
             <button
               onClick={handleRestoreAll}
               className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-border bg-card hover:border-emerald/50"
             >
               <RefreshCcw className="w-3.5 h-3.5" />
-              استرجاع كل البيانات
+              استرجاع الأصلية
             </button>
             <button
               onClick={() => setShowAdd(true)}
@@ -152,6 +175,7 @@ function ManagePage() {
               مطعم جديد
             </button>
           </div>
+
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
