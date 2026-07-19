@@ -453,6 +453,7 @@ function Dashboard() {
         onSave={updateSettings}
         onReset={resetSettings}
       />
+      <OnboardingTour forceOpen={tourOpen} onClose={() => setTourOpen(false)} />
     </div>
   );
 }
