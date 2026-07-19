@@ -9,9 +9,10 @@ interface Props {
   onOpenFollowUps: () => void;
   onOpenCommand: () => void;
   onOpenSettings: () => void;
+  onOpenHelp?: () => void;
 }
 
-export function TopNav({ followUpsCount, overdueCount, onOpenFollowUps, onOpenCommand, onOpenSettings }: Props) {
+export function TopNav({ followUpsCount, overdueCount, onOpenFollowUps, onOpenCommand, onOpenSettings, onOpenHelp }: Props) {
   const loc = useLocation();
   const path = loc.pathname;
   const { user, signOut } = useAuth();
