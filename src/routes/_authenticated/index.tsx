@@ -22,6 +22,7 @@ import { CommandPalette } from "@/components/crm/CommandPalette";
 import { FollowUpsDrawer } from "@/components/crm/FollowUpsDrawer";
 import { SettingsDialog } from "@/components/crm/SettingsDialog";
 import { TopNav } from "@/components/crm/TopNav";
+import { OnboardingTour, resetOnboarding } from "@/components/crm/OnboardingTour";
 import { Search, LayoutGrid, List, Sparkles, Download } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/")({
