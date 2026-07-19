@@ -320,6 +320,7 @@ function Dashboard() {
               onOpenFollowUps={() => setFollowUpsOpen(true)}
               onOpenCommand={() => setCmdOpen(true)}
               onOpenSettings={() => setSettingsOpen(true)}
+              onOpenHelp={() => { resetOnboarding(); setTourOpen(true); }}
             />
           </div>
           <AnalyticsBar
