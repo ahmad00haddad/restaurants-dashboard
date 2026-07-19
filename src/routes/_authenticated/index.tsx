@@ -67,6 +67,7 @@ function Dashboard() {
   const [cmdOpen, setCmdOpen] = useState(false);
   const [followUpsOpen, setFollowUpsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
