@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, BarChart3, Bell, CalendarClock, Settings as SettingsIcon, Database, LogOut, User as UserIcon } from "lucide-react";
+import { LayoutDashboard, BarChart3, Bell, CalendarClock, Settings as SettingsIcon, Database, LogOut, User as UserIcon, HelpCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -9,9 +9,10 @@ interface Props {
   onOpenFollowUps: () => void;
   onOpenCommand: () => void;
   onOpenSettings: () => void;
+  onOpenHelp?: () => void;
 }
 
-export function TopNav({ followUpsCount, overdueCount, onOpenFollowUps, onOpenCommand, onOpenSettings }: Props) {
+export function TopNav({ followUpsCount, overdueCount, onOpenFollowUps, onOpenCommand, onOpenSettings, onOpenHelp }: Props) {
   const loc = useLocation();
   const path = loc.pathname;
   const { user, signOut } = useAuth();
@@ -69,6 +70,15 @@ export function TopNav({ followUpsCount, overdueCount, onOpenFollowUps, onOpenCo
       >
         <SettingsIcon className="w-4 h-4" />
       </button>
+      {onOpenHelp && (
+        <button
+          onClick={onOpenHelp}
+          title="جولة تعريفية"
+          className="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-accent text-muted-foreground hover:text-gold"
+        >
+          <HelpCircle className="w-4 h-4" />
+        </button>
+      )}
       <div className="w-px h-5 bg-border mx-1" />
       <div
         title={user?.email ?? ""}

@@ -22,6 +22,7 @@ import { CommandPalette } from "@/components/crm/CommandPalette";
 import { FollowUpsDrawer } from "@/components/crm/FollowUpsDrawer";
 import { SettingsDialog } from "@/components/crm/SettingsDialog";
 import { TopNav } from "@/components/crm/TopNav";
+import { OnboardingTour, resetOnboarding } from "@/components/crm/OnboardingTour";
 import { Search, LayoutGrid, List, Sparkles, Download } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -66,6 +67,7 @@ function Dashboard() {
   const [cmdOpen, setCmdOpen] = useState(false);
   const [followUpsOpen, setFollowUpsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -318,6 +320,7 @@ function Dashboard() {
               onOpenFollowUps={() => setFollowUpsOpen(true)}
               onOpenCommand={() => setCmdOpen(true)}
               onOpenSettings={() => setSettingsOpen(true)}
+              onOpenHelp={() => { resetOnboarding(); setTourOpen(true); }}
             />
           </div>
           <AnalyticsBar
@@ -450,6 +453,7 @@ function Dashboard() {
         onSave={updateSettings}
         onReset={resetSettings}
       />
+      <OnboardingTour forceOpen={tourOpen} onClose={() => setTourOpen(false)} />
     </div>
   );
 }
