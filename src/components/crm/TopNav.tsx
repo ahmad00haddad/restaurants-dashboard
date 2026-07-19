@@ -70,6 +70,15 @@ export function TopNav({ followUpsCount, overdueCount, onOpenFollowUps, onOpenCo
       >
         <SettingsIcon className="w-4 h-4" />
       </button>
+      {onOpenHelp && (
+        <button
+          onClick={onOpenHelp}
+          title="جولة تعريفية"
+          className="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-accent text-muted-foreground hover:text-gold"
+        >
+          <HelpCircle className="w-4 h-4" />
+        </button>
+      )}
       <div className="w-px h-5 bg-border mx-1" />
       <div
         title={user?.email ?? ""}
