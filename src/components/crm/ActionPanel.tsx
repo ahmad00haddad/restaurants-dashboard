@@ -54,17 +54,21 @@ export function ActionPanel({
   const [serviceKey, setServiceKey] = useState<ServiceKey | null>(null);
   const [proposalServices, setProposalServices] = useState<Set<ServiceKey>>(new Set(["reel"]));
   const [tagInput, setTagInput] = useState("");
+  const [variantNonce, setVariantNonce] = useState(0);
+  const [scrapingEmail, setScrapingEmail] = useState(false);
   const toast = useToast();
+  const scrapeOne = useServerFn(scrapeEmailForRestaurant);
+  const qc = useQueryClient();
 
   const messages = useMemo(() => {
     if (!restaurant) return null;
     const wa = serviceKey
       ? buildServiceMessage(restaurant, serviceKey, settings)
-      : buildWhatsAppMessage(restaurant, settings);
-    const baseEmail = buildEmailMessage(restaurant, settings);
+      : buildWhatsAppMessage(restaurant, settings, variantNonce);
+    const baseEmail = buildEmailMessage(restaurant, settings, variantNonce);
     const proposal = buildProposal(restaurant, [...proposalServices], settings);
     return { whatsapp: wa, email: baseEmail, proposal };
-  }, [restaurant, serviceKey, proposalServices, settings]);
+  }, [restaurant, serviceKey, proposalServices, settings, variantNonce]);
 
   if (!restaurant) {
     return (
