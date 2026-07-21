@@ -127,6 +127,22 @@ function ManagePage() {
       if (fileRef.current) fileRef.current.value = "";
     }
   };
+  const handleScrapeEmails = async () => {
+    if (missingEmailCount === 0) { toast.push("لا توجد مواقع بحاجة لاستخراج إيميل", "info"); return; }
+    const batch = Math.min(20, missingEmailCount);
+    if (!confirm(`سيتم فحص ${batch} موقع مطعم لاستخراج الإيميلات (قد يستغرق دقيقة). المتابعة؟`)) return;
+    setScraping(true);
+    try {
+      const res = await scrape({ data: { limit: batch } });
+      qc.invalidateQueries({ queryKey: ["restaurants"] });
+      toast.push(`تم فحص ${res.scanned} موقع — عُثر على ${res.found} إيميل جديد`, res.found > 0 ? "success" : "info");
+    } catch (e) {
+      toast.push(`فشل الاستخراج: ${(e as Error).message}`, "error");
+    } finally {
+      setScraping(false);
+    }
+  };
+
 
 
   return (
