@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowRight, Database, Copy, Plus, Search, Trash2, Pencil, Save, X,
-  AlertTriangle, RefreshCcw, CheckCircle2, Crown, Download, Upload, Loader2,
+  AlertTriangle, RefreshCcw, CheckCircle2, Crown, Download, Upload, Loader2, Mail,
 } from "lucide-react";
 import {
   useRestaurants, addRestaurant, updateRestaurant, deleteRestaurants,
@@ -11,6 +12,8 @@ import {
 import { findDuplicateGroups, SEGMENT_META, type Restaurant } from "@/lib/restaurants";
 import { useToast } from "@/hooks/useToast";
 import { restaurantsToCsv, downloadCsv, parseCsv } from "@/lib/csv";
+import { bulkScrapeEmails } from "@/lib/scrape.functions";
+import { useQueryClient } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/_authenticated/manage")({
   head: () => ({
