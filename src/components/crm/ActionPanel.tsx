@@ -230,6 +230,24 @@ export function ActionPanel({
               </a>
             </InfoRow>
           )}
+          <InfoRow icon={<Mail className="w-4 h-4" />} label="إيميل">
+            {restaurant.email ? (
+              <a href={`mailto:${restaurant.email}`} className="text-emerald hover:underline truncate inline-block max-w-[200px]">
+                {restaurant.email}
+              </a>
+            ) : (
+              <button
+                onClick={scrapeEmail}
+                disabled={scrapingEmail || !restaurant.website}
+                title={!restaurant.website ? "لا يوجد موقع للاستخراج منه" : "استخراج الإيميل من موقع المطعم"}
+                className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded border border-emerald/40 bg-emerald-soft text-emerald hover:bg-emerald/20 disabled:opacity-50"
+              >
+                {scrapingEmail ? <Loader2 className="w-3 h-3 animate-spin" /> : <SearchIcon className="w-3 h-3" />}
+                {restaurant.website ? "استخراج من الموقع" : "لا يوجد"}
+              </button>
+            )}
+          </InfoRow>
+
           {restaurant.address && (
             <InfoRow icon={<MapPin className="w-4 h-4" />} label="العنوان">
               <a
