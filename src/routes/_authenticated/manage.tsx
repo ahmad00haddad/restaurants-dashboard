@@ -437,10 +437,15 @@ function RestaurantTableManage({
 
 /* ---------------- Duplicates view ---------------- */
 
+function bestKeeperScore(r: Restaurant) {
+  return (r.phone ? 3 : 0) + (r.website ? 2 : 0) + (r.email ? 2 : 0) + (r.address ? 1 : 0) - r.rank / 10000;
+}
+
 function DuplicatesView({
   groups, onEdit,
 }: { groups: Restaurant[][]; onEdit: (r: Restaurant) => void }) {
   const toast = useToast();
+  const [merging, setMerging] = useState(false);
   if (groups.length === 0) {
     return (
       <div className="rounded-2xl border border-emerald/30 bg-emerald-soft p-10 text-center">
@@ -451,16 +456,45 @@ function DuplicatesView({
     );
   }
 
+  const autoMergeAll = async () => {
+    const toDelete: string[] = [];
+    for (const g of groups) {
+      const keeper = g.slice().sort((a, b) => bestKeeperScore(b) - bestKeeperScore(a))[0];
+      for (const r of g) if (r.id !== keeper.id) toDelete.push(r.id);
+    }
+    if (toDelete.length === 0) return;
+    if (!confirm(`سيتم دمج ${groups.length} مجموعة تلقائياً وحذف ${toDelete.length} نسخة مكررة (مع الإبقاء على الأكثر معلوماتٍ في كل مجموعة). هل تريد المتابعة؟`)) return;
+    setMerging(true);
+    try {
+      await deleteRestaurants(toDelete);
+      toast.push(`تم الدمج التلقائي — حذف ${toDelete.length} نسخة`, "success");
+    } catch (e) {
+      toast.push(`فشل الدمج: ${(e as Error).message}`, "error");
+    } finally {
+      setMerging(false);
+    }
+  };
+
+  const totalDupes = groups.reduce((n, g) => n + g.length - 1, 0);
+
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm flex items-start gap-3">
+      <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm flex items-start gap-3 flex-wrap">
         <AlertTriangle className="w-5 h-5 text-destructive-foreground shrink-0 mt-0.5" />
-        <div>
-          <div className="font-semibold text-foreground">تم العثور على {groups.length.toLocaleString("ar")} مجموعة مكررة</div>
+        <div className="flex-1 min-w-[240px]">
+          <div className="font-semibold text-foreground">تم العثور على {groups.length.toLocaleString("ar")} مجموعة مكررة ({totalDupes.toLocaleString("ar")} نسخة زائدة)</div>
           <div className="text-muted-foreground text-xs mt-1">
-            يتم اكتشاف التكرار عبر مطابقة الاسم (بعد التطبيع) أو نفس رقم الهاتف. اختر أي نسخة تريد الإبقاء عليها واحذف الباقي.
+            الدمج التلقائي يبقي على النسخة الأكثر اكتمالاً (هاتف/موقع/إيميل/عنوان) في كل مجموعة ويحذف الباقي بضغطة واحدة.
           </div>
         </div>
+        <button
+          onClick={autoMergeAll}
+          disabled={merging}
+          className="inline-flex items-center gap-2 text-xs font-semibold px-4 py-2 rounded-md bg-gold text-background hover:opacity-90 disabled:opacity-60"
+        >
+          {merging ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCcw className="w-3.5 h-3.5" />}
+          دمج تلقائي للكل ({totalDupes.toLocaleString("ar")})
+        </button>
       </div>
 
       {groups.map((group, gi) => (
@@ -469,6 +503,7 @@ function DuplicatesView({
     </div>
   );
 }
+
 
 function DuplicateGroupCard({
   group, onEdit, toast,
