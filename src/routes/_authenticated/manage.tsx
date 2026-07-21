@@ -508,10 +508,8 @@ function DuplicatesView({
 function DuplicateGroupCard({
   group, onEdit, toast,
 }: { group: Restaurant[]; onEdit: (r: Restaurant) => void; toast: ReturnType<typeof useToast> }) {
-  // Default keeper: highest rank (lowest number) with the most data
-  const score = (r: Restaurant) =>
-    (r.phone ? 3 : 0) + (r.website ? 2 : 0) + (r.address ? 1 : 0) - r.rank / 10000;
-  const initialKeep = group.slice().sort((a, b) => score(b) - score(a))[0].id;
+  // Default keeper: the row with the most useful data (phone/website/email/address)
+  const initialKeep = group.slice().sort((a, b) => bestKeeperScore(b) - bestKeeperScore(a))[0].id;
   const [keepId, setKeepId] = useState(initialKeep);
 
   const deleteOthers = () => {
