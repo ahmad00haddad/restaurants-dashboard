@@ -115,13 +115,36 @@ export function ActionPanel({
 
   const sendEmail = () => {
     const m = messages!.email;
+    const to = restaurant.email ?? "";
     window.open(
-      `mailto:?subject=${encodeURIComponent(m.subject)}&body=${encodeURIComponent(m.body)}`,
+      `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(m.subject)}&body=${encodeURIComponent(m.body)}`,
       "_blank",
     );
     onStatusChange("email");
-    toast.push("تم تجهيز الإيميل");
+    toast.push(to ? `تم فتح الإيميل إلى ${to}` : "تم تجهيز الإيميل");
   };
+
+  const scrapeEmail = async () => {
+    setScrapingEmail(true);
+    try {
+      const res = await scrapeOne({ data: { restaurantId: restaurant.id } });
+      if (res.found) {
+        qc.invalidateQueries({ queryKey: ["restaurants"] });
+        toast.push(`تم العثور على: ${res.email}`, "success");
+      } else {
+        const reason =
+          res.reason === "no_website" ? "لا يوجد موقع" :
+          res.reason === "not_found_on_site" ? "لم نجد إيميل في الموقع" :
+          "غير متوفر";
+        toast.push(`تعذّر الاستخراج (${reason})`, "info");
+      }
+    } catch (e) {
+      toast.push(`فشل: ${(e as Error).message}`, "error");
+    } finally {
+      setScrapingEmail(false);
+    }
+  };
+
 
   const toggleProposalService = (k: ServiceKey) => {
     const n = new Set(proposalServices);
