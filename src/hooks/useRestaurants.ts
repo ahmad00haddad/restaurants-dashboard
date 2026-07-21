@@ -18,6 +18,7 @@ interface DbRow {
   title: string;
   phone: string | null;
   website: string | null;
+  email: string | null;
   address: string | null;
   street: string | null;
   city: string | null;
@@ -29,6 +30,7 @@ function rowToRestaurant(row: DbRow): Restaurant {
     title: row.title,
     phone: row.phone,
     website: row.website ?? undefined,
+    email: row.email ?? undefined,
     address: row.address,
     street: row.street,
     city: row.city,
@@ -50,7 +52,7 @@ async function fetchAll(): Promise<Restaurant[]> {
   for (let from = 0; ; from += STEP) {
     const { data, error } = await supabase
       .from("restaurants")
-      .select("id, external_id, title, phone, website, address, street, city, rank")
+      .select("id, external_id, title, phone, website, email, address, street, city, rank")
       .order("rank", { ascending: true })
       .range(from, from + STEP - 1);
     if (error) throw error;
@@ -92,6 +94,7 @@ export async function updateRestaurant(id: string, patch: Partial<RawRestaurant>
       title: patch.title,
       phone: patch.phone,
       website: patch.website ?? null,
+      email: patch.email ?? null,
       address: patch.address,
       street: patch.street,
       city: patch.city,

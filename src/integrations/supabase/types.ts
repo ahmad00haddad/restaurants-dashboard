@@ -97,6 +97,7 @@ export type Database = {
           city: string | null
           created_at: string
           created_by: string | null
+          email: string | null
           external_id: string | null
           id: string
           phone: string | null
@@ -111,6 +112,7 @@ export type Database = {
           city?: string | null
           created_at?: string
           created_by?: string | null
+          email?: string | null
           external_id?: string | null
           id?: string
           phone?: string | null
@@ -125,6 +127,7 @@ export type Database = {
           city?: string | null
           created_at?: string
           created_by?: string | null
+          email?: string | null
           external_id?: string | null
           id?: string
           phone?: string | null

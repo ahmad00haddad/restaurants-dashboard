@@ -25,8 +25,12 @@ import type { Settings } from "@/hooks/useSettings";
 import {
   X, Phone, Globe, MapPin, Star, MessageCircle, Mail, Copy, CheckCircle2,
   Calendar, StickyNote, History, Sparkles, Tag, FileText, Plus, Printer, DollarSign, Flame,
+  Shuffle, Search as SearchIcon, Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/useToast";
+import { useServerFn } from "@tanstack/react-start";
+import { useQueryClient } from "@tanstack/react-query";
+import { scrapeEmailForRestaurant } from "@/lib/scrape.functions";
 
 interface Props {
   restaurant: Restaurant | null;
@@ -50,17 +54,21 @@ export function ActionPanel({
   const [serviceKey, setServiceKey] = useState<ServiceKey | null>(null);
   const [proposalServices, setProposalServices] = useState<Set<ServiceKey>>(new Set(["reel"]));
   const [tagInput, setTagInput] = useState("");
+  const [variantNonce, setVariantNonce] = useState(0);
+  const [scrapingEmail, setScrapingEmail] = useState(false);
   const toast = useToast();
+  const scrapeOne = useServerFn(scrapeEmailForRestaurant);
+  const qc = useQueryClient();
 
   const messages = useMemo(() => {
     if (!restaurant) return null;
     const wa = serviceKey
       ? buildServiceMessage(restaurant, serviceKey, settings)
-      : buildWhatsAppMessage(restaurant, settings);
-    const baseEmail = buildEmailMessage(restaurant, settings);
+      : buildWhatsAppMessage(restaurant, settings, variantNonce);
+    const baseEmail = buildEmailMessage(restaurant, settings, variantNonce);
     const proposal = buildProposal(restaurant, [...proposalServices], settings);
     return { whatsapp: wa, email: baseEmail, proposal };
-  }, [restaurant, serviceKey, proposalServices, settings]);
+  }, [restaurant, serviceKey, proposalServices, settings, variantNonce]);
 
   if (!restaurant) {
     return (
@@ -107,13 +115,36 @@ export function ActionPanel({
 
   const sendEmail = () => {
     const m = messages!.email;
+    const to = restaurant.email ?? "";
     window.open(
-      `mailto:?subject=${encodeURIComponent(m.subject)}&body=${encodeURIComponent(m.body)}`,
+      `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(m.subject)}&body=${encodeURIComponent(m.body)}`,
       "_blank",
     );
     onStatusChange("email");
-    toast.push("تم تجهيز الإيميل");
+    toast.push(to ? `تم فتح الإيميل إلى ${to}` : "تم تجهيز الإيميل");
   };
+
+  const scrapeEmail = async () => {
+    setScrapingEmail(true);
+    try {
+      const res = await scrapeOne({ data: { restaurantId: restaurant.id } });
+      if (res.found) {
+        qc.invalidateQueries({ queryKey: ["restaurants"] });
+        toast.push(`تم العثور على: ${res.email}`, "success");
+      } else {
+        const reason =
+          res.reason === "no_website" ? "لا يوجد موقع" :
+          res.reason === "not_found_on_site" ? "لم نجد إيميل في الموقع" :
+          "غير متوفر";
+        toast.push(`تعذّر الاستخراج (${reason})`, "info");
+      }
+    } catch (e) {
+      toast.push(`فشل: ${(e as Error).message}`, "error");
+    } finally {
+      setScrapingEmail(false);
+    }
+  };
+
 
   const toggleProposalService = (k: ServiceKey) => {
     const n = new Set(proposalServices);
@@ -199,6 +230,24 @@ export function ActionPanel({
               </a>
             </InfoRow>
           )}
+          <InfoRow icon={<Mail className="w-4 h-4" />} label="إيميل">
+            {restaurant.email ? (
+              <a href={`mailto:${restaurant.email}`} className="text-emerald hover:underline truncate inline-block max-w-[200px]">
+                {restaurant.email}
+              </a>
+            ) : (
+              <button
+                onClick={scrapeEmail}
+                disabled={scrapingEmail || !restaurant.website}
+                title={!restaurant.website ? "لا يوجد موقع للاستخراج منه" : "استخراج الإيميل من موقع المطعم"}
+                className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded border border-emerald/40 bg-emerald-soft text-emerald hover:bg-emerald/20 disabled:opacity-50"
+              >
+                {scrapingEmail ? <Loader2 className="w-3 h-3 animate-spin" /> : <SearchIcon className="w-3 h-3" />}
+                {restaurant.website ? "استخراج من الموقع" : "لا يوجد"}
+              </button>
+            )}
+          </InfoRow>
+
           {restaurant.address && (
             <InfoRow icon={<MapPin className="w-4 h-4" />} label="العنوان">
               <a
@@ -369,10 +418,20 @@ export function ActionPanel({
         <div>
           <div className="flex items-center justify-between mb-2">
             <div className="text-[11px] tracking-widest uppercase text-muted-foreground">المحتوى الجاهز</div>
-            <button onClick={copy} className="text-[11px] inline-flex items-center gap-1 text-muted-foreground hover:text-gold">
-              {copied ? <><CheckCircle2 className="w-3 h-3 text-emerald" /> نُسخت</> : <><Copy className="w-3 h-3" /> نسخ</>}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => { setVariantNonce((n) => n + 1); toast.push("تم توليد صيغة جديدة"); }}
+                title="توليد صيغة مختلفة للرسالة — كل نسخة تختلف قليلاً حتى لا تبدو آلية"
+                className="text-[11px] inline-flex items-center gap-1 text-muted-foreground hover:text-gold"
+              >
+                <Shuffle className="w-3 h-3" /> صيغة أخرى
+              </button>
+              <button onClick={copy} className="text-[11px] inline-flex items-center gap-1 text-muted-foreground hover:text-gold">
+                {copied ? <><CheckCircle2 className="w-3 h-3 text-emerald" /> نُسخت</> : <><Copy className="w-3 h-3" /> نسخ</>}
+              </button>
+            </div>
           </div>
+
 
           <div className="flex gap-1 mb-2 bg-surface-2 p-1 rounded-md">
             <TabBtn active={tab === "whatsapp"} onClick={() => setTab("whatsapp")}>

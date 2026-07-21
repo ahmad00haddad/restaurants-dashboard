@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowRight, Database, Copy, Plus, Search, Trash2, Pencil, Save, X,
-  AlertTriangle, RefreshCcw, CheckCircle2, Crown, Download, Upload, Loader2,
+  AlertTriangle, RefreshCcw, CheckCircle2, Crown, Download, Upload, Loader2, Mail,
 } from "lucide-react";
 import {
   useRestaurants, addRestaurant, updateRestaurant, deleteRestaurants,
@@ -11,6 +12,8 @@ import {
 import { findDuplicateGroups, SEGMENT_META, type Restaurant } from "@/lib/restaurants";
 import { useToast } from "@/hooks/useToast";
 import { restaurantsToCsv, downloadCsv, parseCsv } from "@/lib/csv";
+import { bulkScrapeEmails } from "@/lib/scrape.functions";
+import { useQueryClient } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/_authenticated/manage")({
   head: () => ({
@@ -33,10 +36,17 @@ function ManagePage() {
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<Restaurant | null>(null);
   const [importing, setImporting] = useState(false);
+  const [scraping, setScraping] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const scrape = useServerFn(bulkScrapeEmails);
+  const qc = useQueryClient();
 
   const duplicateGroups = useMemo(() => findDuplicateGroups(list), [list]);
   const duplicateCount = duplicateGroups.reduce((n, g) => n + g.length - 1, 0);
+  const missingEmailCount = useMemo(
+    () => list.filter((r) => r.website && !r.email).length,
+    [list],
+  );
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -117,6 +127,22 @@ function ManagePage() {
       if (fileRef.current) fileRef.current.value = "";
     }
   };
+  const handleScrapeEmails = async () => {
+    if (missingEmailCount === 0) { toast.push("لا توجد مواقع بحاجة لاستخراج إيميل", "info"); return; }
+    const batch = Math.min(20, missingEmailCount);
+    if (!confirm(`سيتم فحص ${batch} موقع مطعم لاستخراج الإيميلات (قد يستغرق دقيقة). المتابعة؟`)) return;
+    setScraping(true);
+    try {
+      const res = await scrape({ data: { limit: batch } });
+      qc.invalidateQueries({ queryKey: ["restaurants"] });
+      toast.push(`تم فحص ${res.scanned} موقع — عُثر على ${res.found} إيميل جديد`, res.found > 0 ? "success" : "info");
+    } catch (e) {
+      toast.push(`فشل الاستخراج: ${(e as Error).message}`, "error");
+    } finally {
+      setScraping(false);
+    }
+  };
+
 
 
   return (
@@ -159,6 +185,15 @@ function ManagePage() {
             >
               <Download className="w-3.5 h-3.5" />
               تصدير CSV
+            </button>
+            <button
+              onClick={handleScrapeEmails}
+              disabled={scraping || missingEmailCount === 0}
+              title={missingEmailCount === 0 ? "لا توجد مواقع تنتظر الاستخراج" : `فحص ${Math.min(20, missingEmailCount)} موقع لاستخراج الإيميلات`}
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-emerald/40 bg-emerald-soft text-emerald hover:bg-emerald/20 disabled:opacity-50"
+            >
+              {scraping ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+              استخراج الإيميلات ({missingEmailCount.toLocaleString("ar")})
             </button>
             <button
               onClick={handleRestoreAll}
@@ -437,10 +472,15 @@ function RestaurantTableManage({
 
 /* ---------------- Duplicates view ---------------- */
 
+function bestKeeperScore(r: Restaurant) {
+  return (r.phone ? 3 : 0) + (r.website ? 2 : 0) + (r.email ? 2 : 0) + (r.address ? 1 : 0) - r.rank / 10000;
+}
+
 function DuplicatesView({
   groups, onEdit,
 }: { groups: Restaurant[][]; onEdit: (r: Restaurant) => void }) {
   const toast = useToast();
+  const [merging, setMerging] = useState(false);
   if (groups.length === 0) {
     return (
       <div className="rounded-2xl border border-emerald/30 bg-emerald-soft p-10 text-center">
@@ -451,16 +491,45 @@ function DuplicatesView({
     );
   }
 
+  const autoMergeAll = async () => {
+    const toDelete: string[] = [];
+    for (const g of groups) {
+      const keeper = g.slice().sort((a, b) => bestKeeperScore(b) - bestKeeperScore(a))[0];
+      for (const r of g) if (r.id !== keeper.id) toDelete.push(r.id);
+    }
+    if (toDelete.length === 0) return;
+    if (!confirm(`سيتم دمج ${groups.length} مجموعة تلقائياً وحذف ${toDelete.length} نسخة مكررة (مع الإبقاء على الأكثر معلوماتٍ في كل مجموعة). هل تريد المتابعة؟`)) return;
+    setMerging(true);
+    try {
+      await deleteRestaurants(toDelete);
+      toast.push(`تم الدمج التلقائي — حذف ${toDelete.length} نسخة`, "success");
+    } catch (e) {
+      toast.push(`فشل الدمج: ${(e as Error).message}`, "error");
+    } finally {
+      setMerging(false);
+    }
+  };
+
+  const totalDupes = groups.reduce((n, g) => n + g.length - 1, 0);
+
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm flex items-start gap-3">
+      <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm flex items-start gap-3 flex-wrap">
         <AlertTriangle className="w-5 h-5 text-destructive-foreground shrink-0 mt-0.5" />
-        <div>
-          <div className="font-semibold text-foreground">تم العثور على {groups.length.toLocaleString("ar")} مجموعة مكررة</div>
+        <div className="flex-1 min-w-[240px]">
+          <div className="font-semibold text-foreground">تم العثور على {groups.length.toLocaleString("ar")} مجموعة مكررة ({totalDupes.toLocaleString("ar")} نسخة زائدة)</div>
           <div className="text-muted-foreground text-xs mt-1">
-            يتم اكتشاف التكرار عبر مطابقة الاسم (بعد التطبيع) أو نفس رقم الهاتف. اختر أي نسخة تريد الإبقاء عليها واحذف الباقي.
+            الدمج التلقائي يبقي على النسخة الأكثر اكتمالاً (هاتف/موقع/إيميل/عنوان) في كل مجموعة ويحذف الباقي بضغطة واحدة.
           </div>
         </div>
+        <button
+          onClick={autoMergeAll}
+          disabled={merging}
+          className="inline-flex items-center gap-2 text-xs font-semibold px-4 py-2 rounded-md bg-gold text-background hover:opacity-90 disabled:opacity-60"
+        >
+          {merging ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCcw className="w-3.5 h-3.5" />}
+          دمج تلقائي للكل ({totalDupes.toLocaleString("ar")})
+        </button>
       </div>
 
       {groups.map((group, gi) => (
@@ -470,13 +539,12 @@ function DuplicatesView({
   );
 }
 
+
 function DuplicateGroupCard({
   group, onEdit, toast,
 }: { group: Restaurant[]; onEdit: (r: Restaurant) => void; toast: ReturnType<typeof useToast> }) {
-  // Default keeper: highest rank (lowest number) with the most data
-  const score = (r: Restaurant) =>
-    (r.phone ? 3 : 0) + (r.website ? 2 : 0) + (r.address ? 1 : 0) - r.rank / 10000;
-  const initialKeep = group.slice().sort((a, b) => score(b) - score(a))[0].id;
+  // Default keeper: the row with the most useful data (phone/website/email/address)
+  const initialKeep = group.slice().sort((a, b) => bestKeeperScore(b) - bestKeeperScore(a))[0].id;
   const [keepId, setKeepId] = useState(initialKeep);
 
   const deleteOthers = () => {
