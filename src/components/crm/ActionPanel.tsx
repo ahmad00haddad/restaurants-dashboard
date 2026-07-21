@@ -418,10 +418,20 @@ export function ActionPanel({
         <div>
           <div className="flex items-center justify-between mb-2">
             <div className="text-[11px] tracking-widest uppercase text-muted-foreground">المحتوى الجاهز</div>
-            <button onClick={copy} className="text-[11px] inline-flex items-center gap-1 text-muted-foreground hover:text-gold">
-              {copied ? <><CheckCircle2 className="w-3 h-3 text-emerald" /> نُسخت</> : <><Copy className="w-3 h-3" /> نسخ</>}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => { setVariantNonce((n) => n + 1); toast.push("تم توليد صيغة جديدة"); }}
+                title="توليد صيغة مختلفة للرسالة — كل نسخة تختلف قليلاً حتى لا تبدو آلية"
+                className="text-[11px] inline-flex items-center gap-1 text-muted-foreground hover:text-gold"
+              >
+                <Shuffle className="w-3 h-3" /> صيغة أخرى
+              </button>
+              <button onClick={copy} className="text-[11px] inline-flex items-center gap-1 text-muted-foreground hover:text-gold">
+                {copied ? <><CheckCircle2 className="w-3 h-3 text-emerald" /> نُسخت</> : <><Copy className="w-3 h-3" /> نسخ</>}
+              </button>
+            </div>
           </div>
+
 
           <div className="flex gap-1 mb-2 bg-surface-2 p-1 rounded-md">
             <TabBtn active={tab === "whatsapp"} onClick={() => setTab("whatsapp")}>
