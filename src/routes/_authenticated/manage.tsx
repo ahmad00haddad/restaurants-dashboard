@@ -36,10 +36,17 @@ function ManagePage() {
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<Restaurant | null>(null);
   const [importing, setImporting] = useState(false);
+  const [scraping, setScraping] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const scrape = useServerFn(bulkScrapeEmails);
+  const qc = useQueryClient();
 
   const duplicateGroups = useMemo(() => findDuplicateGroups(list), [list]);
   const duplicateCount = duplicateGroups.reduce((n, g) => n + g.length - 1, 0);
+  const missingEmailCount = useMemo(
+    () => list.filter((r) => r.website && !r.email).length,
+    [list],
+  );
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
