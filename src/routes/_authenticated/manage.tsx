@@ -187,6 +187,15 @@ function ManagePage() {
               تصدير CSV
             </button>
             <button
+              onClick={handleScrapeEmails}
+              disabled={scraping || missingEmailCount === 0}
+              title={missingEmailCount === 0 ? "لا توجد مواقع تنتظر الاستخراج" : `فحص ${Math.min(20, missingEmailCount)} موقع لاستخراج الإيميلات`}
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-emerald/40 bg-emerald-soft text-emerald hover:bg-emerald/20 disabled:opacity-50"
+            >
+              {scraping ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+              استخراج الإيميلات ({missingEmailCount.toLocaleString("ar")})
+            </button>
+            <button
               onClick={handleRestoreAll}
               className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-border bg-card hover:border-emerald/50"
             >
