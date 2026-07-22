@@ -253,7 +253,12 @@ function ManagePage() {
             <Copy className="w-3.5 h-3.5 inline-block ml-1" />
             المكررات
           </TabBtn>
+          <TabBtn active={tab === "trash"} onClick={() => setTab("trash")} count={trashCount}>
+            <Archive className="w-3.5 h-3.5 inline-block ml-1" />
+            سلة المحذوفات
+          </TabBtn>
         </div>
+
 
         {tab === "all" && (
           <>
