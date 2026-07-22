@@ -215,7 +215,9 @@ function ManagePage() {
             </button>
             <button
               onClick={() => setShowAdd(true)}
-              className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-gold text-primary-foreground font-semibold hover:bg-gold/90"
+              disabled={!isAdmin}
+              title={isAdmin ? "" : "متاح للمشرف فقط"}
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-gold text-primary-foreground font-semibold hover:bg-gold/90 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Plus className="w-3.5 h-3.5" />
               مطعم جديد
@@ -223,6 +225,16 @@ function ManagePage() {
           </div>
 
         </div>
+
+        {!roleLoading && !isAdmin && (
+          <div className="mt-5 rounded-xl border border-gold/30 bg-gold-soft/40 p-3 flex items-center gap-2 text-xs">
+            <ShieldAlert className="w-4 h-4 text-gold" />
+            <span className="text-foreground/90">
+              أنت مسجل كمستخدم عادي — عرض فقط. الإضافة والتعديل والحذف متاحة للمشرف.
+            </span>
+          </div>
+        )}
+
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
           <StatChip label="الإجمالي الحالي" value={stats.total} tone="gold" icon={<Database className="w-4 h-4" />} />
