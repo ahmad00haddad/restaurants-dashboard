@@ -278,6 +278,15 @@ function ManagePage() {
         {tab === "duplicates" && (
           <DuplicatesView groups={duplicateGroups} onEdit={setEditing} />
         )}
+
+        {tab === "trash" && (
+          <TrashView
+            rows={trashQuery.data ?? []}
+            loading={trashQuery.isLoading}
+            isAdmin={isAdmin}
+            onRefresh={() => trashQuery.refetch()}
+          />
+        )}
       </main>
 
       {showAdd && (
