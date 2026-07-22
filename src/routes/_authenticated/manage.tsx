@@ -4,16 +4,19 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowRight, Database, Copy, Plus, Search, Trash2, Pencil, Save, X,
   AlertTriangle, RefreshCcw, CheckCircle2, Crown, Download, Upload, Loader2, Mail,
+  Archive, RotateCcw, ShieldAlert,
 } from "lucide-react";
 import {
   useRestaurants, addRestaurant, updateRestaurant, deleteRestaurants,
   restoreAllRestaurants, restaurantStats, type NewRestaurantInput,
+  useTrashedRestaurants, restoreRestaurants, purgeRestaurants,
 } from "@/hooks/useRestaurants";
 import { findDuplicateGroups, SEGMENT_META, type Restaurant } from "@/lib/restaurants";
 import { useToast } from "@/hooks/useToast";
 import { restaurantsToCsv, downloadCsv, parseCsv } from "@/lib/csv";
 import { bulkScrapeEmails } from "@/lib/scrape.functions";
 import { useQueryClient } from "@tanstack/react-query";
+import { useUserRole } from "@/hooks/useUserRole";
 
 export const Route = createFileRoute("/_authenticated/manage")({
   head: () => ({
@@ -25,12 +28,14 @@ export const Route = createFileRoute("/_authenticated/manage")({
   component: ManagePage,
 });
 
-type Tab = "all" | "duplicates" | "added" | "edited";
+type Tab = "all" | "duplicates" | "trash" | "added" | "edited";
+
 
 function ManagePage() {
   const list = useRestaurants();
   const stats = restaurantStats();
   const toast = useToast();
+  const { isAdmin, loading: roleLoading } = useUserRole();
   const [tab, setTab] = useState<Tab>("all");
   const [q, setQ] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -40,9 +45,12 @@ function ManagePage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const scrape = useServerFn(bulkScrapeEmails);
   const qc = useQueryClient();
+  const trashQuery = useTrashedRestaurants();
+  const trashCount = trashQuery.data?.length ?? 0;
 
   const duplicateGroups = useMemo(() => findDuplicateGroups(list), [list]);
   const duplicateCount = duplicateGroups.reduce((n, g) => n + g.length - 1, 0);
+
   const missingEmailCount = useMemo(
     () => list.filter((r) => r.website && !r.email).length,
     [list],
@@ -57,17 +65,20 @@ function ManagePage() {
   }, [list, q]);
 
   const handleDelete = async (r: Restaurant) => {
-    if (!confirm(`حذف "${r.title}" نهائياً من القاعدة؟`)) return;
+    if (!isAdmin) { toast.push("هذه العملية متاحة للمشرف فقط", "error"); return; }
+    if (!confirm(`نقل "${r.title}" إلى سلة المحذوفات؟ يمكن استعادته لاحقاً.`)) return;
     await deleteRestaurants([r.id]);
-    toast.push("تم الحذف", "success");
+    toast.push("تم النقل إلى سلة المحذوفات", "success");
   };
 
   const handleBulkDelete = async (ids: string[]) => {
+    if (!isAdmin) { toast.push("هذه العملية متاحة للمشرف فقط", "error"); return; }
     if (ids.length === 0) return;
-    if (!confirm(`حذف ${ids.length} مطعم نهائياً؟ لا يمكن التراجع.`)) return;
+    if (!confirm(`نقل ${ids.length} مطعم إلى سلة المحذوفات؟ يمكن استعادتها لاحقاً.`)) return;
     await deleteRestaurants(ids);
-    toast.push(`تم حذف ${ids.length} مطعم`, "success");
+    toast.push(`تم نقل ${ids.length} مطعم إلى السلة`, "success");
   };
+
 
   const handleAdd = async (input: NewRestaurantInput) => {
     await addRestaurant(input);
@@ -204,7 +215,9 @@ function ManagePage() {
             </button>
             <button
               onClick={() => setShowAdd(true)}
-              className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-gold text-primary-foreground font-semibold hover:bg-gold/90"
+              disabled={!isAdmin}
+              title={isAdmin ? "" : "متاح للمشرف فقط"}
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-gold text-primary-foreground font-semibold hover:bg-gold/90 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Plus className="w-3.5 h-3.5" />
               مطعم جديد
@@ -212,6 +225,16 @@ function ManagePage() {
           </div>
 
         </div>
+
+        {!roleLoading && !isAdmin && (
+          <div className="mt-5 rounded-xl border border-gold/30 bg-gold-soft/40 p-3 flex items-center gap-2 text-xs">
+            <ShieldAlert className="w-4 h-4 text-gold" />
+            <span className="text-foreground/90">
+              أنت مسجل كمستخدم عادي — عرض فقط. الإضافة والتعديل والحذف متاحة للمشرف.
+            </span>
+          </div>
+        )}
+
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
           <StatChip label="الإجمالي الحالي" value={stats.total} tone="gold" icon={<Database className="w-4 h-4" />} />
@@ -230,7 +253,12 @@ function ManagePage() {
             <Copy className="w-3.5 h-3.5 inline-block ml-1" />
             المكررات
           </TabBtn>
+          <TabBtn active={tab === "trash"} onClick={() => setTab("trash")} count={trashCount}>
+            <Archive className="w-3.5 h-3.5 inline-block ml-1" />
+            سلة المحذوفات
+          </TabBtn>
         </div>
+
 
         {tab === "all" && (
           <>
@@ -249,6 +277,15 @@ function ManagePage() {
 
         {tab === "duplicates" && (
           <DuplicatesView groups={duplicateGroups} onEdit={setEditing} />
+        )}
+
+        {tab === "trash" && (
+          <TrashView
+            rows={trashQuery.data ?? []}
+            loading={trashQuery.isLoading}
+            isAdmin={isAdmin}
+            onRefresh={() => trashQuery.refetch()}
+          />
         )}
       </main>
 
@@ -703,3 +740,171 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </label>
   );
 }
+
+/* ---------------- Trash view ---------------- */
+
+function TrashView({
+  rows, loading, isAdmin, onRefresh,
+}: {
+  rows: Restaurant[];
+  loading: boolean;
+  isAdmin: boolean;
+  onRefresh: () => void;
+}) {
+  const toast = useToast();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+
+  const toggle = (id: string) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelected(next);
+  };
+  const toggleAll = () => {
+    if (selected.size === rows.length) setSelected(new Set());
+    else setSelected(new Set(rows.map((r) => r.id)));
+  };
+
+  const doRestore = async (ids: string[]) => {
+    if (!isAdmin) { toast.push("متاح للمشرف فقط", "error"); return; }
+    if (ids.length === 0) return;
+    setBusy(true);
+    try {
+      await restoreRestaurants(ids);
+      setSelected(new Set());
+      toast.push(`تم استعادة ${ids.length} مطعم`, "success");
+      onRefresh();
+    } finally { setBusy(false); }
+  };
+
+  const doPurge = async (ids: string[]) => {
+    if (!isAdmin) { toast.push("متاح للمشرف فقط", "error"); return; }
+    if (ids.length === 0) return;
+    if (!confirm(`حذف ${ids.length} مطعم نهائياً؟ لا يمكن التراجع بعد الآن.`)) return;
+    setBusy(true);
+    try {
+      await purgeRestaurants(ids);
+      setSelected(new Set());
+      toast.push(`تم الحذف النهائي لـ ${ids.length} مطعم`, "success");
+      onRefresh();
+    } finally { setBusy(false); }
+  };
+
+  if (loading) {
+    return (
+      <div className="rounded-2xl border border-border bg-card p-10 text-center text-muted-foreground text-sm">
+        <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
+        جاري تحميل السلة...
+      </div>
+    );
+  }
+
+  if (rows.length === 0) {
+    return (
+      <div className="rounded-2xl border border-emerald/30 bg-emerald-soft p-10 text-center">
+        <Archive className="w-10 h-10 text-emerald mx-auto mb-3" />
+        <div className="text-lg font-bold text-foreground">السلة فارغة</div>
+        <div className="text-sm text-muted-foreground mt-2">
+          المطاعم المحذوفة تظهر هنا لمدة 30 يوماً قبل الحذف النهائي.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border bg-surface-2 flex-wrap">
+        <div className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <Archive className="w-4 h-4 text-muted-foreground" />
+          {rows.length.toLocaleString("ar")} مطعم في السلة
+          {selected.size > 0 && (
+            <span className="text-xs text-gold">— محدد {selected.size.toLocaleString("ar")}</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => doRestore([...selected])}
+            disabled={!isAdmin || busy || selected.size === 0}
+            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-emerald-soft border border-emerald/40 text-emerald hover:bg-emerald/20 disabled:opacity-40"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            استعادة المحدد
+          </button>
+          <button
+            onClick={() => doPurge([...selected])}
+            disabled={!isAdmin || busy || selected.size === 0}
+            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-destructive/15 border border-destructive/30 text-destructive-foreground hover:bg-destructive/25 disabled:opacity-40"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            حذف نهائي
+          </button>
+          <button
+            onClick={() => doPurge(rows.map((r) => r.id))}
+            disabled={!isAdmin || busy}
+            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-border bg-card hover:border-destructive/40 disabled:opacity-40"
+          >
+            إفراغ السلة
+          </button>
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-surface-2 text-muted-foreground text-[11px] uppercase tracking-wider">
+            <tr>
+              <th className="text-right px-3 py-2.5 w-10">
+                <input
+                  type="checkbox"
+                  checked={selected.size === rows.length && rows.length > 0}
+                  onChange={toggleAll}
+                  className="accent-gold w-4 h-4 cursor-pointer"
+                />
+              </th>
+              <th className="text-right px-3 py-2.5">المطعم</th>
+              <th className="text-right px-3 py-2.5">الفئة</th>
+              <th className="text-right px-3 py-2.5">الهاتف</th>
+              <th className="text-right px-3 py-2.5">الإجراء</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {rows.map((r) => (
+              <tr key={r.id} className={selected.has(r.id) ? "bg-gold-soft/20" : ""}>
+                <td className="px-3 py-2.5">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(r.id)}
+                    onChange={() => toggle(r.id)}
+                    className="accent-gold w-4 h-4 cursor-pointer"
+                  />
+                </td>
+                <td className="px-3 py-2.5 font-semibold text-foreground">{r.title}</td>
+                <td className="px-3 py-2.5 text-muted-foreground">{r.category}</td>
+                <td className="px-3 py-2.5 text-muted-foreground text-xs tabular-nums" dir="ltr">{r.phone ?? "—"}</td>
+                <td className="px-3 py-2.5">
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => doRestore([r.id])}
+                      disabled={!isAdmin || busy}
+                      className="w-7 h-7 rounded-md hover:bg-emerald-soft text-muted-foreground hover:text-emerald flex items-center justify-center disabled:opacity-40"
+                      title="استعادة"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => doPurge([r.id])}
+                      disabled={!isAdmin || busy}
+                      className="w-7 h-7 rounded-md hover:bg-destructive/15 text-muted-foreground hover:text-destructive-foreground flex items-center justify-center disabled:opacity-40"
+                      title="حذف نهائي"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+

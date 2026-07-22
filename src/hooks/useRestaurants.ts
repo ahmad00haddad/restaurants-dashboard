@@ -53,6 +53,7 @@ async function fetchAll(): Promise<Restaurant[]> {
     const { data, error } = await supabase
       .from("restaurants")
       .select("id, external_id, title, phone, website, email, address, street, city, rank")
+      .is("deleted_at", null)
       .order("rank", { ascending: true })
       .range(from, from + STEP - 1);
     if (error) throw error;
@@ -61,6 +62,19 @@ async function fetchAll(): Promise<Restaurant[]> {
     if (data.length < STEP) break;
   }
   return out;
+}
+
+const TRASH_QK = ["restaurants-trash"] as const;
+
+async function fetchTrash(): Promise<Restaurant[]> {
+  const { data, error } = await supabase
+    .from("restaurants")
+    .select("id, external_id, title, phone, website, email, address, street, city, rank, deleted_at")
+    .not("deleted_at", "is", null)
+    .order("deleted_at", { ascending: false })
+    .limit(2000);
+  if (error) throw error;
+  return (data ?? []).map((row) => rowToRestaurant(row as DbRow));
 }
 
 export function useRestaurants(): Restaurant[] {
@@ -76,16 +90,44 @@ export function useRestaurantsQuery() {
   return useQuery({ queryKey: QK, queryFn: fetchAll, staleTime: 60_000 });
 }
 
+export function useTrashedRestaurants() {
+  return useQuery({ queryKey: TRASH_QK, queryFn: fetchTrash, staleTime: 30_000 });
+}
+
 function invalidate() {
-  getGlobalQueryClient()?.invalidateQueries({ queryKey: QK });
+  const qc = getGlobalQueryClient();
+  qc?.invalidateQueries({ queryKey: QK });
+  qc?.invalidateQueries({ queryKey: TRASH_QK });
 }
 
 export async function deleteRestaurants(ids: string[]) {
+  if (ids.length === 0) return;
+  // Soft-delete: move to trash instead of permanent removal.
+  const { error } = await supabase
+    .from("restaurants")
+    .update({ deleted_at: new Date().toISOString() })
+    .in("id", ids);
+  if (error) throw error;
+  invalidate();
+}
+
+export async function restoreRestaurants(ids: string[]) {
+  if (ids.length === 0) return;
+  const { error } = await supabase
+    .from("restaurants")
+    .update({ deleted_at: null })
+    .in("id", ids);
+  if (error) throw error;
+  invalidate();
+}
+
+export async function purgeRestaurants(ids: string[]) {
   if (ids.length === 0) return;
   const { error } = await supabase.from("restaurants").delete().in("id", ids);
   if (error) throw error;
   invalidate();
 }
+
 
 export async function updateRestaurant(id: string, patch: Partial<RawRestaurant>) {
   const { error } = await supabase
