@@ -65,17 +65,20 @@ function ManagePage() {
   }, [list, q]);
 
   const handleDelete = async (r: Restaurant) => {
-    if (!confirm(`حذف "${r.title}" نهائياً من القاعدة؟`)) return;
+    if (!isAdmin) { toast.push("هذه العملية متاحة للمشرف فقط", "error"); return; }
+    if (!confirm(`نقل "${r.title}" إلى سلة المحذوفات؟ يمكن استعادته لاحقاً.`)) return;
     await deleteRestaurants([r.id]);
-    toast.push("تم الحذف", "success");
+    toast.push("تم النقل إلى سلة المحذوفات", "success");
   };
 
   const handleBulkDelete = async (ids: string[]) => {
+    if (!isAdmin) { toast.push("هذه العملية متاحة للمشرف فقط", "error"); return; }
     if (ids.length === 0) return;
-    if (!confirm(`حذف ${ids.length} مطعم نهائياً؟ لا يمكن التراجع.`)) return;
+    if (!confirm(`نقل ${ids.length} مطعم إلى سلة المحذوفات؟ يمكن استعادتها لاحقاً.`)) return;
     await deleteRestaurants(ids);
-    toast.push(`تم حذف ${ids.length} مطعم`, "success");
+    toast.push(`تم نقل ${ids.length} مطعم إلى السلة`, "success");
   };
+
 
   const handleAdd = async (input: NewRestaurantInput) => {
     await addRestaurant(input);
