@@ -4,16 +4,19 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowRight, Database, Copy, Plus, Search, Trash2, Pencil, Save, X,
   AlertTriangle, RefreshCcw, CheckCircle2, Crown, Download, Upload, Loader2, Mail,
+  Archive, RotateCcw, ShieldAlert,
 } from "lucide-react";
 import {
   useRestaurants, addRestaurant, updateRestaurant, deleteRestaurants,
   restoreAllRestaurants, restaurantStats, type NewRestaurantInput,
+  useTrashedRestaurants, restoreRestaurants, purgeRestaurants,
 } from "@/hooks/useRestaurants";
 import { findDuplicateGroups, SEGMENT_META, type Restaurant } from "@/lib/restaurants";
 import { useToast } from "@/hooks/useToast";
 import { restaurantsToCsv, downloadCsv, parseCsv } from "@/lib/csv";
 import { bulkScrapeEmails } from "@/lib/scrape.functions";
 import { useQueryClient } from "@tanstack/react-query";
+import { useUserRole } from "@/hooks/useUserRole";
 
 export const Route = createFileRoute("/_authenticated/manage")({
   head: () => ({
@@ -25,7 +28,8 @@ export const Route = createFileRoute("/_authenticated/manage")({
   component: ManagePage,
 });
 
-type Tab = "all" | "duplicates" | "added" | "edited";
+type Tab = "all" | "duplicates" | "trash" | "added" | "edited";
+
 
 function ManagePage() {
   const list = useRestaurants();
