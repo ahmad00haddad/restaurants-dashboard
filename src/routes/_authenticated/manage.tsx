@@ -35,6 +35,7 @@ function ManagePage() {
   const list = useRestaurants();
   const stats = restaurantStats();
   const toast = useToast();
+  const { isAdmin, loading: roleLoading } = useUserRole();
   const [tab, setTab] = useState<Tab>("all");
   const [q, setQ] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -44,9 +45,12 @@ function ManagePage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const scrape = useServerFn(bulkScrapeEmails);
   const qc = useQueryClient();
+  const trashQuery = useTrashedRestaurants();
+  const trashCount = trashQuery.data?.length ?? 0;
 
   const duplicateGroups = useMemo(() => findDuplicateGroups(list), [list]);
   const duplicateCount = duplicateGroups.reduce((n, g) => n + g.length - 1, 0);
+
   const missingEmailCount = useMemo(
     () => list.filter((r) => r.website && !r.email).length,
     [list],
