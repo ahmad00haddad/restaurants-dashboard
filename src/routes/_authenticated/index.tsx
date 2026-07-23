@@ -418,6 +418,7 @@ function Dashboard() {
               isFavorite={(id) => !!store[id]?.favorite}
               onSelect={(r) => setSelectedId(r.id === selectedId ? null : r.id)}
               selectedId={selectedId}
+              onStatusChange={(id, s) => setStatus(id, s)}
             />
           )}
         </div>
