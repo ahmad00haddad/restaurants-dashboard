@@ -169,7 +169,7 @@ export function useCrmStore() {
   const importStore = useCallback(async (data: Store) => {
     if (!userId) return;
     for (const [id, s] of Object.entries(data)) {
-      await upsertOne(userId, id, s);
+      await upsertOne(userId, id, {}, s);
     }
     qc.invalidateQueries({ queryKey: QK });
   }, [userId, qc]);
