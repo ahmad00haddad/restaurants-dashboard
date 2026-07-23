@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Status } from "@/lib/restaurants";
@@ -54,27 +54,24 @@ async function fetchAll(userId: string): Promise<Store> {
   return out;
 }
 
-async function upsertOne(userId: string, restaurantId: string, patch: Partial<RestaurantState> & { historyAppend?: { at: number; status: Status } }) {
-  // Load current row to merge (no race-safe RPC available)
-  const { data: cur } = await supabase
-    .from("crm_states")
-    .select("history, tags, status, favorite, notes, follow_up, deal_value")
-    .eq("user_id", userId)
-    .eq("restaurant_id", restaurantId)
-    .maybeSingle();
-
-  const baseHistory = Array.isArray(cur?.history) ? (cur!.history as { at: number; status: Status }[]) : [];
+async function upsertOne(
+  userId: string,
+  restaurantId: string,
+  cur: RestaurantState,
+  patch: Partial<RestaurantState> & { historyAppend?: { at: number; status: Status } },
+) {
+  const baseHistory = cur.history ?? [];
   const history = patch.historyAppend ? [...baseHistory, patch.historyAppend] : (patch.history ?? baseHistory);
 
   const payload = {
     user_id: userId,
     restaurant_id: restaurantId,
-    status: patch.status ?? cur?.status ?? "new",
-    favorite: patch.favorite ?? cur?.favorite ?? false,
-    notes: patch.notes ?? cur?.notes ?? null,
-    follow_up: patch.followUp ?? cur?.follow_up ?? null,
-    tags: patch.tags ?? cur?.tags ?? [],
-    deal_value: patch.dealValue ?? cur?.deal_value ?? null,
+    status: patch.status ?? cur.status ?? "new",
+    favorite: patch.favorite ?? cur.favorite ?? false,
+    notes: patch.notes ?? cur.notes ?? null,
+    follow_up: patch.followUp ?? cur.followUp ?? null,
+    tags: patch.tags ?? cur.tags ?? [],
+    deal_value: patch.dealValue ?? cur.dealValue ?? null,
     history,
   };
   const { error } = await supabase
@@ -102,23 +99,39 @@ export function useCrmStore() {
     staleTime: 30_000,
   });
 
-  const ready = !userIdQuery.isLoading && (!userId || !!store);
+  // Realtime: refresh crm state on any change for this user
+  useEffect(() => {
+    if (!userId) return;
+    const ch = supabase
+      .channel(`crm-${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "crm_states", filter: `user_id=eq.${userId}` },
+        () => qc.invalidateQueries({ queryKey: QK }),
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [userId, qc]);
 
-  const optimistic = (id: string, patch: Partial<RestaurantState>) => {
-    qc.setQueryData<Store>(QK, (prev) => {
-      const cur = prev?.[id] ?? {};
-      return { ...(prev ?? {}), [id]: { ...cur, ...patch, updatedAt: Date.now() } };
-    });
-  };
+  const ready = !userIdQuery.isLoading && (!userId || !!store);
 
   const persist = useCallback(
     async (id: string, patch: Partial<RestaurantState> & { historyAppend?: { at: number; status: Status } }) => {
       if (!userId) return;
-      optimistic(id, patch);
+      // Merge from live cache (avoids race with a stale separate SELECT).
+      const prev = qc.getQueryData<Store>(QK) ?? {};
+      const cur = prev[id] ?? {};
+      const nextHistory = patch.historyAppend
+        ? [...(cur.history ?? []), patch.historyAppend]
+        : (patch.history ?? cur.history);
+      const merged: RestaurantState = { ...cur, ...patch, history: nextHistory, updatedAt: Date.now() };
+      qc.setQueryData<Store>(QK, { ...prev, [id]: merged });
       try {
-        await upsertOne(userId, id, patch);
-      } finally {
-        qc.invalidateQueries({ queryKey: QK });
+        await upsertOne(userId, id, cur, patch);
+      } catch (e) {
+        // Rollback on failure
+        qc.setQueryData<Store>(QK, prev);
+        throw e;
       }
     },
     [userId, qc],
@@ -156,7 +169,7 @@ export function useCrmStore() {
   const importStore = useCallback(async (data: Store) => {
     if (!userId) return;
     for (const [id, s] of Object.entries(data)) {
-      await upsertOne(userId, id, s);
+      await upsertOne(userId, id, {}, s);
     }
     qc.invalidateQueries({ queryKey: QK });
   }, [userId, qc]);

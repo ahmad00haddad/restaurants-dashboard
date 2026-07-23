@@ -163,22 +163,30 @@ export const bulkScrapeEmails = createServerFn({ method: "POST" })
       .is("email", null)
       .limit(data.limit);
     if (error) throw new Error(error.message);
-    let ok = 0;
+    const targets = (rows ?? []).filter((r) => r.website);
+    const CONCURRENCY = 5;
     const results: { id: string; email: string | null }[] = [];
-    for (const r of rows ?? []) {
-      if (!r.website) continue;
-      try {
-        const email = await scrapeSite(r.website);
-        if (email) {
-          await supabase.from("restaurants").update({ email }).eq("id", r.id);
-          ok++;
-          results.push({ id: r.id, email });
-        } else {
-          results.push({ id: r.id, email: null });
-        }
-      } catch {
-        results.push({ id: r.id, email: null });
+    let ok = 0;
+
+    for (let i = 0; i < targets.length; i += CONCURRENCY) {
+      const batch = targets.slice(i, i + CONCURRENCY);
+      const settled = await Promise.all(
+        batch.map(async (r) => {
+          try {
+            const email = await scrapeSite(r.website!);
+            if (email) {
+              await supabase.from("restaurants").update({ email }).eq("id", r.id);
+            }
+            return { id: r.id, email };
+          } catch {
+            return { id: r.id, email: null };
+          }
+        }),
+      );
+      for (const s of settled) {
+        results.push(s);
+        if (s.email) ok++;
       }
     }
-    return { scanned: rows?.length ?? 0, found: ok, results };
+    return { scanned: targets.length, found: ok, results };
   });
