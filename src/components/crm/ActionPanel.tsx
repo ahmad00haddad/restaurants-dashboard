@@ -25,12 +25,14 @@ import type { Settings } from "@/hooks/useSettings";
 import {
   X, Phone, Globe, MapPin, Star, MessageCircle, Mail, Copy, CheckCircle2,
   Calendar, StickyNote, History, Sparkles, Tag, FileText, Plus, Printer, DollarSign, Flame,
-  Shuffle, Search as SearchIcon, Loader2,
+  Shuffle, Search as SearchIcon, Loader2, Wand2, RotateCcw,
 } from "lucide-react";
 import { useToast } from "@/hooks/useToast";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import { scrapeEmailForRestaurant } from "@/lib/scrape.functions";
+import { composeOutreach } from "@/lib/ai.functions";
+
 
 interface Props {
   restaurant: Restaurant | null;
@@ -45,6 +47,15 @@ interface Props {
 }
 
 type Tab = "whatsapp" | "email" | "proposal";
+type AiTone = "friendly" | "formal" | "short" | "bold";
+
+const TONE_LABEL: Record<AiTone, string> = {
+  friendly: "ودّي",
+  formal: "رسمي",
+  short: "مختصر",
+  bold: "جريء",
+};
+
 
 export function ActionPanel({
   restaurant, state, settings, onStatusChange, onToggleFavorite, onUpdate, onAddTag, onRemoveTag, onClose,
@@ -56,19 +67,77 @@ export function ActionPanel({
   const [tagInput, setTagInput] = useState("");
   const [variantNonce, setVariantNonce] = useState(0);
   const [scrapingEmail, setScrapingEmail] = useState(false);
+  const [tone, setTone] = useState<AiTone>("friendly");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiWa, setAiWa] = useState<string | null>(null);
+  const [aiEmail, setAiEmail] = useState<{ subject?: string; body: string } | null>(null);
   const toast = useToast();
   const scrapeOne = useServerFn(scrapeEmailForRestaurant);
+  const compose = useServerFn(composeOutreach);
   const qc = useQueryClient();
 
   const messages = useMemo(() => {
     if (!restaurant) return null;
-    const wa = serviceKey
+    const wa = aiWa ?? (serviceKey
       ? buildServiceMessage(restaurant, serviceKey, settings)
-      : buildWhatsAppMessage(restaurant, settings, variantNonce);
-    const baseEmail = buildEmailMessage(restaurant, settings, variantNonce);
+      : buildWhatsAppMessage(restaurant, settings, variantNonce));
+    const tpl = buildEmailMessage(restaurant, settings, variantNonce);
+    const baseEmail = aiEmail
+      ? { subject: aiEmail.subject ?? tpl.subject, body: aiEmail.body }
+      : tpl;
     const proposal = buildProposal(restaurant, [...proposalServices], settings);
     return { whatsapp: wa, email: baseEmail, proposal };
-  }, [restaurant, serviceKey, proposalServices, settings, variantNonce]);
+  }, [restaurant, serviceKey, proposalServices, settings, variantNonce, aiWa, aiEmail]);
+
+  // Reset AI drafts when switching restaurant
+  const currentId = restaurant?.id ?? null;
+  const [lastId, setLastId] = useState<string | null>(currentId);
+  if (currentId !== lastId) {
+    setLastId(currentId);
+    setAiWa(null);
+    setAiEmail(null);
+  }
+
+  const runAi = async () => {
+    if (!restaurant) return;
+    const channel: "whatsapp" | "email" = tab === "email" ? "email" : "whatsapp";
+    setAiLoading(true);
+    try {
+      const res = await compose({
+        data: {
+          channel,
+          tone,
+          restaurant: {
+            title: restaurant.title,
+            category: restaurant.category,
+            segment: SEGMENT_META[restaurant.segment].label,
+            city: restaurant.city,
+            website: restaurant.website ?? null,
+            rating: restaurant.rating,
+          },
+          service: serviceKey ? SERVICE_BY_KEY[serviceKey].label : undefined,
+          price: serviceKey ? priceFor(restaurant, serviceKey) : undefined,
+          currency: settings.currency,
+          sender: {
+            name: settings.senderName,
+            role: settings.senderRole,
+            signature: settings.signature,
+            portfolioUrl: settings.portfolioUrl,
+          },
+          notes: state.notes || undefined,
+          language: "ar" as const,
+        },
+      });
+      if (channel === "email") setAiEmail({ subject: res.subject, body: res.body });
+      else setAiWa(res.body);
+      toast.push("تمت كتابة رسالة مخصّصة ✍️", "success");
+    } catch (e) {
+      toast.push((e as Error).message || "تعذّر التوليد", "error");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
 
   if (!restaurant) {
     return (
@@ -431,6 +500,53 @@ export function ActionPanel({
               </button>
             </div>
           </div>
+
+          {/* AI writer */}
+          {tab !== "proposal" && (
+            <div className="mb-2 p-2 rounded-md border border-gold/25 bg-gold-soft/40 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-[10px] uppercase tracking-widest text-gold flex items-center gap-1">
+                  <Wand2 className="w-3 h-3" /> كاتب الرسائل الذكي
+                </div>
+                {(aiWa || aiEmail) && (
+                  <button
+                    onClick={() => { setAiWa(null); setAiEmail(null); toast.push("تمت العودة للقالب"); }}
+                    className="text-[10px] inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                  >
+                    <RotateCcw className="w-3 h-3" /> القالب الأصلي
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {(Object.keys(TONE_LABEL) as AiTone[]).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setTone(t)}
+                    className={`text-[10px] px-2 py-1 rounded-full border transition-colors ${
+                      tone === t
+                        ? "bg-gold text-primary-foreground border-gold font-semibold"
+                        : "border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {TONE_LABEL[t]}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={runAi}
+                disabled={aiLoading}
+                className="w-full inline-flex items-center justify-center gap-1.5 py-2 rounded-md bg-gold text-primary-foreground text-xs font-semibold hover:opacity-90 disabled:opacity-50"
+              >
+                {aiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+                {aiLoading ? "يكتب الآن..." : `اكتب رسالة ${tab === "email" ? "إيميل" : "واتساب"} مخصّصة`}
+              </button>
+              <div className="text-[10px] text-muted-foreground leading-5">
+                تُكتب بأسلوب بشري لكل مطعم على حدة، وتراعي نوع المطبخ، الشريحة، الباقة المختارة، وملاحظاتك الداخلية.
+              </div>
+            </div>
+          )}
+
+
 
 
           <div className="flex gap-1 mb-2 bg-surface-2 p-1 rounded-md">

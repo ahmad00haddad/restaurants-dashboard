@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedPlanRouteImport } from './routes/_authenticated/plan'
 import { Route as AuthenticatedManageRouteImport } from './routes/_authenticated/manage'
 import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticated/insights'
 
@@ -27,6 +28,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPlanRoute = AuthenticatedPlanRouteImport.update({
+  id: '/plan',
+  path: '/plan',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedManageRoute = AuthenticatedManageRouteImport.update({
@@ -45,11 +51,13 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/insights': typeof AuthenticatedInsightsRoute
   '/manage': typeof AuthenticatedManageRoute
+  '/plan': typeof AuthenticatedPlanRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/insights': typeof AuthenticatedInsightsRoute
   '/manage': typeof AuthenticatedManageRoute
+  '/plan': typeof AuthenticatedPlanRoute
   '/': typeof AuthenticatedIndexRoute
 }
 export interface FileRoutesById {
@@ -58,19 +66,21 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/insights': typeof AuthenticatedInsightsRoute
   '/_authenticated/manage': typeof AuthenticatedManageRoute
+  '/_authenticated/plan': typeof AuthenticatedPlanRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/insights' | '/manage'
+  fullPaths: '/' | '/auth' | '/insights' | '/manage' | '/plan'
   fileRoutesByTo: FileRoutesByTo
-  to: '/auth' | '/insights' | '/manage' | '/'
+  to: '/auth' | '/insights' | '/manage' | '/plan' | '/'
   id:
     | '__root__'
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/insights'
     | '/_authenticated/manage'
+    | '/_authenticated/plan'
     | '/_authenticated/'
   fileRoutesById: FileRoutesById
 }
@@ -102,6 +112,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/plan': {
+      id: '/_authenticated/plan'
+      path: '/plan'
+      fullPath: '/plan'
+      preLoaderRoute: typeof AuthenticatedPlanRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/manage': {
       id: '/_authenticated/manage'
       path: '/manage'
@@ -122,12 +139,14 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedInsightsRoute: typeof AuthenticatedInsightsRoute
   AuthenticatedManageRoute: typeof AuthenticatedManageRoute
+  AuthenticatedPlanRoute: typeof AuthenticatedPlanRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedInsightsRoute: AuthenticatedInsightsRoute,
   AuthenticatedManageRoute: AuthenticatedManageRoute,
+  AuthenticatedPlanRoute: AuthenticatedPlanRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }
 
