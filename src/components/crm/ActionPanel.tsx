@@ -25,12 +25,14 @@ import type { Settings } from "@/hooks/useSettings";
 import {
   X, Phone, Globe, MapPin, Star, MessageCircle, Mail, Copy, CheckCircle2,
   Calendar, StickyNote, History, Sparkles, Tag, FileText, Plus, Printer, DollarSign, Flame,
-  Shuffle, Search as SearchIcon, Loader2,
+  Shuffle, Search as SearchIcon, Loader2, Wand2, RotateCcw,
 } from "lucide-react";
 import { useToast } from "@/hooks/useToast";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import { scrapeEmailForRestaurant } from "@/lib/scrape.functions";
+import { composeOutreach } from "@/lib/ai.functions";
+
 
 interface Props {
   restaurant: Restaurant | null;
