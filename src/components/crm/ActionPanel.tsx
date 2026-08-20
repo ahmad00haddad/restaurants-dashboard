@@ -58,19 +58,77 @@ export function ActionPanel({
   const [tagInput, setTagInput] = useState("");
   const [variantNonce, setVariantNonce] = useState(0);
   const [scrapingEmail, setScrapingEmail] = useState(false);
+  const [tone, setTone] = useState<AiTone>("friendly");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiWa, setAiWa] = useState<string | null>(null);
+  const [aiEmail, setAiEmail] = useState<{ subject?: string; body: string } | null>(null);
   const toast = useToast();
   const scrapeOne = useServerFn(scrapeEmailForRestaurant);
+  const compose = useServerFn(composeOutreach);
   const qc = useQueryClient();
 
   const messages = useMemo(() => {
     if (!restaurant) return null;
-    const wa = serviceKey
+    const wa = aiWa ?? (serviceKey
       ? buildServiceMessage(restaurant, serviceKey, settings)
-      : buildWhatsAppMessage(restaurant, settings, variantNonce);
-    const baseEmail = buildEmailMessage(restaurant, settings, variantNonce);
+      : buildWhatsAppMessage(restaurant, settings, variantNonce));
+    const tpl = buildEmailMessage(restaurant, settings, variantNonce);
+    const baseEmail = aiEmail
+      ? { subject: aiEmail.subject ?? tpl.subject, body: aiEmail.body }
+      : tpl;
     const proposal = buildProposal(restaurant, [...proposalServices], settings);
     return { whatsapp: wa, email: baseEmail, proposal };
-  }, [restaurant, serviceKey, proposalServices, settings, variantNonce]);
+  }, [restaurant, serviceKey, proposalServices, settings, variantNonce, aiWa, aiEmail]);
+
+  // Reset AI drafts when switching restaurant
+  const currentId = restaurant?.id ?? null;
+  const [lastId, setLastId] = useState<string | null>(currentId);
+  if (currentId !== lastId) {
+    setLastId(currentId);
+    setAiWa(null);
+    setAiEmail(null);
+  }
+
+  const runAi = async () => {
+    if (!restaurant) return;
+    const channel: "whatsapp" | "email" = tab === "email" ? "email" : "whatsapp";
+    setAiLoading(true);
+    try {
+      const res = await compose({
+        data: {
+          channel,
+          tone,
+          restaurant: {
+            title: restaurant.title,
+            category: restaurant.category,
+            segment: SEGMENT_META[restaurant.segment].label,
+            city: restaurant.city,
+            website: restaurant.website ?? null,
+            rating: restaurant.rating,
+          },
+          service: serviceKey ? SERVICE_BY_KEY[serviceKey].label : undefined,
+          price: serviceKey ? priceFor(restaurant, serviceKey) : undefined,
+          currency: settings.currency,
+          sender: {
+            name: settings.senderName,
+            role: settings.senderRole,
+            signature: settings.signature,
+            portfolioUrl: settings.portfolioUrl,
+          },
+          notes: state.notes || undefined,
+          language: "ar" as const,
+        },
+      });
+      if (channel === "email") setAiEmail({ subject: res.subject, body: res.body });
+      else setAiWa(res.body);
+      toast.push("تمت كتابة رسالة مخصّصة ✍️", "success");
+    } catch (e) {
+      toast.push((e as Error).message || "تعذّر التوليد", "error");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
 
   if (!restaurant) {
     return (
