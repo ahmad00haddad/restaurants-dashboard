@@ -47,6 +47,15 @@ interface Props {
 }
 
 type Tab = "whatsapp" | "email" | "proposal";
+type AiTone = "friendly" | "formal" | "short" | "bold";
+
+const TONE_LABEL: Record<AiTone, string> = {
+  friendly: "ودّي",
+  formal: "رسمي",
+  short: "مختصر",
+  bold: "جريء",
+};
+
 
 export function ActionPanel({
   restaurant, state, settings, onStatusChange, onToggleFavorite, onUpdate, onAddTag, onRemoveTag, onClose,
