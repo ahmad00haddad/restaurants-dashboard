@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, BarChart3, Bell, CalendarClock, Settings as SettingsIcon, Database, LogOut, User as UserIcon, HelpCircle } from "lucide-react";
+import { Target, LayoutDashboard, BarChart3, Bell, CalendarClock, Settings as SettingsIcon, Database, LogOut, User as UserIcon, HelpCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -33,6 +33,9 @@ export function TopNav({ followUpsCount, overdueCount, onOpenFollowUps, onOpenCo
 
       <NavLink to="/" active={path === "/"} icon={<LayoutDashboard className="w-3.5 h-3.5" />}>
         لوحة التواصل
+      </NavLink>
+      <NavLink to="/plan" active={path.startsWith("/plan")} icon={<Target className="w-3.5 h-3.5" />}>
+        خطة اليوم
       </NavLink>
       <NavLink to="/insights" active={path.startsWith("/insights")} icon={<BarChart3 className="w-3.5 h-3.5" />}>
         التحليلات
