@@ -3,7 +3,7 @@
 Searches Google Maps, opens every place, then reads each website for email + social accounts + text.
 Output: leads-<kind>-<date>.json  →  upload it in the site with "استيراد من الجامع" (duplicates are merged there too).
 """
-import html, json, re, sys, urllib.parse
+import html, json, os, re, sys, urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 import httpx
@@ -157,6 +157,52 @@ def read_site(d):
     return d
 
 
+# ---------------- Deep analysis (ScrapeGraphAI + local Ollama, free) ----------------
+DEEP_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5-coder:7b")
+DEEP_PROMPT = ("Extract facts about this organisation for a film/photo studio that wants to introduce itself to them. "
+               "JSON keys: summary, mission, programs (list), recent_projects_or_stories (list of specific names), "
+               "audiences (list), events_or_campaigns (list), uses_video (yes/no + evidence), "
+               "comms_contact (name, role, email), language_of_site. Only facts present in the text; empty if unknown.")
+
+
+def deep_graph():
+    """Returns a function text->facts, or None if ScrapeGraphAI/Ollama isn't available."""
+    try:
+        import langchain_community.chat_models as cm
+        from langchain_ollama import ChatOllama
+        cm.ChatOllama = ChatOllama  # scrapegraphai still imports it from the old location
+        from scrapegraphai.graphs import SmartScraperGraph
+        httpx.get("http://127.0.0.1:11434/api/tags", timeout=3)
+    except Exception as e:
+        print("  (deep analysis unavailable:", str(e)[:80], ")")
+        return None
+    cfg = {"llm": {"model": "ollama/" + DEEP_MODEL, "temperature": 0, "format": "json", "model_tokens": 8192}, "verbose": False}
+
+    def run(text):
+        r = SmartScraperGraph(prompt=DEEP_PROMPT, source=text, config=cfg).run()
+        return r.get("content", r) if isinstance(r, dict) else r
+    return run
+
+
+def deepen(rows):
+    run = deep_graph()
+    if not run:
+        return rows
+    todo = [r for r in rows if r.get("about")]
+    print(f"\n🧠 deep analysis of {len(todo)} sites with {DEEP_MODEL} (local, free)…")
+    for i, r in enumerate(todo, 1):
+        try:
+            facts = run(r["about"])
+            c = facts.get("comms_contact") if isinstance(facts, dict) else None
+            if isinstance(c, dict) and not r.get("email") and "@" in str(c.get("email", "")):
+                r["email"] = c["email"]
+            r["about"] = "FACTS (extracted):\n" + json.dumps(facts, ensure_ascii=False) + "\n---\n" + r["about"]
+            print(f"  [{i}/{len(todo)}] {r['name']}: {str(facts.get('summary', ''))[:90] if isinstance(facts, dict) else ''}")
+        except Exception as e:
+            print(f"  [{i}/{len(todo)}] {r['name']}: ✗ {str(e)[:80]}")
+    return rows
+
+
 def dedupe(rows):
     seen, out = set(), []
     for r in rows:
@@ -242,6 +288,7 @@ if __name__ == "__main__":
     terms = [t.strip() for t in custom.split(",") if t.strip()] or PRESETS[kind]
     per = int(ask("Max places per search", "40"))
     show = ask("Show browser? y/n", "n") == "y"
+    deep = ask("Deep analysis with local AI (ScrapeGraphAI + Ollama, ~15s/site)? y/n", "y" if kind in ("ngo", "org") else "n") == "y"
 
     qs = [(kind, f"{t} in {c} Jordan", c) for c in cities for t in terms]
     print(f"\n{len(qs)} searches…")
@@ -249,6 +296,8 @@ if __name__ == "__main__":
     print(f"\n🌐 reading {sum(1 for r in rows if r.get('website'))} websites…")
     with ThreadPoolExecutor(8) as ex:
         rows = list(ex.map(read_site, rows))
+    if deep:
+        rows = deepen(rows)
     path = f"leads-{kind}-{date.today()}.json"
     json.dump(rows, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     print(f"\n✅ {len(rows)} unique leads, {sum(1 for r in rows if r.get('email'))} with email → {path}")

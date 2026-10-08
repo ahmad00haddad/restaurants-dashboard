@@ -1,6 +1,7 @@
 @echo off
 cd /d %~dp0
-pip install -q httpx playwright
-python -m playwright install chromium
-python harvest.py
+if not exist .venv python -m venv .venv
+.venv\Scripts\python -m pip install -q -r requirements.txt
+.venv\Scripts\python -m playwright install chromium
+.venv\Scripts\python harvest.py
 pause

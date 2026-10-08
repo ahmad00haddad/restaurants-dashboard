@@ -1,0 +1,5 @@
+httpx
+playwright
+scrapegraphai
+langchain-community>=0.4
+langchain-ollama
