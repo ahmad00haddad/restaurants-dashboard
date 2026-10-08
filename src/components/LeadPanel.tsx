@@ -52,7 +52,7 @@ export function LeadPanel({ id }: { id: string }) {
     }
   };
 
-  const write = (mode: "first" | "followup" | "reply") =>
+  const write = (mode: "first" | "followup" | "reply" | "proposal") =>
     run(mode, async () => {
       if (!lead.profile) await research({ data: { id, refetch: false } });
       const r = await draft({ data: { id, mode, channel, hint: hint || undefined } });
@@ -96,6 +96,14 @@ export function LeadPanel({ id }: { id: string }) {
         </div>
       </div>
 
+      {lead.signal && (
+        <div className="rounded border border-amber-500/50 bg-amber-500/10 p-2">
+          🔔 <b>فرصة الآن:</b> {lead.signal}
+          {lead.signal_until && <span className="text-xs"> — تُغلق {lead.signal_until}</span>}
+          {lead.signal_url && <a className="underline mr-2 text-xs" target="_blank" rel="noreferrer" href={lead.signal_url}>الإعلان</a>}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-2">
         <input className={field} defaultValue={lead.email ?? ""} placeholder="email" onBlur={(e) => e.target.value !== (lead.email ?? "") && act.update(id, { email: e.target.value || null })} />
         <input className={field} defaultValue={lead.phone ?? ""} placeholder="phone" onBlur={(e) => e.target.value !== (lead.phone ?? "") && act.update(id, { phone: e.target.value || null })} />
@@ -107,7 +115,9 @@ export function LeadPanel({ id }: { id: string }) {
         <select className={field} value={lead.status} onChange={(e) => act.update(id, { status: e.target.value as LeadStatus })}>
           {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
-        <label className="col-span-2 flex items-center gap-2 text-xs text-muted-foreground">
+        <input className={field} type="number" defaultValue={lead.deal_value ?? ""} placeholder="قيمة الصفقة (د.أ)"
+          onBlur={(e) => String(lead.deal_value ?? "") !== e.target.value && act.update(id, { deal_value: e.target.value ? Number(e.target.value) : null })} />
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
           المتابعة القادمة
           <input type="date" className="rounded border border-border bg-background px-2 py-1" value={lead.next_action_at ?? ""} onChange={(e) => act.update(id, { next_action_at: e.target.value || null })} />
         </label>
@@ -142,6 +152,7 @@ export function LeadPanel({ id }: { id: string }) {
             {busy && busy !== "research" ? "يكتب…" : { first: "✍️ اكتب رسالة أولى", followup: "↩️ اكتب متابعة", reply: "💬 اكتب ردّاً" }[mode]}
           </button>
           {mode !== "first" && <button className={btn} disabled={!!busy} onClick={() => write("first")}>رسالة أولى جديدة</button>}
+          {["replied", "meeting"].includes(lead.status) && <button className={btn} disabled={!!busy} onClick={() => write("proposal")}>📄 اكتب عرضاً</button>}
         </div>
         <input className={field} value={hint} onChange={(e) => setHint(e.target.value)} placeholder="توجيه اختياري: مثلاً 'اذكر أن عندهم ذكرى 20 سنة' أو 'اعرض تصوير المنيو'" />
         {body && (

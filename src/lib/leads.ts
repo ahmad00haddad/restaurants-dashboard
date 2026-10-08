@@ -54,6 +54,10 @@ export interface Lead {
   needs_reply: boolean;
   notes: string | null;
   source: string | null;
+  signal: string | null;        // live buying signal: tender / comms hiring
+  signal_url: string | null;
+  signal_until: string | null;
+  deal_value: number | null;
   created_at: string;
 }
 

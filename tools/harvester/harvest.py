@@ -170,6 +170,57 @@ def dedupe(rows):
     return out
 
 
+# ---------------- Buying signals (ReliefWeb) ----------------
+SIGNAL_TERMS = ["videographer", "video production", "documentary", "photographer", "audiovisual", "multimedia",
+                "communication officer", "communications officer", "visibility", "media production", "content creator",
+                "storytelling", "RFQ video", "photography services"]
+RELEVANT_TITLE = re.compile(r"video|film|photo|media|communicat|visibility|content|audiovisual|multimedia|documentar|"
+                            r"storytell|campaign|advocacy|outreach|branding|RFQ|RFP|tender|quotation|event|إعلام|تصوير|اتصال", re.I)
+COUNTRY_ID = {"Jordan": "C129"}
+VIDEO_WORDS = re.compile(r"video|film|documentar|photo|audiovisual|multimedia|media production|filming|تصوير|فيديو", re.I)
+
+
+def signals(country="Jordan"):
+    """Organisations in the country that are hiring comms/media people or tendering media work right now."""
+    from email.utils import parsedate_to_datetime
+    out, seen = [], set()
+    cid = COUNTRY_ID.get(country)
+    for term in [""] + SIGNAL_TERMS:
+        params = {"search": term} if term else {}
+        if cid:
+            params["advanced-search"] = f"({cid})"
+        try:
+            xml = httpx.get("https://reliefweb.int/jobs/rss.xml", params=params, headers=UA, timeout=30).text
+        except Exception as e:
+            print("  ✗", term, e); continue
+        for item in re.findall(r"<item>(.*?)</item>", xml, re.S):
+            link = re.search(r"<link>(.*?)</link>", item).group(1)
+            desc = html.unescape(re.search(r"<description>(.*?)</description>", item, re.S).group(1))
+            if link in seen or f"Country: {country}" not in desc:
+                continue
+            seen.add(link)
+            title = html.unescape(re.search(r"<title>(.*?)</title>", item).group(1))
+            org = re.search(r"Organization: ([^<]+)", desc)
+            close = re.search(r"Closing date: ([^<]+)", desc)
+            if not org or not RELEVANT_TITLE.search(title):
+                continue
+            from datetime import datetime
+            until = datetime.strptime(close.group(1).strip(), "%d %b %Y").date().isoformat() if close else None
+            body = text(desc)
+            tender = re.search(r"(RFQ|RFP|tender|quotation|EOI|expression of interest|consultan)", title, re.I)
+            kind = "Tender" if tender else "Hiring"
+            hot = bool(VIDEO_WORDS.search(title + " " + body[:3000]))
+            if tender and not VIDEO_WORDS.search(title + " " + body[:6000]):
+                continue  # a tender for something we don't do
+            out.append({
+                "name": org.group(1).strip(), "kind": "ngo", "city": None, "source": "reliefweb",
+                "signal": f"{kind}: {title}" + ("" if hot else " (comms)"), "signal_url": link, "signal_until": until,
+                "about": f"Their current posting — {title}:\n{body[:3500]}",
+            })
+            print(f"  🔔 {org.group(1).strip()} — {title} (closes {until})")
+    return out
+
+
 def ask(prompt, default):
     v = input(f"{prompt} [{default}]: ").strip()
     return v or default
@@ -177,8 +228,14 @@ def ask(prompt, default):
 
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
-    print("Kinds:", ", ".join(PRESETS))
+    print("Kinds:", ", ".join(PRESETS), "| signals = organisations hiring media people / tendering video work now")
     kind = ask("Kind", "ngo")
+    if kind == "signals":
+        rows = signals(ask("Country", "Jordan"))
+        path = f"leads-signals-{date.today()}.json"
+        json.dump(rows, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+        print(f"\n✅ {len(rows)} live opportunities → {path}\nUpload it in the site: ⬆️ استيراد من الجامع")
+        sys.exit()
     cities = [c.strip() for c in ask("Cities (comma separated, or 'all')", "Amman").split(",")]
     cities = CITIES if cities == ["all"] else cities
     custom = ask("Custom search terms (comma separated, empty = presets)", "")

@@ -8,7 +8,7 @@ async function fetchLeads(): Promise<Lead[]> {
   const out: Lead[] = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await db.from("leads")
-      .select("id,kind,name,category,city,address,phone,email,website,instagram,facebook,linkedin,youtube,tiktok,rating,maps_url,profile,score,status,followups,next_action_at,needs_reply,notes,source,created_at")
+      .select("id,kind,name,category,city,address,phone,email,website,instagram,facebook,linkedin,youtube,tiktok,rating,maps_url,profile,score,status,followups,next_action_at,needs_reply,notes,source,signal,signal_url,signal_until,deal_value,created_at")
       .is("deleted_at", null).order("score", { ascending: false, nullsFirst: false }).range(from, from + 999);
     if (error) throw error;
     out.push(...(data as Lead[]));

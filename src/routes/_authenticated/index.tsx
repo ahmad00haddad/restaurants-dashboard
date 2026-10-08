@@ -13,7 +13,7 @@ export const Route = createFileRoute("/_authenticated/")({
   component: Home,
 });
 
-type View = "today" | "reply" | "followup" | "best" | "all";
+type View = "today" | "signals" | "reply" | "followup" | "best" | "all";
 const today = () => new Date().toISOString().slice(0, 10);
 
 function Home() {
@@ -37,7 +37,9 @@ function Home() {
     const followup = leads.filter((l) => l.status === "contacted" && l.next_action_at && l.next_action_at <= t && l.followups < 2);
     const meeting = leads.filter((l) => l.status === "meeting" || (l.status === "replied" && l.next_action_at && l.next_action_at <= t && !l.needs_reply));
     const best = leads.filter((l) => l.status === "new" && l.score != null && (l.email || l.phone || l.instagram));
-    return { reply, followup, meeting, best };
+    const signals = leads.filter((l) => l.signal && (!l.signal_until || l.signal_until >= t) && !["won", "lost", "skip"].includes(l.status))
+      .sort((a, b) => (a.signal_until ?? "9").localeCompare(b.signal_until ?? "9"));
+    return { reply, followup, meeting, best, signals };
   }, [leads]);
 
   const list = useMemo(() => {
@@ -45,7 +47,8 @@ function Home() {
       view === "reply" ? groups.reply
       : view === "followup" ? groups.followup
       : view === "best" ? groups.best
-      : view === "today" ? [...groups.reply, ...groups.meeting, ...groups.followup, ...groups.best.slice(0, 30)]
+      : view === "signals" ? groups.signals
+      : view === "today" ? [...new Set([...groups.reply, ...groups.meeting, ...groups.signals.filter((l) => l.status === "new"), ...groups.followup, ...groups.best.slice(0, 30)])]
       : leads;
     if (kind) L = L.filter((l) => l.kind === kind);
     if (status) L = L.filter((l) => l.status === status);
@@ -92,6 +95,8 @@ function Home() {
     contacted: leads.filter((l) => !["new", "skip"].includes(l.status)).length,
     replied: leads.filter((l) => ["replied", "meeting", "won"].includes(l.status)).length,
     won: leads.filter((l) => l.status === "won").length,
+    revenue: leads.filter((l) => l.status === "won").reduce((s, l) => s + (Number(l.deal_value) || 0), 0),
+    pipeline: leads.filter((l) => ["replied", "meeting"].includes(l.status)).reduce((s, l) => s + (Number(l.deal_value) || 0), 0),
   };
   const tab = (v: View, label: string, n?: number) => (
     <button onClick={() => { setView(v); setLimit(100); }} className={`px-3 py-1.5 rounded text-sm ${view === v ? "bg-primary text-primary-foreground" : "border border-border"}`}>
@@ -104,7 +109,7 @@ function Home() {
       <header className="flex flex-wrap items-center gap-4 border-b border-border px-4 py-2 text-sm">
         <b>FAII Sales</b>
         <span className="text-muted-foreground">
-          {stats.total} عميل · {stats.ngo} منظمة · {stats.analysed} محلَّل · تواصلنا {stats.contacted} · ردّ {stats.replied} · صفقات {stats.won}
+          {stats.total} عميل · {stats.ngo} منظمة · {stats.analysed} محلَّل · تواصلنا {stats.contacted} · ردّ {stats.replied} · صفقات {stats.won} ({stats.revenue} د.أ) · قيد التفاوض {stats.pipeline} د.أ
         </span>
         <div className="flex-1" />
         <Link to="/settings" className="underline">الإعدادات</Link>
@@ -113,6 +118,7 @@ function Home() {
 
       <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-border">
         {tab("today", "اليوم")}
+        {tab("signals", "🔔 فرص الآن", groups.signals.length)}
         {tab("reply", "🔥 يحتاج رد", groups.reply.length)}
         {tab("followup", "↩️ متابعات", groups.followup.length)}
         {tab("best", "🎯 أفضل جدد", groups.best.length)}
@@ -145,7 +151,8 @@ function Home() {
               {list.slice(0, limit).map((l) => (
                 <tr key={l.id} onClick={() => setSel(l.id)} className={`cursor-pointer border-b border-border hover:bg-muted ${sel === l.id ? "bg-muted" : ""}`}>
                   <td className="p-2">
-                    <div className="font-medium">{l.needs_reply && "🔥 "}{l.name}</div>
+                    <div className="font-medium">{l.needs_reply && "🔥 "}{l.signal && "🔔 "}{l.name}</div>
+                    {l.signal && <div className="text-xs text-amber-600">{l.signal}{l.signal_until ? ` — ${l.signal_until}` : ""}</div>}
                     <div className="text-xs text-muted-foreground">
                       {KIND_LABEL[l.kind]} · {l.category ?? ""} · {l.city ?? ""}
                     </div>

@@ -31,6 +31,21 @@ async function ask(system: string, user: string): Promise<Record<string, unknown
 
 type Ctx = { supabase: any };
 
+/** Our past first messages that got a reply from the same kind of client — the AI learns the style that works. */
+async function winners(ctx: Ctx, lead: Lead): Promise<string> {
+  const { data: won } = await ctx.supabase.from("leads").select("id")
+    .eq("kind", lead.kind).in("status", ["replied", "meeting", "won"]).neq("id", lead.id).limit(30);
+  if (!won?.length) return "";
+  const { data: msgs } = await ctx.supabase.from("lead_messages").select("lead_id, body, created_at")
+    .in("lead_id", won.map((w: { id: string }) => w.id)).eq("direction", "out").eq("draft", false).order("created_at");
+  const firsts = new Map<string, string>();
+  for (const m of msgs ?? []) if (!firsts.has(m.lead_id)) firsts.set(m.lead_id, m.body);
+  const ex = [...firsts.values()].slice(-3);
+  if (!ex.length) return "";
+  return "\n\nOUR PAST FIRST MESSAGES THAT GOT REPLIES from similar clients (learn what works — never copy):\n" +
+    ex.map((e, i) => `#${i + 1}\n${e}`).join("\n\n");
+}
+
 async function load(ctx: Ctx, id: string) {
   const [{ data: lead, error }, { data: msgs }, { data: st }] = await Promise.all([
     ctx.supabase.from("leads").select("*").eq("id", id).single(),
@@ -57,6 +72,7 @@ function them(l: Lead) {
     ["type", l.kind], ["name", l.name], ["category", l.category], ["city", l.city], ["address", l.address],
     ["website", l.website], ["instagram", l.instagram], ["facebook", l.facebook], ["linkedin", l.linkedin],
     ["youtube", l.youtube], ["tiktok", l.tiktok], ["google rating", l.rating], ["our notes", l.notes],
+    ["LIVE SIGNAL (why now)", l.signal ? `${l.signal}${l.signal_until ? ` — closes ${l.signal_until}` : ""} ${l.signal_url ?? ""}` : null],
   ];
   const lines = f.filter(([, v]) => v != null && v !== "").map(([k, v]) => `${k}: ${v}`);
   if (l.about) lines.push(`What their website says:\n${l.about}`);
@@ -117,7 +133,7 @@ export const draftMessage = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z.object({
       id: z.string().uuid(),
-      mode: z.enum(["first", "followup", "reply"]),
+      mode: z.enum(["first", "followup", "reply", "proposal"]),
       channel: z.enum(["email", "whatsapp", "instagram"]),
       hint: z.string().max(500).optional(),
     }).parse(d),
@@ -129,13 +145,18 @@ export const draftMessage = createServerFn({ method: "POST" })
     const task = {
       first: "Write the FIRST message to this client.",
       followup: `They haven't answered. Write follow-up #${lead.followups + 1}. Don't repeat the first message — add one new useful thing (a different relevant example, a quick idea, or a timing reason). 2–4 lines.${lead.followups >= 1 ? " This is the last follow-up: polite, leaves the door open." : ""}`,
+      proposal: `They are interested. Write a short, clear proposal email they can forward internally: one line on their goal (in their words), the idea, what we deliver (bullets allowed here: e.g. film length, versions, photos, subtitles), timeline, what we need from them, and price ${team.priceGuide ? `based on: ${team.priceGuide}` : "as 'to be confirmed after a 15-minute scoping call' (no numbers)"}. Then the next step. Keep it under 200 words.`,
       reply: `Answer their latest message exactly like a human would. Price question → ${team.priceGuide ? `use this guide: ${team.priceGuide}` : "no fixed number; propose a 15-minute call to scope it"}. Interested → propose two concrete times this week. Not now / no → thank them in one line and ask if you can check back later. Asked for work → 1–2 closest portfolio links.`,
     }[data.mode];
 
+    const learned = data.mode === "first" ? await winners(ctx, lead) : "";
+    const signalRule = lead.signal
+      ? "\n- They have a LIVE signal (tender, or hiring for comms/media). Mention it naturally as the reason you're writing now, and position us as help that fits it (covering video while they hire, or bidding on the tender)."
+      : "";
     const out = await ask(
-      VOICE(team) + "\nReturn JSON only.",
+      VOICE(team) + signalRule + "\nReturn JSON only.",
       `${us(team)}\n\nCLIENT:\n${them(lead)}\n\nWHAT WE KNOW ABOUT THEM:\n${JSON.stringify(lead.profile ?? {}, null, 1)}\n\n` +
-        `CONVERSATION SO FAR:\n${history || "(none)"}\n\nCHANNEL: ${data.channel}\nTASK: ${task}` +
+        `CONVERSATION SO FAR:\n${history || "(none)"}${learned}\n\nCHANNEL: ${data.channel}\nTASK: ${task}` +
         (data.hint ? `\nEXTRA INSTRUCTION FROM ${team.senderName}: ${data.hint}` : "") +
         `\n\nReturn JSON: {"subject":"${data.channel === "email" ? "short, human, not salesy" : ""}","body":"...",` +
         `"intent":"${data.mode === "reply" ? "interested|question|price|not_now|no|other" : ""}","status":"${data.mode === "reply" ? "replied|meeting|lost" : ""}","summary":"one line for the CRM"}`,
