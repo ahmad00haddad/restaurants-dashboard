@@ -17,7 +17,7 @@ type View = "today" | "signals" | "reply" | "followup" | "best" | "all";
 const today = () => new Date().toISOString().slice(0, 10);
 
 function Home() {
-  const { data: leads = [], isLoading } = useLeads();
+  const { data: leads = [], isLoading, error } = useLeads();
   const act = useLeadActions();
   const toast = useToast();
   const { signOut } = useAuth();
@@ -143,6 +143,13 @@ function Home() {
       <div className="grid md:grid-cols-[1fr_520px]">
         <div className="overflow-auto md:h-[calc(100vh-100px)]">
           {isLoading && <p className="p-4 text-muted-foreground">...</p>}
+          {error && <p className="p-4 text-red-600">خطأ في قراءة البيانات: {(error as Error).message}</p>}
+          {!isLoading && !error && leads.length === 0 && (
+            <button className="m-4 px-3 py-1.5 rounded bg-primary text-primary-foreground text-sm" onClick={() =>
+              act.restoreOld().then((r) => toast.push(`استُرجع ${r.inserted} مطعم (دُمج ${r.merged} مكرر)`), (e) => toast.push(e.message, "error"))}>
+              استرجاع المطاعم القديمة
+            </button>
+          )}
           {!isLoading && list.length === 0 && (
             <p className="p-4 text-muted-foreground">لا شيء هنا. استورد عملاء من الجامع أو اضغط "حلّل 20 عميل".</p>
           )}

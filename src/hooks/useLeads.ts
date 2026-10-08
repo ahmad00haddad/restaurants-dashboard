@@ -8,7 +8,7 @@ async function fetchLeads(): Promise<Lead[]> {
   const out: Lead[] = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await db.from("leads")
-      .select("id,kind,name,category,city,address,phone,email,website,instagram,facebook,linkedin,youtube,tiktok,rating,maps_url,profile,score,status,followups,next_action_at,needs_reply,notes,source,signal,signal_url,signal_until,deal_value,created_at")
+      .select("*") // "*" keeps working even if a later DB update is not applied yet
       .is("deleted_at", null).order("score", { ascending: false, nullsFirst: false }).range(from, from + 999);
     if (error) throw error;
     out.push(...(data as Lead[]));
@@ -60,16 +60,7 @@ export function useLeadActions() {
     refresh(id);
   };
 
-  return {
-    refresh,
-    update,
-    async add(lead: Partial<Lead>) {
-      const { data, error } = await db.rpc("ingest_leads", { rows: [lead] });
-      if (error) throw error;
-      refresh();
-      return data as { inserted: number; merged: number };
-    },
-    async importRows(rows: Partial<Lead>[]) {
+  const importRows = async (rows: Partial<Lead>[]) => {
       let inserted = 0, merged = 0;
       for (let i = 0; i < rows.length; i += 300) {
         const { data, error } = await db.rpc("ingest_leads", { rows: rows.slice(i, i + 300) });
@@ -78,6 +69,29 @@ export function useLeadActions() {
       }
       refresh();
       return { inserted, merged };
+    };
+
+  return {
+    refresh,
+    importRows,
+    update,
+    async add(lead: Partial<Lead>) {
+      const { data, error } = await db.rpc("ingest_leads", { rows: [lead] });
+      if (error) throw error;
+      refresh();
+      return data as { inserted: number; merged: number };
+    },
+    /** Copy the old restaurants table into leads (duplicates are merged, safe to run many times). */
+    async restoreOld() {
+      const rows: Partial<Lead>[] = [];
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await db.from("restaurants").select("title,phone,email,website,address,city").range(from, from + 999);
+        if (error) throw error;
+        rows.push(...(data ?? []).map((r: any) => ({ kind: "restaurant", name: r.title, phone: r.phone, email: r.email,
+          website: r.website, address: r.address, city: r.city, source: "old-list" })));
+        if (!data || data.length < 1000) break;
+      }
+      return importRows(rows);
     },
     /** Called after the message was actually sent from Gmail/WhatsApp/Instagram. */
     async logSent(lead: Lead, channel: Channel, body: string, subject?: string) {
