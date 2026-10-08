@@ -1,475 +1,169 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  downloadCSV,
-  exportRestaurantsCSV,
-  leadScore,
-  type Restaurant,
-  type Segment,
-  type Status,
-} from "@/lib/restaurants";
-import { useRestaurants } from "@/hooks/useRestaurants";
-import { useCrmStore } from "@/hooks/useCrmStore";
-import { useSettings } from "@/hooks/useSettings";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMemo, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { researchLead } from "@/lib/ai.functions";
+import { useLeadActions, useLeads } from "@/hooks/useLeads";
 import { useToast } from "@/hooks/useToast";
-import { CrmSidebar, type ExtraFilters, type SortKey } from "@/components/crm/Sidebar";
-import { AnalyticsBar } from "@/components/crm/Analytics";
-import { RestaurantTable } from "@/components/crm/RestaurantTable";
-import { KanbanBoard } from "@/components/crm/KanbanBoard";
-import { BulkActionBar } from "@/components/crm/BulkActionBar";
-import { ActionPanel } from "@/components/crm/ActionPanel";
-import { CommandPalette } from "@/components/crm/CommandPalette";
-import { FollowUpsDrawer } from "@/components/crm/FollowUpsDrawer";
-import { SettingsDialog } from "@/components/crm/SettingsDialog";
-import { TopNav } from "@/components/crm/TopNav";
-import { OnboardingTour, resetOnboarding } from "@/components/crm/OnboardingTour";
-import { Search, LayoutGrid, List, Sparkles, Download } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { LeadPanel } from "@/components/LeadPanel";
+import { KIND_LABEL, STATUS_LABEL, type Lead } from "@/lib/leads";
 
 export const Route = createFileRoute("/_authenticated/")({
-  head: () => ({
-    meta: [
-      { title: "FAII HOUSE — Outreach CRM" },
-      {
-        name: "description",
-        content:
-          "لوحة تحكم احترافية للتواصل مع مطاعم إربد — FAII HOUSE استوديو إنتاج سينمائي.",
-      },
-    ],
-  }),
-  component: Dashboard,
+  head: () => ({ meta: [{ title: "FAII — Sales" }] }),
+  component: Home,
 });
 
-const PAGE_SIZE = 25;
-const DAILY_GOAL = 20;
+type View = "today" | "reply" | "followup" | "best" | "all";
+const today = () => new Date().toISOString().slice(0, 10);
 
-function Dashboard() {
-  const RESTAURANTS = useRestaurants();
-  const {
-    getStatus, setStatus, setStatusBulk, getState, update, toggleFavorite, store, todayCount,
-    addTag, removeTag, allTags, importStore, exportStore, clearAll,
-  } = useCrmStore();
-  const { settings, update: updateSettings, reset: resetSettings } = useSettings();
+function Home() {
+  const { data: leads = [], isLoading } = useLeads();
+  const act = useLeadActions();
   const toast = useToast();
-
-  const [segments, setSegments] = useState<Set<Segment>>(new Set());
-  const [categories, setCategories] = useState<Set<string>>(new Set());
-  const [statuses, setStatuses] = useState<Set<Status>>(new Set());
-  const [tags, setTags] = useState<Set<string>>(new Set());
-  const [extra, setExtra] = useState<ExtraFilters>({
-    favorites: false, hasPhone: false, hasWebsite: false,
-  });
-  const [sort, setSort] = useState<SortKey>("rank");
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [view, setView] = useState<"table" | "kanban">("table");
-  const [cmdOpen, setCmdOpen] = useState(false);
-  const [followUpsOpen, setFollowUpsOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [tourOpen, setTourOpen] = useState(false);
-  const searchRef = useRef<HTMLInputElement>(null);
+  const { signOut } = useAuth();
+  const research = useServerFn(researchLead);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [view, setView] = useState<View>("today");
+  const [kind, setKind] = useState("");
+  const [status, setStatus] = useState("");
+  const [q, setQ] = useState("");
+  const [sel, setSel] = useState<string | null>(null);
+  const [limit, setLimit] = useState(100);
+  const [bulk, setBulk] = useState<string | null>(null);
 
-  const segmentCounts = useMemo(() => {
-    const c = { premium: 0, medium: 0, testing: 0 } as Record<Segment, number>;
-    for (const r of RESTAURANTS) c[r.segment]++;
-    return c;
-  }, [RESTAURANTS]);
+  const groups = useMemo(() => {
+    const t = today();
+    const reply = leads.filter((l) => l.needs_reply);
+    const followup = leads.filter((l) => l.status === "contacted" && l.next_action_at && l.next_action_at <= t && l.followups < 2);
+    const meeting = leads.filter((l) => l.status === "meeting" || (l.status === "replied" && l.next_action_at && l.next_action_at <= t && !l.needs_reply));
+    const best = leads.filter((l) => l.status === "new" && l.score != null && (l.email || l.phone || l.instagram));
+    return { reply, followup, meeting, best };
+  }, [leads]);
 
-  const statusCounts = useMemo(() => {
-    const c = { new: 0, email: 0, whatsapp: 0, meeting: 0 } as Record<Status, number>;
-    for (const r of RESTAURANTS) c[(store[r.id]?.status ?? "new") as Status]++;
-    return c;
-  }, [store, RESTAURANTS]);
-
-  const favCount = useMemo(
-    () => Object.values(store).filter((s) => s.favorite).length,
-    [store],
-  );
-
-  const revenueStats = useMemo(() => {
-    let revenue = 0, pipeline = 0;
-    for (const s of Object.values(store)) {
-      const v = s.dealValue ?? 0;
-      if (!v) continue;
-      if (s.status === "meeting") revenue += v;
-      else if (s.status === "whatsapp" || s.status === "email") pipeline += v;
+  const list = useMemo(() => {
+    let L: Lead[] =
+      view === "reply" ? groups.reply
+      : view === "followup" ? groups.followup
+      : view === "best" ? groups.best
+      : view === "today" ? [...groups.reply, ...groups.meeting, ...groups.followup, ...groups.best.slice(0, 30)]
+      : leads;
+    if (kind) L = L.filter((l) => l.kind === kind);
+    if (status) L = L.filter((l) => l.status === status);
+    if (q) {
+      const s = q.toLowerCase();
+      L = L.filter((l) => [l.name, l.category, l.city, l.profile?.summary].some((x) => x?.toLowerCase().includes(s)));
     }
-    return { revenue, pipeline };
-  }, [store]);
+    return L;
+  }, [leads, groups, view, kind, status, q]);
 
-  const allCategories = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const r of RESTAURANTS) m.set(r.category, (m.get(r.category) ?? 0) + 1);
-    return [...m.entries()]
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count);
-  }, [RESTAURANTS]);
-
-  const today = new Date().toISOString().slice(0, 10);
-  const followUps = useMemo(() => {
-    let total = 0, overdue = 0;
-    for (const s of Object.values(store)) {
-      if (!s.followUp) continue;
-      total++;
-      if (s.followUp < today) overdue++;
+  const analyseBatch = async (n: number) => {
+    const targets = leads
+      .filter((l) => !l.profile && (kind ? l.kind === kind : true) && (l.email || l.phone || l.instagram))
+      .sort((a, b) => Number(b.kind === "ngo") - Number(a.kind === "ngo") || Number(!!b.website) - Number(!!a.website))
+      .slice(0, n);
+    for (let i = 0; i < targets.length; i++) {
+      setBulk(`تحليل ${i + 1}/${targets.length}: ${targets[i].name}`);
+      try {
+        await research({ data: { id: targets[i].id, refetch: false } });
+      } catch (e) {
+        toast.push((e as Error).message, "error");
+        if (/رصيد|حد الاستخدام/.test((e as Error).message)) break;
+      }
+      if (i % 5 === 4) act.refresh();
     }
-    return { total, overdue };
-  }, [store, today]);
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const arr = RESTAURANTS.filter((r) => {
-      if (segments.size && !segments.has(r.segment)) return false;
-      if (categories.size && !categories.has(r.category)) return false;
-      if (statuses.size && !statuses.has(getStatus(r.id))) return false;
-      if (extra.favorites && !store[r.id]?.favorite) return false;
-      if (extra.hasPhone && !r.phone) return false;
-      if (extra.hasWebsite && !r.website) return false;
-      if (tags.size) {
-        const t = store[r.id]?.tags ?? [];
-        if (!t.some((x) => tags.has(x))) return false;
-      }
-      if (q) {
-        const hay = `${r.title} ${r.category} ${r.street ?? ""} ${r.phone ?? ""}`.toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      return true;
-    });
-    const sorted = [...arr];
-    switch (sort) {
-      case "score": sorted.sort((a, b) => leadScore(b) - leadScore(a)); break;
-      case "rating": sorted.sort((a, b) => b.rating - a.rating); break;
-      case "name": sorted.sort((a, b) => a.title.localeCompare(b.title, "ar")); break;
-      case "updated":
-        sorted.sort((a, b) => (store[b.id]?.updatedAt ?? 0) - (store[a.id]?.updatedAt ?? 0)); break;
-      default: sorted.sort((a, b) => a.rank - b.rank);
-    }
-    return sorted;
-  }, [segments, categories, statuses, tags, extra, sort, search, getStatus, store, RESTAURANTS]);
-
-  useEffect(() => { setPage(1); }, [segments, categories, statuses, tags, extra, sort, search]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setCmdOpen(true);
-        return;
-      }
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
-      if (e.key === "/") { e.preventDefault(); searchRef.current?.focus(); }
-      else if (e.key === "Escape") {
-        if (cmdOpen) setCmdOpen(false);
-        else if (followUpsOpen) setFollowUpsOpen(false);
-        else if (selectedId) setSelectedId(null);
-        else if (selectedIds.size) setSelectedIds(new Set());
-      } else if (e.key.toLowerCase() === "k") {
-        setView((v) => (v === "table" ? "kanban" : "table"));
-      } else if (e.key.toLowerCase() === "f") {
-        setFollowUpsOpen((v) => !v);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [selectedId, selectedIds, cmdOpen, followUpsOpen]);
-
-  const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  const selected: Restaurant | null = useMemo(
-    () => (selectedId ? RESTAURANTS.find((r) => r.id === selectedId) ?? null : null),
-    [selectedId, RESTAURANTS],
-  );
-
-  const contactedCount = statusCounts.email + statusCounts.whatsapp + statusCounts.meeting;
-
-  const toggle = <T,>(set: Set<T>, setSet: (s: Set<T>) => void, v: T) => {
-    const n = new Set(set);
-    if (n.has(v)) n.delete(v); else n.add(v);
-    setSet(n);
+    setBulk(null);
+    act.refresh();
   };
 
-  const toggleSelect = (id: string) => {
-    const n = new Set(selectedIds);
-    if (n.has(id)) n.delete(id); else n.add(id);
-    setSelectedIds(n);
-  };
-
-  const pageIds = pageRows.map((r) => r.id);
-  const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
-  const toggleSelectAll = () => {
-    const n = new Set(selectedIds);
-    if (allSelected) pageIds.forEach((id) => n.delete(id));
-    else pageIds.forEach((id) => n.add(id));
-    setSelectedIds(n);
-  };
-
-  const bulkStatus = (s: Status) => {
-    setStatusBulk([...selectedIds], s);
-    toast.push(`تم تحديث ${selectedIds.size} مطعم`, "success");
-    setSelectedIds(new Set());
-  };
-
-  const exportSelected = () => {
-    const ids = selectedIds.size ? selectedIds : new Set(filtered.map((r) => r.id));
-    const rows = RESTAURANTS.filter((r) => ids.has(r.id));
-    downloadCSV(`faii-restaurants-${Date.now()}.csv`, exportRestaurantsCSV(rows));
-    toast.push(`تم تصدير ${rows.length} مطعم`, "success");
-  };
-
-  const smartSuggest = () => {
-    const candidates = RESTAURANTS.filter(
-      (r) => r.segment === "premium" && r.phone && (store[r.id]?.status ?? "new") === "new",
-    )
-      .sort((a, b) => b.rating - a.rating || a.rank - b.rank)
-      .slice(0, 10);
-    setSelectedIds(new Set(candidates.map((r) => r.id)));
-    setSegments(new Set(["premium"]));
-    setExtra({ ...extra, hasPhone: true });
-    setStatuses(new Set(["new"]));
-    toast.push(`🔥 تم اقتراح أفضل ${candidates.length} لِيد للبدء بهم`, "info");
-  };
-
-  const handleBackup = () => {
-    const data = exportStore();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `faii-crm-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.push("تم تنزيل نسخة احتياطية", "success");
-  };
-
-  const handleRestore = () => fileRef.current?.click();
-  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
+  const importFile = async (f: File) => {
     try {
-      const text = await f.text();
-      const data = JSON.parse(text);
-      if (typeof data !== "object" || !data) throw new Error("bad");
-      importStore(data);
-      toast.push("تم استرجاع البيانات بنجاح", "success");
-    } catch {
-      toast.push("الملف غير صالح", "error");
-    } finally {
-      e.target.value = "";
+      const rows = JSON.parse(await f.text());
+      const r = await act.importRows(Array.isArray(rows) ? rows : rows.leads);
+      toast.push(`أُضيف ${r.inserted} جديد، ودُمج ${r.merged} مكرر`);
+    } catch (e) {
+      toast.push((e as Error).message, "error");
     }
   };
 
-  const handleClearAll = () => {
-    if (confirm("سيتم حذف جميع بيانات CRM المحلية (حالات، ملاحظات، مفضلة، وسوم). هل أنت متأكد؟")) {
-      clearAll();
-      toast.push("تم مسح جميع بيانات CRM", "info");
-    }
+  const stats = {
+    total: leads.length,
+    ngo: leads.filter((l) => l.kind === "ngo").length,
+    analysed: leads.filter((l) => l.profile).length,
+    contacted: leads.filter((l) => !["new", "skip"].includes(l.status)).length,
+    replied: leads.filter((l) => ["replied", "meeting", "won"].includes(l.status)).length,
+    won: leads.filter((l) => l.status === "won").length,
   };
-
-  return (
-    <div className="min-h-screen flex bg-background text-foreground">
-      <CrmSidebar
-        segments={segments}
-        toggleSegment={(s) => toggle(segments, setSegments, s)}
-        categories={categories}
-        toggleCategory={(c) => toggle(categories, setCategories, c)}
-        allCategories={allCategories}
-        statuses={statuses}
-        toggleStatus={(s) => toggle(statuses, setStatuses, s)}
-        segmentCounts={segmentCounts}
-        statusCounts={statusCounts}
-        extra={extra}
-        setExtra={setExtra}
-        favCount={favCount}
-        sort={sort}
-        setSort={setSort}
-        tags={tags}
-        toggleTag={(t) => toggle(tags, setTags, t)}
-        allTags={allTags}
-        onReset={() => {
-          setSegments(new Set());
-          setCategories(new Set());
-          setStatuses(new Set());
-          setTags(new Set());
-          setExtra({ favorites: false, hasPhone: false, hasWebsite: false });
-          setSearch("");
-        }}
-        onBackup={handleBackup}
-        onRestore={handleRestore}
-        onClearAll={handleClearAll}
-      />
-
-      <input ref={fileRef} type="file" accept="application/json" onChange={onFile} className="hidden" />
-
-      <main className="flex-1 min-w-0 flex flex-col">
-        <header className="px-6 lg:px-8 py-6 border-b border-border bg-gradient-hero">
-          <div className="flex items-center justify-between gap-6 mb-5 flex-wrap">
-            <div>
-              <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight">
-                لوحة تواصل المطاعم
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                {RESTAURANTS.length.toLocaleString("ar")} مطعم في إربد — مُصنّفة آلياً حسب الشريحة والفئة، مع رسائل وأسعار جاهزة.
-              </p>
-            </div>
-            <TopNav
-              followUpsCount={followUps.total}
-              overdueCount={followUps.overdue}
-              onOpenFollowUps={() => setFollowUpsOpen(true)}
-              onOpenCommand={() => setCmdOpen(true)}
-              onOpenSettings={() => setSettingsOpen(true)}
-              onOpenHelp={() => { resetOnboarding(); setTourOpen(true); }}
-            />
-          </div>
-          <AnalyticsBar
-            total={RESTAURANTS.length}
-            premium={segmentCounts.premium}
-            contacted={contactedCount}
-            meetings={statusCounts.meeting}
-            today={todayCount}
-            goal={DAILY_GOAL}
-            revenue={revenueStats.revenue}
-            pipeline={revenueStats.pipeline}
-            currency={settings.currency}
-          />
-        </header>
-
-        <div className="px-6 lg:px-8 py-5 flex-1 min-h-0 flex flex-col gap-4">
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="relative flex-1 min-w-[240px] max-w-md">
-              <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                ref={searchRef}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="ابحث عن مطعم، فئة، رقم... (/)"
-                className="w-full pr-9 pl-4 py-2.5 rounded-lg bg-card border border-border focus:border-gold/50 outline-none text-sm placeholder:text-muted-foreground"
-              />
-            </div>
-            <div className="text-xs text-muted-foreground">
-              <span className="text-foreground font-semibold tabular-nums">
-                {filtered.length.toLocaleString("ar")}
-              </span>{" "}
-              نتيجة
-            </div>
-
-            <div className="flex-1" />
-
-            <button
-              onClick={smartSuggest}
-              className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-gold-soft border border-gold/40 text-gold hover:bg-gold/20"
-            >
-              <Sparkles className="w-3.5 h-3.5" /> اقتراح ذكي
-            </button>
-            <button
-              onClick={exportSelected}
-              className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-card border border-border text-foreground hover:border-emerald/50"
-              title="تصدير القائمة الحالية أو المحددة"
-            >
-              <Download className="w-3.5 h-3.5" /> تصدير
-            </button>
-
-            <div className="inline-flex rounded-lg border border-border bg-card p-1">
-              <ViewBtn active={view === "table"} onClick={() => setView("table")}>
-                <List className="w-3.5 h-3.5" /> جدول
-              </ViewBtn>
-              <ViewBtn active={view === "kanban"} onClick={() => setView("kanban")}>
-                <LayoutGrid className="w-3.5 h-3.5" /> Pipeline
-              </ViewBtn>
-            </div>
-          </div>
-
-          <BulkActionBar
-            count={selectedIds.size}
-            onClear={() => setSelectedIds(new Set())}
-            onBulkStatus={bulkStatus}
-            onExport={exportSelected}
-          />
-
-          {view === "table" ? (
-            <RestaurantTable
-              rows={pageRows}
-              selectedId={selectedId}
-              onSelect={(r) => setSelectedId(r.id === selectedId ? null : r.id)}
-              getStatus={getStatus}
-              isFavorite={(id) => !!store[id]?.favorite}
-              hasNotes={(id) => !!store[id]?.notes?.trim()}
-              followUp={(id) => store[id]?.followUp}
-              tags={(id) => store[id]?.tags ?? []}
-              toggleFavorite={(id) => {
-                toggleFavorite(id);
-                toast.push(store[id]?.favorite ? "أُزيلت من المفضلة" : "أُضيفت للمفضلة", "info");
-              }}
-              selectedIds={selectedIds}
-              toggleSelect={toggleSelect}
-              toggleSelectAll={toggleSelectAll}
-              allSelected={allSelected}
-              page={page}
-              pageSize={PAGE_SIZE}
-              total={filtered.length}
-              onPage={setPage}
-            />
-          ) : (
-            <KanbanBoard
-              rows={filtered}
-              getStatus={getStatus}
-              isFavorite={(id) => !!store[id]?.favorite}
-              onSelect={(r) => setSelectedId(r.id === selectedId ? null : r.id)}
-              selectedId={selectedId}
-              onStatusChange={(id, s) => setStatus(id, s)}
-            />
-          )}
-        </div>
-      </main>
-
-      <ActionPanel
-        restaurant={selected}
-        state={selected ? getState(selected.id) : {}}
-        settings={settings}
-        onStatusChange={(s) => selected && setStatus(selected.id, s)}
-        onToggleFavorite={() => selected && toggleFavorite(selected.id)}
-        onUpdate={(patch) => selected && update(selected.id, patch)}
-        onAddTag={(t) => selected && addTag(selected.id, t)}
-        onRemoveTag={(t) => selected && removeTag(selected.id, t)}
-        onClose={() => setSelectedId(null)}
-      />
-
-      <CommandPalette
-        open={cmdOpen}
-        onClose={() => setCmdOpen(false)}
-        onPick={(r) => setSelectedId(r.id)}
-      />
-      <FollowUpsDrawer
-        open={followUpsOpen}
-        onClose={() => setFollowUpsOpen(false)}
-        store={store}
-        onPick={(r) => setSelectedId(r.id)}
-      />
-      <SettingsDialog
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        settings={settings}
-        onSave={updateSettings}
-        onReset={resetSettings}
-      />
-      <OnboardingTour forceOpen={tourOpen} onClose={() => setTourOpen(false)} />
-    </div>
-  );
-}
-
-function ViewBtn({
-  active, onClick, children,
-}: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs transition-all ${
-        active ? "bg-gold text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground"
-      }`}
-    >
-      {children}
+  const tab = (v: View, label: string, n?: number) => (
+    <button onClick={() => { setView(v); setLimit(100); }} className={`px-3 py-1.5 rounded text-sm ${view === v ? "bg-primary text-primary-foreground" : "border border-border"}`}>
+      {label}{n != null ? ` (${n})` : ""}
     </button>
+  );
+
+  return (
+    <div dir="rtl" className="min-h-screen bg-background text-foreground">
+      <header className="flex flex-wrap items-center gap-4 border-b border-border px-4 py-2 text-sm">
+        <b>FAII Sales</b>
+        <span className="text-muted-foreground">
+          {stats.total} عميل · {stats.ngo} منظمة · {stats.analysed} محلَّل · تواصلنا {stats.contacted} · ردّ {stats.replied} · صفقات {stats.won}
+        </span>
+        <div className="flex-1" />
+        <Link to="/settings" className="underline">الإعدادات</Link>
+        <button className="underline" onClick={() => signOut()}>خروج</button>
+      </header>
+
+      <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-border">
+        {tab("today", "اليوم")}
+        {tab("reply", "🔥 يحتاج رد", groups.reply.length)}
+        {tab("followup", "↩️ متابعات", groups.followup.length)}
+        {tab("best", "🎯 أفضل جدد", groups.best.length)}
+        {tab("all", "الكل", leads.length)}
+        <input className="rounded border border-border bg-background px-2 py-1.5 text-sm" placeholder="بحث" value={q} onChange={(e) => setQ(e.target.value)} />
+        <select className="rounded border border-border bg-background px-2 py-1.5 text-sm" value={kind} onChange={(e) => setKind(e.target.value)}>
+          <option value="">كل الأنواع</option>
+          {Object.entries(KIND_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        <select className="rounded border border-border bg-background px-2 py-1.5 text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="">كل الحالات</option>
+          {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        <div className="flex-1" />
+        <button disabled={!!bulk} className="px-3 py-1.5 rounded border border-border text-sm" onClick={() => analyseBatch(20)}>
+          {bulk ?? "🧠 حلّل 20 عميل"}
+        </button>
+        <button className="px-3 py-1.5 rounded border border-border text-sm" onClick={() => fileRef.current?.click()}>⬆️ استيراد من الجامع</button>
+        <input ref={fileRef} type="file" accept=".json" hidden onChange={(e) => e.target.files?.[0] && importFile(e.target.files[0])} />
+      </div>
+
+      <div className="grid md:grid-cols-[1fr_520px]">
+        <div className="overflow-auto md:h-[calc(100vh-100px)]">
+          {isLoading && <p className="p-4 text-muted-foreground">...</p>}
+          {!isLoading && list.length === 0 && (
+            <p className="p-4 text-muted-foreground">لا شيء هنا. استورد عملاء من الجامع أو اضغط "حلّل 20 عميل".</p>
+          )}
+          <table className="w-full text-sm">
+            <tbody>
+              {list.slice(0, limit).map((l) => (
+                <tr key={l.id} onClick={() => setSel(l.id)} className={`cursor-pointer border-b border-border hover:bg-muted ${sel === l.id ? "bg-muted" : ""}`}>
+                  <td className="p-2">
+                    <div className="font-medium">{l.needs_reply && "🔥 "}{l.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {KIND_LABEL[l.kind]} · {l.category ?? ""} · {l.city ?? ""}
+                    </div>
+                    {l.profile?.angle && <div className="text-xs text-muted-foreground">💡 {l.profile.best_service}: {l.profile.angle}</div>}
+                  </td>
+                  <td className="p-2 text-center w-12">{l.score != null ? <b>{l.score}</b> : "—"}</td>
+                  <td className="p-2 text-xs w-16 whitespace-nowrap">{l.email && "✉"} {l.phone && "☎"} {l.instagram && "IG"}</td>
+                  <td className="p-2 text-xs w-20">{STATUS_LABEL[l.status]}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {list.length > limit && <button className="m-3 underline text-sm" onClick={() => setLimit(limit + 200)}>عرض المزيد ({list.length - limit})</button>}
+        </div>
+        <aside className="border-r border-border md:h-[calc(100vh-100px)] overflow-auto">
+          {sel ? <LeadPanel key={sel} id={sel} /> : <p className="p-6 text-muted-foreground">اختر عميلاً.</p>}
+        </aside>
+      </div>
+    </div>
   );
 }
