@@ -17,7 +17,7 @@ const FIELDS: [keyof TeamSettings, string, number][] = [
   ["company", "اسم الاستوديو", 1],
   ["whoWeAre", "من أنتم (بصدق، بكلامك)", 3],
   ["services", "خدماتكم — سطر لكل خدمة ولمن تناسب", 7],
-  ["portfolioSite", "موقعك الذي عليه أعمالك", 1],
+  ["portfolioSite", "رابط أعمالك (موقعك أو صفحة Behance)", 1],
   ["portfolio", "البورتفوليو — سطر لكل عمل: العنوان | الرابط | كلمات (ngo, documentary, food, event…)", 10],
   ["priceGuide", "دليل أسعار (اختياري — إن تُرك فارغاً لن يذكر الذكاء أرقاماً)", 2],
   ["focus", "الأولوية", 2],

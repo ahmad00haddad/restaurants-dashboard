@@ -80,10 +80,24 @@ export interface PageSummary {
   text: string;
 }
 
+/** Behance project pages are bot-protected, but the profile page lists every project's id + name. */
+async function behanceProjects(profileUrl: string): Promise<PageSummary[]> {
+  const h = await get(profileUrl.replace(/behance\.com/, "behance.net"));
+  const out = new Map<string, PageSummary>();
+  for (const m of h.matchAll(/gallery\/(\d+)\/([A-Za-z0-9\-%_.]+)/g)) {
+    if (out.has(m[1])) continue;
+    const seg = h.slice(Math.max(0, h.indexOf(`"id":${m[1]}`)), h.indexOf(`"id":${m[1]}`) + 1500);
+    const name = seg.match(/"name":"([^"]{2,120})"/)?.[1] ?? decodeURIComponent(m[2]).replace(/-/g, " ");
+    out.set(m[1], { url: `https://www.behance.net/gallery/${m[1]}/${m[2]}`, title: name, text: "Behance project" });
+  }
+  return [...out.values()];
+}
+
 /** Crawl a site (sitemap first, then links from the home page) — used to read our own portfolio site. */
 export async function crawlSite(siteUrl: string, max = 40): Promise<PageSummary[]> {
   let start = siteUrl.trim();
   if (!/^https?:\/\//i.test(start)) start = "https://" + start;
+  if (/behance\.(net|com)/i.test(start)) return behanceProjects(start);
   const origin = new URL(start).origin;
   const queue = new Set<string>([start]);
 
