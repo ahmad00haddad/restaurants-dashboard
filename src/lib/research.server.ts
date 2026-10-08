@@ -73,3 +73,36 @@ export async function readWebsite(website: string): Promise<SiteFindings | null>
   const text = pages.filter(Boolean).map((p) => toText(p).slice(0, 1500)).join("\n---\n").slice(0, 4000);
   return { emails, socials, text };
 }
+
+export interface PageSummary {
+  url: string;
+  title: string;
+  text: string;
+}
+
+/** Crawl a site (sitemap first, then links from the home page) — used to read our own portfolio site. */
+export async function crawlSite(siteUrl: string, max = 40): Promise<PageSummary[]> {
+  let start = siteUrl.trim();
+  if (!/^https?:\/\//i.test(start)) start = "https://" + start;
+  const origin = new URL(start).origin;
+  const queue = new Set<string>([start]);
+
+  const sitemap = await get(origin + "/sitemap.xml");
+  for (const m of sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)) if (m[1].startsWith(origin)) queue.add(m[1]);
+  const home = await get(start);
+  for (const m of home.matchAll(/href=["']([^"'#?]+)["']/gi)) {
+    try {
+      const u = new URL(m[1], origin + "/").toString();
+      if (u.startsWith(origin) && !/\.(jpe?g|png|gif|webp|svg|pdf|css|js|xml)$/i.test(u)) queue.add(u);
+    } catch { /* skip */ }
+  }
+  const urls = [...queue].slice(0, max);
+  const pages = await Promise.all(urls.map(async (url) => {
+    const h = url === start ? home : await get(url);
+    if (!h) return null;
+    const title = (h.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1] ?? "").trim();
+    const videos = [...h.matchAll(/(?:youtube\.com\/embed\/|player\.vimeo\.com\/video\/)[A-Za-z0-9_-]+/g)].map((m) => m[0]).slice(0, 3);
+    return { url, title, text: (toText(h).slice(0, 600) + (videos.length ? ` [videos: ${videos.join(", ")}]` : "")) };
+  }));
+  return pages.filter((p): p is PageSummary => !!p);
+}

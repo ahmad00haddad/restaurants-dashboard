@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import { readWebsite } from "@/lib/research.server";
+import { crawlSite, readWebsite } from "@/lib/research.server";
 import { DEFAULT_TEAM, type Lead, type LeadMessage, type LeadProfile, type TeamSettings } from "@/lib/leads";
 
 const MODEL = "openai/gpt-6-astra";
@@ -63,6 +63,7 @@ function us(t: TeamSettings) {
     `Who we are: ${t.whoWeAre}`,
     `Services we offer:\n${t.services}`,
     `Priority: ${t.focus}`,
+    t.portfolioSite ? `Full portfolio website (may be mentioned once as "the rest of our work"): ${t.portfolioSite}` : "",
     `Portfolio (title | url | tags):\n${t.portfolio || "(none added yet — don't invent links)"}`,
   ].join("\n");
 }
@@ -181,4 +182,20 @@ export const draftMessage = createServerFn({ method: "POST" })
       }).eq("id", data.id);
     }
     return { subject: out.subject as string | undefined, body: String(out.body ?? ""), intent: out.intent as string | undefined, summary: out.summary as string | undefined };
+  });
+
+// ---------- 3) Build the portfolio list from our own website ----------
+export const importPortfolio = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ url: z.string().min(4) }).parse(d))
+  .handler(async ({ data }) => {
+    const pages = await crawlSite(data.url);
+    if (!pages.length) throw new Error("تعذّر قراءة الموقع");
+    const out = await ask(
+      "You catalogue a photographer/filmmaker's portfolio website. Identify pages that show a specific project/work (not home, contact, about, blog index). Return JSON only.",
+      "PAGES:\n" + pages.map((p) => `URL: ${p.url}\nTITLE: ${p.title}\n${p.text}`).join("\n\n") + "\n\n" +
+        'Return JSON: {"items":[{"title":"short project title incl. client if shown","url":"page url","tags":"type and sector, e.g. documentary, ngo, refugees, food, event, commercial, hotel"}]}',
+    );
+    const items = (out.items as { title: string; url: string; tags: string }[] | undefined) ?? [];
+    return { lines: items.map((i) => `${i.title} | ${i.url} | ${i.tags}`).join("\n"), pages: pages.length };
   });

@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { useLeadActions, useTeamSettings } from "@/hooks/useLeads";
 import { useToast } from "@/hooks/useToast";
 import { DEFAULT_TEAM, type TeamSettings } from "@/lib/leads";
+import { useServerFn } from "@tanstack/react-start";
+import { importPortfolio } from "@/lib/ai.functions";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "FAII — Settings" }] }),
@@ -15,6 +17,7 @@ const FIELDS: [keyof TeamSettings, string, number][] = [
   ["company", "اسم الاستوديو", 1],
   ["whoWeAre", "من أنتم (بصدق، بكلامك)", 3],
   ["services", "خدماتكم — سطر لكل خدمة ولمن تناسب", 7],
+  ["portfolioSite", "موقعك الذي عليه أعمالك", 1],
   ["portfolio", "البورتفوليو — سطر لكل عمل: العنوان | الرابط | كلمات (ngo, documentary, food, event…)", 10],
   ["priceGuide", "دليل أسعار (اختياري — إن تُرك فارغاً لن يذكر الذكاء أرقاماً)", 2],
   ["focus", "الأولوية", 2],
@@ -25,6 +28,20 @@ function SettingsPage() {
   const act = useLeadActions();
   const toast = useToast();
   const [s, setS] = useState<TeamSettings>(DEFAULT_TEAM);
+  const readSite = useServerFn(importPortfolio);
+  const [reading, setReading] = useState(false);
+  const pull = async () => {
+    setReading(true);
+    try {
+      const r = await readSite({ data: { url: s.portfolioSite } });
+      setS((x) => ({ ...x, portfolio: r.lines }));
+      toast.push(`قرأت ${r.pages} صفحة — راجع القائمة ثم احفظ`);
+    } catch (e) {
+      toast.push((e as Error).message, "error");
+    } finally {
+      setReading(false);
+    }
+  };
   useEffect(() => { if (data) setS(data); }, [data]);
 
   return (
@@ -38,6 +55,11 @@ function SettingsPage() {
             <input className="w-full rounded border border-border bg-background px-2 py-1.5" value={s[k]} onChange={(e) => setS({ ...s, [k]: e.target.value })} />
           ) : (
             <textarea dir={k === "portfolio" ? "ltr" : "rtl"} rows={rows} className="w-full rounded border border-border bg-background px-2 py-1.5" value={s[k]} onChange={(e) => setS({ ...s, [k]: e.target.value })} />
+          )}
+          {k === "portfolioSite" && (
+            <button type="button" disabled={!s.portfolioSite || reading} onClick={pull} className="mt-1 px-3 py-1.5 rounded border border-border disabled:opacity-40">
+              {reading ? "يقرأ موقعك…" : "اقرأ أعمالي من الموقع واملأ البورتفوليو"}
+            </button>
           )}
         </label>
       ))}
