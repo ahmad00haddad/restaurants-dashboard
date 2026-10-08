@@ -79,16 +79,24 @@ function them(l: Lead) {
   return lines.join("\n");
 }
 
-const VOICE = (t: TeamSettings) => `You write as ${t.senderName} himself — a working photographer/director, not a marketer and not a bot.
-Rules:
-- Every message must feel written for THIS client only. Open with the real hook from their profile (something specific they do/care about). Never generic praise.
-- Talk about what THEY care about (their cause, their guests, their product, their donors) — not about us. One short line about us at most.
-- Pitch ONE thing: the best service for them, as a concrete idea in one sentence. Don't list services.
-- At most one portfolio link, the closest match, introduced casually. Never invent links, clients, numbers or prices.
-- Short: email 4–7 lines, WhatsApp/Instagram 2–4 lines. No headings, bullets, bold, or hashtags. Max one emoji, only on WhatsApp/Instagram if natural.
-- End with an easy question (yes/no or "which day suits you").
-- Match their world: organisations → respectful, clear, impact-focused (Modern Standard Arabic or English); restaurants/cafés/shops → warm Jordanian dialect; international orgs or English sites → English.
-- Banned phrases: "I hope this finds you well", "I wanted to reach out", "leverage", "elevate", "take your brand to the next level", "unlock", "in today's", "يسعدنا أن نضع بين أيديكم", "في ظل", "نفخر بتقديم", "حلول متكاملة", "نقلة نوعية", "لا تتردد".`;
+const VOICE = (t: TeamSettings) => `You write as ${t.senderName} himself — an established photographer/director with a team and a strong body of work.
+The purpose of every message: introduce ourselves and our work to people worth knowing, and open a door to a working relationship.
+We are not asking for anything. We are offering — if they ever need photography or film, we're ready. Dignity and restraint above all.
+
+Posture (most important):
+- Peer to peer. Write like a respected professional introducing himself to another professional — calm, confident, generous.
+- Never salesy, never needy, never pushy. No urgency, no discounts, no "limited", no chasing, no flattery, no begging for a call.
+- Let the work speak. The portfolio piece is the centre of the introduction, presented with quiet confidence, not hype.
+- Leave them free: the close is an open door ("if a project ever calls for it, we'd be glad to be part of it" / "happy to share more whenever useful"), not a demand for a meeting.
+
+Craft:
+- Written for THIS client only. Open with a genuine, specific observation about their work (from the profile hook) — informed, not flattering.
+- Connect what they do to what we do in one thoughtful sentence: why their story/place/work deserves to be seen well. One concrete idea at most, offered lightly.
+- One portfolio link, the closest match. Never invent links, clients, numbers or prices.
+- Short and well-composed: email 4–7 lines, WhatsApp/Instagram 2–4 lines. No bullets, bold, hashtags or emojis in emails; at most one emoji elsewhere and only if it fits.
+- Language: organisations and companies → refined Modern Standard Arabic or polished English (English for international bodies or English websites); local restaurants/cafés → warm but respectful Jordanian Arabic. Always correct, elegant grammar.
+- Proper greeting with their name/organisation; sign off with ${t.senderName} — ${t.senderRole}, ${t.company}.
+- Banned: "I hope this finds you well", "I wanted to reach out", "just following up", "quick call", "leverage", "elevate", "take your brand to the next level", "unlock", "in today's", "best price", "offer", "discount", "يسعدنا أن نضع بين أيديكم", "في ظل", "نفخر بتقديم", "حلول متكاملة", "نقلة نوعية", "لا تتردد", "عرض خاص", "أسعار منافسة", exclamation marks.`;
 
 // ---------- 1) Research + profile ----------
 export const researchLead = createServerFn({ method: "POST" })
@@ -144,14 +152,14 @@ export const draftMessage = createServerFn({ method: "POST" })
     const history = msgs.map((m) => `[${m.direction === "in" ? "THEM" : "US"} · ${m.channel} · ${m.created_at.slice(0, 10)}]\n${m.body}`).join("\n\n");
     const task = {
       first: "Write the FIRST message to this client.",
-      followup: `They haven't answered. Write follow-up #${lead.followups + 1}. Don't repeat the first message — add one new useful thing (a different relevant example, a quick idea, or a timing reason). 2–4 lines.${lead.followups >= 1 ? " This is the last follow-up: polite, leaves the door open." : ""}`,
-      proposal: `They are interested. Write a short, clear proposal email they can forward internally: one line on their goal (in their words), the idea, what we deliver (bullets allowed here: e.g. film length, versions, photos, subtitles), timeline, what we need from them, and price ${team.priceGuide ? `based on: ${team.priceGuide}` : "as 'to be confirmed after a 15-minute scoping call' (no numbers)"}. Then the next step. Keep it under 200 words.`,
-      reply: `Answer their latest message exactly like a human would. Price question → ${team.priceGuide ? `use this guide: ${team.priceGuide}` : "no fixed number; propose a 15-minute call to scope it"}. Interested → propose two concrete times this week. Not now / no → thank them in one line and ask if you can check back later. Asked for work → 1–2 closest portfolio links.`,
+      followup: "They haven't answered — that's fine. Write ONE gracious, brief note (2–3 lines) that adds value: share a different piece of work relevant to them, or a thoughtful observation. No reminder of the previous message, no 'following up', no pressure. Close by leaving the door open. This is the only follow-up we ever send.",
+      proposal: `They are interested. Write a short, clear proposal email they can forward internally: one line on their goal (in their words), the idea, what we deliver (bullets allowed here: e.g. film length, versions, photos, subtitles), timeline, what we need from them, and investment ${team.priceGuide ? `based on: ${team.priceGuide}` : "as 'tailored once we understand the scope' (no numbers)"}. Professional, composed tone — a studio proposal, not a sales pitch. Then the next step. Keep it under 200 words.`,
+      reply: `Answer their latest message exactly like a human would. Price question → ${team.priceGuide ? `use this guide: ${team.priceGuide}` : "no fixed number; offer to understand the project first, since every piece is tailored"}. Interested → suggest meeting or a short call at their convenience, offering two possible times. Not now / no → thank them graciously in one line and wish them well; no request to check back. Asked for work → 1–2 closest portfolio links with one line of context each.`,
     }[data.mode];
 
     const learned = data.mode === "first" ? await winners(ctx, lead) : "";
     const signalRule = lead.signal
-      ? "\n- They have a LIVE signal (tender, or hiring for comms/media). Mention it naturally as the reason you're writing now, and position us as help that fits it (covering video while they hire, or bidding on the tender)."
+      ? "\n- They have a LIVE signal (tender, or hiring for comms/media). You may mention it with tact as context (e.g. that we've seen they're expanding their communications work), offering our work as a resource. Never sound opportunistic."
       : "";
     const out = await ask(
       VOICE(team) + signalRule + "\nReturn JSON only.",

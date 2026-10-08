@@ -34,7 +34,7 @@ function Home() {
   const groups = useMemo(() => {
     const t = today();
     const reply = leads.filter((l) => l.needs_reply);
-    const followup = leads.filter((l) => l.status === "contacted" && l.next_action_at && l.next_action_at <= t && l.followups < 2);
+    const followup = leads.filter((l) => l.status === "contacted" && l.next_action_at && l.next_action_at <= t && l.followups < 1);
     const meeting = leads.filter((l) => l.status === "meeting" || (l.status === "replied" && l.next_action_at && l.next_action_at <= t && !l.needs_reply));
     const best = leads.filter((l) => l.status === "new" && l.score != null && (l.email || l.phone || l.instagram));
     const signals = leads.filter((l) => l.signal && (!l.signal_until || l.signal_until >= t) && !["won", "lost", "skip"].includes(l.status))

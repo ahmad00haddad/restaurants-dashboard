@@ -84,8 +84,8 @@ export function useLeadActions() {
       await db.from("lead_messages").delete().eq("lead_id", lead.id).eq("draft", true);
       await db.from("lead_messages").insert({ lead_id: lead.id, channel, direction: "out", body, subject: subject || null });
       const patch: Partial<Lead> =
-        lead.status === "new" || lead.status === "skip" ? { status: "contacted", next_action_at: today(4), needs_reply: false }
-        : lead.status === "contacted" ? { followups: lead.followups + 1, next_action_at: today(6), needs_reply: false }
+        lead.status === "new" || lead.status === "skip" ? { status: "contacted", next_action_at: today(7), needs_reply: false }
+        : lead.status === "contacted" ? { followups: lead.followups + 1, next_action_at: null, needs_reply: false }
         : { needs_reply: false, next_action_at: today(3) };
       await update(lead.id, patch);
     },
