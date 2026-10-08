@@ -76,12 +76,12 @@ export const composeOutreach = createServerFn({ method: "POST" })
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-3-flash",
+        model: "openai/gpt-6-astra",
+        reasoning_effort: "low",
         messages: [
           { role: "system", content: system },
           { role: "user", content: user },
         ],
-        temperature: 1,
       }),
     });
 
