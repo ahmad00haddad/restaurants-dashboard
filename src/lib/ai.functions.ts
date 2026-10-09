@@ -66,7 +66,11 @@ function us(t: TeamSettings) {
     t.portfolioSite ? `Full portfolio website (may be mentioned once as "the rest of our work"): ${t.portfolioSite}` : "",
     `PAST CLIENTS we really worked with (name | sector | language) — the only names you may mention:
 ${t.pastClients || "(none listed — mention no client names)"}`,
-    `Portfolio (title | url | tags). Lines starting with ★ are our FLAGSHIP works — always choose a ★ work when one is reasonably related; use others only if no ★ fits. A work whose tags say "ONLY …" may be used only in that case (e.g. only for schools, only around Ramadan):\n${t.portfolio || "(none added yet — don't invent links)"}`,
+    `LINKS — send exactly one, the full body of work, never a single project:
+- ${PERSONAL_SITE} — Ahmad's own site (films, documentaries, client logos). Default; best for organisations, NGOs, institutions, culture and documentaries.
+- ${TEAM_SITE} — FAII House, the production team. Best for brands, restaurants, cafés, companies, campaigns and larger productions.
+- ${BEHANCE} — Behance. Only for design-minded creative clients (agencies, studios) or when asked for a portfolio file.`,
+    `Portfolio (for choosing which work to NAME as proof — do not paste these links) (title | url | tags). Lines starting with ★ are our FLAGSHIP works — always choose a ★ work when one is reasonably related; use others only if no ★ fits. A work whose tags say "ONLY …" may be used only in that case (e.g. only for schools, only around Ramadan):\n${t.portfolio || "(none added yet — don't invent links)"}`,
   ].join("\n");
 }
 
@@ -81,6 +85,10 @@ function them(l: Lead) {
   if (l.about) lines.push(`What their website says:\n${l.about}`);
   return lines.join("\n");
 }
+
+const PERSONAL_SITE = "https://ahmadhaddad.lovable.app";
+const TEAM_SITE = "https://faiihouse.lovable.app";
+const BEHANCE = "https://www.behance.net/ahmad00haddad";
 
 /** From the study of our 63 past clients: which language each kind of client actually works in. */
 const LANGUAGE_RULES = `Language — decide from their own website/profile first. Defaults, from studying our 62 real past clients
@@ -105,10 +113,10 @@ THE POSTURE — this decides everything:
 
 CRAFT:
 - Open with a precise observation from the profile hook: a real detail of their work, place or people. If removing the first line leaves the message unchanged, rewrite it.
-- One insight/idea about their story (one sentence, concrete, visual). Then one line of quiet proof: the single best matching work (prefer ★ flagship works) and, only if truly close to their world, one past client name from the PAST CLIENTS list.
+- One insight/idea about their story (one sentence, concrete, visual). Then one line of quiet proof: name (no link) the closest ★ flagship work and, only if truly close to their world, one past client from the PAST CLIENTS list.
 - Short: email 4–6 lines of body. WhatsApp/Instagram 2–3 lines. No bullets, bold, hashtags, emojis in emails; no exclamation marks; no em dashes in the body.
 - Subject (email): 2–5 calm words about THEM (their programme, place or story), never about us. No "collaboration", "proposal", "opportunity", "services".
-- Greeting: their organisation or the right person. Sign-off: ${t.senderName}, then ${t.senderRole}, ${t.company}, then the portfolio site on its own line if given.
+- Greeting: their organisation or the right person. Sign-off: ${t.senderName}, then ${t.senderRole}, ${t.company}, then ONE link on its own line: the body of work that fits them best (see LINKS). That is the only link in the message; never link a single project.
 ${LANGUAGE_RULES}
 - Never invent facts, clients, numbers, prices or links.`;
 
@@ -116,7 +124,7 @@ ${LANGUAGE_RULES}
 const EDITOR = `You are the toughest editor of outreach messages for a respected director. You judge one draft.
 Score 1-10 on each: dignity (zero neediness, no supplier tone, no begging/thanking/apologising), specificity (could only have been written to this client),
 insight (gives them a real idea about their own story), restraint (short, calm, no adjectives about us), language (natural, elegant, correct for this audience).
-If ANY score is below 9, rewrite the message to score 10 on all, keeping the same language, facts, link and signature. Never add new facts, links or client names.
+If ANY score is below 9, rewrite the message to score 10 on all, keeping the same language, facts, link and signature. Never add new facts, links or client names. Keep exactly one link: the site in the signature; remove any link to a single project.
 Return JSON only: {"scores":{"dignity":n,"specificity":n,"insight":n,"restraint":n,"language":n},"subject":"...","body":"final message"}`;
 
 // ---------- 1) Research + profile ----------
@@ -144,7 +152,7 @@ Return JSON only.`,
       `${us(team)}\n\nCLIENT:\n${them(lead)}\n\nReturn JSON:
 {"summary":"who they are, one line","interests":["what they care about"],"content_needs":["visual content they likely need"],
 "best_service":"one of our services","other_services":["..."],"angle":"one concrete film/photo idea made for them",
-"hook":"a real specific detail from their info to open with (empty if none)","portfolio_pick":"url from our portfolio (prefer ★ flagship works) or empty",
+"hook":"a real specific detail from their info to open with (empty if none)","portfolio_pick":"name of the closest ★ work to mention (no url)","link_pick":"which ONE site to send: personal | team | behance",
 "tone":"formal|warm|casual","lang":"ar|en","channel":"email|whatsapp|instagram","decision_maker":"role to address, e.g. Communications Officer",
 "score":0-100,"why":"one short line"}`,
     )) as unknown as LeadProfile & { score: number };

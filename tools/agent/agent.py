@@ -135,12 +135,10 @@ _allowed = {"t": 0, "urls": set()}
 
 
 def allowed_urls():
-    """Links we're allowed to send: our portfolio, our sites. Refreshed every 10 min from team settings."""
-    if time.time() - _allowed["t"] > 600:
-        st = (db.get("app_settings", select="data", id="eq.1") or [{}])[0].get("data") or {}
-        urls = set(URL.findall(st.get("portfolio", "") + " " + st.get("portfolioSite", "")))
-        urls |= {u.strip() for u in E.get("ALLOWED_LINKS", "").split(",") if u.strip()}
-        _allowed.update(t=time.time(), urls={u.rstrip("/.,").lower().replace("https://", "").replace("http://", "").replace("www.", "") for u in urls})
+    """Only Ahmad's full bodies of work may be linked (his choice): personal site, team site, Behance profile."""
+    if not _allowed["urls"]:
+        links = E.get("ALLOWED_LINKS") or "ahmadhaddad.lovable.app,faiihouse.lovable.app,behance.net/ahmad00haddad,behance.com/ahmad00haddad"
+        _allowed["urls"] = {u.strip().lower().replace("https://", "").replace("http://", "").replace("www.", "").rstrip("/") for u in links.split(",") if u.strip()}
     return _allowed["urls"]
 
 
@@ -161,8 +159,8 @@ def gate(m, L):
     ok = allowed_urls()
     for u in URL.findall(body):
         n = u.rstrip("/.,").lower().replace("https://", "").replace("http://", "").replace("www.", "")
-        if not any(n.startswith(a) or a.startswith(n) for a in ok):
-            why.append(f"رابط ليس من أعمالك: {u}")
+        if not any(n == a or n.startswith(a + "/") and a.count("/") >= n.count("/") - 1 and "gallery" not in n for a in ok):
+            why.append(f"رابط غير مسموح (المسموح: موقعك، موقع الفريق، Behance فقط): {u}")
     if m["channel"] == "email" and len(body) > 1600 and not (L.get("status") in ("replied", "meeting")):
         why.append("أطول من اللازم لرسالة أولى")
     if L.get("status") in ("lost", "skip"):
