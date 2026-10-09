@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_status: {
+        Row: {
+          id: number
+          last_seen: string | null
+          model: string | null
+          note: string | null
+        }
+        Insert: {
+          id?: number
+          last_seen?: string | null
+          model?: string | null
+          note?: string | null
+        }
+        Update: {
+          id?: number
+          last_seen?: string | null
+          model?: string | null
+          note?: string | null
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           data: Json
