@@ -79,6 +79,7 @@ export interface TeamSettings {
   whoWeAre: string;   // honest description of the team
   services: string;   // one per line
   portfolioSite: string; // our own website with all the work
+  pastClients: string;   // one per line: name | sector | language
   portfolio: string;  // one per line: title | url | tags
   priceGuide: string;
   focus: string;      // what to prioritise when it fits
@@ -99,6 +100,7 @@ export const DEFAULT_TEAM: TeamSettings = {
     "Portraits / team photos — مؤسسات وشركات",
   ].join("\n"),
   portfolioSite: "",
+  pastClients: "",
   portfolio: "",
   priceGuide: "",
   focus: "الوثائقيات وأفلام الأثر للمنظمات هي الأولوية عندما تناسب العميل.",

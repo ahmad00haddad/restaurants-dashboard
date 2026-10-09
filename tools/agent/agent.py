@@ -6,7 +6,7 @@
 - Morning report every day + /report /queue /pause /resume commands.
 Config: agent.env (see agent.env.example).
 """
-import json, smtplib, sys, time, traceback
+import json, re, smtplib, sys, time, traceback
 from datetime import date, datetime, timedelta
 from email.mime.text import MIMEText
 from email.utils import formataddr, make_msgid
@@ -125,6 +125,51 @@ def wa_link(phone, text):
     return f"https://wa.me/{d}?text={quote(text)}"
 
 
+# ---------------- Safety gate (deterministic, fails closed) ----------------
+BANNED = ["i hope this", "i wanted to reach out", "just following up", "just checking in", "leverage", "elevate",
+          "next level", "unlock", "best price", "discount", "limited time", "عرض خاص", "أسعار منافسة", "خصم",
+          "يسعدنا أن نضع بين أيديكم", "نقلة نوعية", "حلول متكاملة", "لا تتردد"]
+PRICE = re.compile(r"(\d[\d,.]*\s*(د\.?أ|دينار|jod|jd|usd|\$|€))|((\$|€)\s*\d)", re.I)
+URL = re.compile(r"(https?://[^\s)>\]]+|(?:www\.)?[a-z0-9-]+\.(?:com|net|org|app|io|jo|be)/[^\s)>\]]*)", re.I)
+_allowed = {"t": 0, "urls": set()}
+
+
+def allowed_urls():
+    """Links we're allowed to send: our portfolio, our sites. Refreshed every 10 min from team settings."""
+    if time.time() - _allowed["t"] > 600:
+        st = (db.get("app_settings", select="data", id="eq.1") or [{}])[0].get("data") or {}
+        urls = set(URL.findall(st.get("portfolio", "") + " " + st.get("portfolioSite", "")))
+        urls |= {u.strip() for u in E.get("ALLOWED_LINKS", "").split(",") if u.strip()}
+        _allowed.update(t=time.time(), urls={u.rstrip("/.,").lower().replace("https://", "").replace("http://", "").replace("www.", "") for u in urls})
+    return _allowed["urls"]
+
+
+def gate(m, L):
+    """Returns a list of reasons to block. Empty list = safe to send. Any doubt → block."""
+    body, subj = m.get("body") or "", m.get("subject") or ""
+    text = (subj + "\n" + body).lower()
+    why = []
+    if len(body.strip()) < 40:
+        why.append("الرسالة قصيرة جداً أو فارغة")
+    if re.search(r"\{\{?[^}]*\}\}?|\[(name|اسم|company|link)[^\]]*\]|<[A-Z_]+>|xxx", body, re.I):
+        why.append("فيها خانة لم تُعبّأ مثل {name}")
+    for b in BANNED:
+        if b in text:
+            why.append(f"عبارة ممنوعة: «{b}»")
+    if PRICE.search(body) and L.get("status") in ("new", "contacted", None):
+        why.append("تذكر سعراً في رسالة تعريف — الأسعار فقط بعد أن يردّوا")
+    ok = allowed_urls()
+    for u in URL.findall(body):
+        n = u.rstrip("/.,").lower().replace("https://", "").replace("http://", "").replace("www.", "")
+        if not any(n.startswith(a) or a.startswith(n) for a in ok):
+            why.append(f"رابط ليس من أعمالك: {u}")
+    if m["channel"] == "email" and len(body) > 1600 and not (L.get("status") in ("replied", "meeting")):
+        why.append("أطول من اللازم لرسالة أولى")
+    if L.get("status") in ("lost", "skip"):
+        why.append("العميل مغلق (رفض أو تجاهل)")
+    return why
+
+
 # ---------------- Approval flow ----------------
 KIND = {"ngo": "منظمة", "org": "مؤسسة", "restaurant": "مطعم", "brand": "براند", "hotel": "فندق", "event": "فعاليات", "other": "أخرى"}
 CH = {"email": "✉️ إيميل", "whatsapp": "💬 واتساب", "instagram": "📷 إنستغرام"}
@@ -173,6 +218,10 @@ def approve(mid, tg_mid):
     L = m["leads"]
     if m["review"] == "sent":
         return "أُرسلت مسبقاً"
+    problems = gate(m, L)
+    if problems:
+        db.patch("lead_messages", {"id": mid}, {"review": "failed", "review_note": " · ".join(problems)[:300]})
+        return "🛑 لم تُرسل — الفحص أوقفها:\n• " + "\n• ".join(problems) + "\nعدّلها (✏️ من الموقع) ثم أعد إرسالها للموافقة."
     if m["channel"] == "email":
         if not L.get("email"):
             return "لا يوجد إيميل لهذا العميل"

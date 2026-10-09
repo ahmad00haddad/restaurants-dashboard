@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/useToast";
 import { useAuth } from "@/hooks/useAuth";
 import { LeadPanel } from "@/components/LeadPanel";
 import { Approvals } from "@/components/Approvals";
+import { AddLead } from "@/components/AddLead";
 import { draftMessage } from "@/lib/ai.functions";
 import { useApprovals } from "@/hooks/useLeads";
 import { KIND_LABEL, STATUS_LABEL, type Lead } from "@/lib/leads";
@@ -166,6 +167,7 @@ function Home() {
         <button disabled={!!bulk} className="px-3 py-1.5 rounded border border-border text-sm" onClick={() => analyseBatch(20)}>
           {bulk ?? "🧠 حلّل 20 عميل"}
         </button>
+        <AddLead onAdded={(name) => { setView("all"); setQ(name); }} />
         <button className="px-3 py-1.5 rounded border border-border text-sm" onClick={() => fileRef.current?.click()}>⬆️ استيراد من الجامع</button>
         <input ref={fileRef} type="file" accept=".json" hidden onChange={(e) => e.target.files?.[0] && importFile(e.target.files[0])} />
       </div>

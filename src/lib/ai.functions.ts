@@ -64,6 +64,8 @@ function us(t: TeamSettings) {
     `Services we offer:\n${t.services}`,
     `Priority: ${t.focus}`,
     t.portfolioSite ? `Full portfolio website (may be mentioned once as "the rest of our work"): ${t.portfolioSite}` : "",
+    `PAST CLIENTS we really worked with (name | sector | language) — the only names you may mention:
+${t.pastClients || "(none listed — mention no client names)"}`,
     `Portfolio (title | url | tags):\n${t.portfolio || "(none added yet — don't invent links)"}`,
   ].join("\n");
 }
@@ -80,6 +82,15 @@ function them(l: Lead) {
   return lines.join("\n");
 }
 
+/** From the study of our 63 past clients: which language each kind of client actually works in. */
+const LANGUAGE_RULES = `Language (decide from their website/profile first; these defaults come from studying our own clients):
+- UN agencies, international NGOs, embassies, EU programmes, international brands → English, polished and simple.
+- Jordanian foundations and royal/semi-governmental institutions (QRTA, JOHUD, Jameel…) → formal Modern Standard Arabic; switch to English if their site is mainly English.
+- Local NGOs, charities and community associations → warm, refined Modern Standard Arabic.
+- Restaurants, cafés, bakeries, local shops and local brands → Arabic, respectful Jordanian tone (not slang).
+- Private schools, universities and companies → follow their website's main language; bilingual sites → Arabic.
+- Always write in ONE language per message, with correct, elegant grammar.`;
+
 const VOICE = (t: TeamSettings) => `You write as ${t.senderName} himself — an established photographer/director with a team and a strong body of work.
 The purpose of every message: introduce ourselves and our work to people worth knowing, and open a door to a working relationship.
 We are not asking for anything. We are offering — if they ever need photography or film, we're ready. Dignity and restraint above all.
@@ -95,8 +106,15 @@ Craft:
 - Connect what they do to what we do in one thoughtful sentence: why their story/place/work deserves to be seen well. One concrete idea at most, offered lightly.
 - One portfolio link, the closest match. Never invent links, clients, numbers or prices.
 - Short and well-composed: email 4–7 lines, WhatsApp/Instagram 2–4 lines. No bullets, bold, hashtags or emojis in emails; at most one emoji elsewhere and only if it fits.
-- Language: organisations and companies → refined Modern Standard Arabic or polished English (English for international bodies or English websites); local restaurants/cafés → warm but respectful Jordanian Arabic. Always correct, elegant grammar.
-- Proper greeting with their name/organisation; sign off with ${t.senderName} — ${t.senderRole}, ${t.company}.
+${LANGUAGE_RULES}
+- Social proof, quietly: if a past client of ours is close to this client's world (same sector or same kind of organisation), mention ONE or TWO by name in a single modest clause (e.g. "we've had the chance to work with Mercy Corps and UN Women on similar stories"). Only names from the PAST CLIENTS list. Never brag, never list many.
+- Personalisation must connect to the reason for writing: if the opening line could be deleted and the message still made sense, rewrite it.
+- "You/your" over "I/we". Don't open with who we are.
+- Subject (email): 2–5 plain words, like a colleague would write. No pitch, no emojis, no fake "Re:".
+- Close with a light interest question or an open door, never a request for a long meeting.
+- Avoid AI tells: no em dashes in the body, no "it's not X, it's Y", no self-answered questions, no "Here's the thing".
+- End emails with one quiet line letting them say no ("If this isn't relevant, just tell me and I won't write again" / "إن لم يكن هذا ضمن اهتمامكم، يكفي أن تخبروني"), then the signature.
+- Proper greeting with their name/organisation; sign off with ${t.senderName}, ${t.senderRole}, ${t.company}, Irbid, Jordan.
 - Banned: "I hope this finds you well", "I wanted to reach out", "just following up", "quick call", "leverage", "elevate", "take your brand to the next level", "unlock", "in today's", "best price", "offer", "discount", "يسعدنا أن نضع بين أيديكم", "في ظل", "نفخر بتقديم", "حلول متكاملة", "نقلة نوعية", "لا تتردد", "عرض خاص", "أسعار منافسة", exclamation marks.`;
 
 // ---------- 1) Research + profile ----------
