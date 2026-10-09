@@ -97,8 +97,11 @@ function Home() {
   const localBatch = async (n: number) => {
     if (!agent?.online) toast.push("⚠️ الوكيل متوقف — ستُكتب عند تشغيل run.bat", "info");
     const queued = new Set(approvals.map((a) => a.lead_id));
-    const targets = [...groups.signals.filter((l) => l.status === "new"), ...groups.best]
-      .filter((l, i, a) => a.indexOf(l) === i && !queued.has(l.id) && reachable(l)).slice(0, n);
+    // Best analysed leads first; fill the rest with not-yet-analysed ones (the PC analyses each before writing).
+    const fresh = leads.filter((l) => l.status === "new" && !l.profile && (!kind || l.kind === kind))
+      .sort((x, y) => Number(y.kind === "ngo") - Number(x.kind === "ngo") || Number(!!y.website) - Number(!!x.website));
+    const targets = [...groups.signals.filter((l) => l.status === "new"), ...groups.best, ...fresh]
+      .filter((l, i, a) => a.indexOf(l) === i && !queued.has(l.id) && reachable(l) && (!kind || l.kind === kind)).slice(0, n);
     for (const l of targets) await act.requestLocalWrite(l.id, channelFor(l));
     toast.push(`💻 ${targets.length} رسائل في طابور جهازك — تصلك على Telegram تباعاً`);
   };
