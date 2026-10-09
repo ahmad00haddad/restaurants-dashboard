@@ -165,7 +165,7 @@ function Home() {
           ✍️ اكتب لأفضل 10 وأرسلها للموافقة
         </button>
         <button disabled={!!bulk} className="px-3 py-1.5 rounded border border-border text-sm" onClick={() => analyseBatch(20)}>
-          {bulk ?? "🧠 حلّل 20 عميل"}
+          {bulk ?? "🧠 حلّل 20 (رصيد Lovable)"}
         </button>
         <AddLead onAdded={(name) => { setView("all"); setQ(name); }} />
         <button className="px-3 py-1.5 rounded border border-border text-sm" onClick={() => fileRef.current?.click()}>⬆️ استيراد من الجامع</button>

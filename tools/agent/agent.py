@@ -277,7 +277,7 @@ def on_text(msg):
     if text == "/start" and not STATE.get("chat"):
         STATE["chat"] = chat
         save_state()
-        say("أهلاً أحمد 👋 ربطت هذا الحساب بالوكيل. ستصلك هنا الرسائل للموافقة والتقرير الصباحي.\nالأوامر: /report /queue /pause /resume")
+        say("أهلاً أحمد 👋 ربطت هذا الحساب بالوكيل. ستصلك هنا الرسائل للموافقة والتقرير الصباحي.\nالأوامر: /report /queue /analyze /pause /resume")
         return
     if str(chat) != str(STATE.get("chat")):
         return  # only the owner can control the agent
@@ -299,6 +299,9 @@ def on_text(msg):
         say(f"في الانتظار: {n}")
         db.req("PATCH", "lead_messages", {"review": "eq.pending"}, {"tg_message_id": None})
         push_pending()
+    elif text == "/analyze":
+        left = len(db.get("leads", select="id", profile="is.null", deleted_at="is.null", limit="2000"))
+        say(f"🧠 التحليل المحلي ({_local['model'] or 'متوقف — Ollama غير شغّال'}): حلّلت {_local['done']} منذ التشغيل، وبقي {left}")
     elif text == "/pause":
         STATE["paused"] = True; save_state(); say("⏸ أوقفت إرسال المسودات. /resume للاستئناف")
     elif text == "/resume":
@@ -333,13 +336,54 @@ def report():
     say("\n\n".join(lines))
 
 
+# ---------------- Local analysis (Ollama on this PC, no credit) ----------------
+_local = {"team": None, "t": 0, "model": None, "done": 0, "warned": False}
+
+
+def local_model():
+    import local_ai
+    for m in [E.get("OLLAMA_MODEL", "qwen2.5:14b"), "qwen2.5:14b", "qwen2.5-coder:7b"]:
+        if local_ai.available(m):
+            return m
+    return None
+
+
+def analyze_one():
+    """Profile the next un-analysed lead on the local GPU. Organisations first, those with a website first."""
+    if E.get("LOCAL_ANALYSIS", "1") != "1" or STATE.get("paused"):
+        return
+    import local_ai
+    if time.time() - _local["t"] > 600:
+        _local.update(t=time.time(), model=local_model(),
+                      team=((db.get("app_settings", select="data", id="eq.1") or [{}])[0].get("data") or {}))
+    if not _local["model"]:
+        if not _local["warned"]:
+            log("local analysis off: Ollama not running or no model (ollama pull qwen2.5:14b)")
+            _local["warned"] = True
+        return
+    rows = db.get("leads", select="*", profile="is.null", deleted_at="is.null",
+                  **{"or": "(email.not.is.null,phone.not.is.null,instagram.not.is.null)"}, limit="40")
+    if not rows:
+        return
+    rank = {"ngo": 0, "org": 1, "hotel": 2, "brand": 3, "event": 4, "restaurant": 5}
+    rows.sort(key=lambda L: (not L.get("signal"), rank.get(L["kind"], 6), not L.get("website")))
+    L = rows[0]
+    try:
+        p = local_ai.analyze(db, L, _local["team"], _local["model"])
+        _local["done"] += 1
+        log(f"🧠 {L['name']}: {p['score']} — {p['profile'].get('angle', '')[:80]}")
+    except Exception as e:
+        log(f"analysis failed for {L['name']}: {e}")
+        db.patch("leads", {"id": L["id"]}, {"profile": {"summary": "تعذّر التحليل المحلي", "why": str(e)[:200], "analysed_by": "failed"}, "score": 0})
+
+
 # ---------------- Main loop ----------------
 def main():
     log("FAII Agent started. Open Telegram and send /start to your bot." if not STATE.get("chat") else "FAII Agent started.")
     offset, last_push, report_hour = STATE.get("offset", 0), 0, int(E.get("REPORT_HOUR", "8"))
     while True:
         try:
-            ups = tg("getUpdates", offset=offset, timeout=50) or []
+            ups = tg("getUpdates", offset=offset, timeout=20) or []
             for u in ups:
                 offset = u["update_id"] + 1
                 if "callback_query" in u:
@@ -348,6 +392,7 @@ def main():
                     on_text(u["message"])
             STATE["offset"] = offset
             save_state()
+            analyze_one()
             if STATE.get("chat") and time.time() - last_push > 60:
                 push_pending()
                 send_site_approved()
