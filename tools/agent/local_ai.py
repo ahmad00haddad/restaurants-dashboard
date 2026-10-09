@@ -295,7 +295,7 @@ def finish(body, L, team, lang="en"):
     text = "\n\n".join(paras + [CLOSE[lang]])
     # Always one clean greeting: drop whatever greeting-ish lines the model wrote, then add ours.
     ls = text.splitlines()
-    while ls and (not ls[0].strip() or len(ls[0]) < 70 and (re.match(r"\s*(dear|hello|hi|السادة|الأخوة|الإخوة|مرحب|تحية|السلام|إلى)", ls[0], re.I)
+    while ls and (not ls[0].strip() or len(ls[0]) < 70 and (re.match(r"\s*(dear|hello|hi|good (morning|evening|afternoon)|السادة|الأخوة|الإخوة|مرحب|تحية|السلام|إلى|مساء الخير|صباح الخير)", ls[0], re.I)
                                                           or L["name"][:12] in ls[0] or ls[0].strip().endswith((",", "،")))):
         ls.pop(0)
     text = "\n".join(ls).strip()
@@ -310,7 +310,16 @@ def finish(body, L, team, lang="en"):
     return text + "\n\n" + "\n".join(sig)
 
 
-def translate_ar(text, model):
-    """Arabic translation of an English draft, shown to Ahmad only (never sent)."""
-    out = chat(model, "Translate the message into clear, natural Arabic for the sender to understand it. Keep names as they are. Return JSON only: {\"ar\": \"...\"}", text)
-    return (out.get("ar") or "").strip()
+def translate_ar(text, model=None):
+    """Arabic translation of an English draft, shown to Ahmad only (never sent).
+    Uses Gemma (Qwen sometimes drifts into Chinese). Any non-Arabic script → retry once, then give up silently."""
+    model = "gemma3:12b" if available("gemma3:12b") else model
+    for _ in range(2):
+        r = httpx.post(f"{OLLAMA}/api/chat", timeout=300, json={
+            "model": model, "stream": False, "options": {"temperature": 0.1, "num_ctx": 8192},
+            "messages": [{"role": "system", "content": "أنت مترجم. ترجم الرسالة التالية إلى العربية الفصحى الواضحة. اكتب الترجمة فقط بالعربية، بدون أي شرح وبدون أي لغة أخرى. أبقِ أسماء الأشخاص والمنظمات والروابط كما هي."},
+                         {"role": "user", "content": text}]})
+        ar = r.json()["message"]["content"].strip()
+        if ar and not re.search(r"[぀-ヿ㐀-鿿가-힯Ѐ-ӿ]", ar):
+            return ar
+    return ""

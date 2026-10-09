@@ -250,7 +250,9 @@ def push_pending():
                 import local_ai
                 model = _local.get("model") or local_model()
                 if model:
-                    text += "\n\n🔤 الترجمة لك فقط (لا تُرسل):\n" + local_ai.translate_ar(body, model)
+                    ar = local_ai.translate_ar(body, model)
+                    if ar:  # empty when the translation came out in the wrong script — better nothing than garbage
+                        text += "\n\n🔤 الترجمة لك فقط (لا تُرسل):\n" + ar
             except Exception as e:
                 log("translation failed:", e)
         r = say(text, reply_markup=buttons(m["id"]))
