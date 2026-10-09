@@ -48,9 +48,15 @@ function Item({ m, onOpen, online }: { m: Approval; onOpen: (id: string) => void
         <span>{m.review === "write" && !online ? "⏸ الوكيل متوقف — سيكتبها عند تشغيله" : STATE[m.review]}{m.review_note && m.review !== "write" ? `: ${m.review_note}` : ""}</span>
         {["write", "approved"].includes(m.review) && <button className="underline" onClick={() => go("rejected")}>إلغاء</button>}
       </div>
-      {m.review !== "write" && m.channel === "email" && <input className="w-full rounded border border-border bg-background px-2 py-1.5" value={subject} onChange={(e) => setSubject(e.target.value)} />}
-      {m.review !== "write" && <textarea className="w-full rounded border border-border bg-background px-2 py-1.5" rows={7} value={body} onChange={(e) => setBody(e.target.value)} />}
-      {!["approved", "write"].includes(m.review) && (
+      {m.review !== "write" && !(m.review === "failed" && !m.body) && m.channel === "email" && <input className="w-full rounded border border-border bg-background px-2 py-1.5" value={subject} onChange={(e) => setSubject(e.target.value)} />}
+      {m.review !== "write" && !(m.review === "failed" && !m.body) && <textarea className="w-full rounded border border-border bg-background px-2 py-1.5" rows={7} value={body} onChange={(e) => setBody(e.target.value)} />}
+      {m.review === "failed" && !m.body && (
+        <div className="flex gap-2">
+          <button className="px-3 py-1.5 rounded bg-primary text-primary-foreground" onClick={() => act.retry(m.id).then(() => toast.push("🔁 أُعيدت إلى جهازك"), (e) => toast.push(e.message, "error"))}>🔁 أعد المحاولة</button>
+          <button className="px-3 py-1.5 rounded border border-border" onClick={() => go("rejected")}>❌ ارفض</button>
+        </div>
+      )}
+      {!["approved", "write"].includes(m.review) && !(m.review === "failed" && !m.body) && (
         <div className="flex gap-2">
           <button className="px-3 py-1.5 rounded bg-primary text-primary-foreground" onClick={() => go("approved")}>✅ وافق وأرسل</button>
           <button className="px-3 py-1.5 rounded border border-border" onClick={() => go("rejected")}>❌ ارفض</button>

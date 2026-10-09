@@ -170,6 +170,12 @@ export function useLeadActions() {
       if (error) throw error;
       qc.invalidateQueries({ queryKey: ["approvals"] });
     },
+    /** Ask the PC agent to write a failed draft again. */
+    async retry(id: string) {
+      const { error } = await db.from("lead_messages").update({ review: "write", review_note: null, body: "", tg_message_id: null }).eq("id", id);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["approvals"] });
+    },
     async review(id: string, review: "approved" | "rejected", body?: string, subject?: string | null) {
       const { error } = await db.from("lead_messages").update({ review, ...(body != null ? { body, subject } : {}) }).eq("id", id);
       if (error) throw error;
