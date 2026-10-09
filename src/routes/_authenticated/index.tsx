@@ -30,6 +30,10 @@ function Home() {
   const [view, setView] = useState<View>("today");
   const [kind, setKind] = useState("");
   const [status, setStatus] = useState("");
+  const [contact, setContact] = useState<"" | "email" | "phone">("");
+  /** Which leads a batch may target, and on which channel — follows the contact filter. */
+  const reachable = (l: Lead) => (contact === "email" ? !!l.email : contact === "phone" ? !!l.phone : !!(l.email || l.phone));
+  const channelFor = (l: Lead): "email" | "whatsapp" => (contact === "phone" ? "whatsapp" : contact === "email" ? "email" : l.email ? "email" : "whatsapp");
   const [q, setQ] = useState("");
   const [sel, setSel] = useState<string | null>(null);
   const [limit, setLimit] = useState(100);
@@ -56,12 +60,14 @@ function Home() {
       : leads;
     if (kind) L = L.filter((l) => l.kind === kind);
     if (status) L = L.filter((l) => l.status === status);
+    if (contact === "email") L = L.filter((l) => l.email);
+    if (contact === "phone") L = L.filter((l) => l.phone);
     if (q) {
       const s = q.toLowerCase();
       L = L.filter((l) => [l.name, l.category, l.city, l.profile?.summary].some((x) => x?.toLowerCase().includes(s)));
     }
     return L;
-  }, [leads, groups, view, kind, status, q]);
+  }, [leads, groups, view, kind, status, q, contact]);
 
   const draft = useServerFn(draftMessage);
   const { data: approvals = [] } = useApprovals();
@@ -70,13 +76,13 @@ function Home() {
   const draftBatch = async (n: number) => {
     const queued = new Set(approvals.map((a) => a.lead_id));
     const targets = [...groups.signals.filter((l) => l.status === "new"), ...groups.best]
-      .filter((l, i, a) => a.indexOf(l) === i && !queued.has(l.id) && (l.email || l.phone)).slice(0, n);
+      .filter((l, i, a) => a.indexOf(l) === i && !queued.has(l.id) && reachable(l)).slice(0, n);
     for (let i = 0; i < targets.length; i++) {
       const l = targets[i];
       setBulk(`كتابة ${i + 1}/${targets.length}: ${l.name}`);
       try {
         if (!l.profile) await research({ data: { id: l.id, refetch: false } });
-        await draft({ data: { id: l.id, mode: "first", channel: l.email ? "email" : "whatsapp" } });
+        await draft({ data: { id: l.id, mode: "first", channel: channelFor(l) } });
         await act.queueDraft(l.id);
       } catch (e) {
         toast.push(`${l.name}: ${(e as Error).message}`, "error");
@@ -92,8 +98,8 @@ function Home() {
     if (!agent?.online) toast.push("⚠️ الوكيل متوقف — ستُكتب عند تشغيل run.bat", "info");
     const queued = new Set(approvals.map((a) => a.lead_id));
     const targets = [...groups.signals.filter((l) => l.status === "new"), ...groups.best]
-      .filter((l, i, a) => a.indexOf(l) === i && !queued.has(l.id) && (l.email || l.phone)).slice(0, n);
-    for (const l of targets) await act.requestLocalWrite(l.id, l.email ? "email" : "whatsapp");
+      .filter((l, i, a) => a.indexOf(l) === i && !queued.has(l.id) && reachable(l)).slice(0, n);
+    for (const l of targets) await act.requestLocalWrite(l.id, channelFor(l));
     toast.push(`💻 ${targets.length} رسائل في طابور جهازك — تصلك على Telegram تباعاً`);
   };
 
@@ -168,13 +174,18 @@ function Home() {
           <option value="">كل الأنواع</option>
           {Object.entries(KIND_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
+        <select className="rounded border border-border bg-background px-2 py-1.5 text-sm" value={contact} onChange={(e) => setContact(e.target.value as "" | "email" | "phone")}>
+          <option value="">كل طرق التواصل</option>
+          <option value="email">✉ لديهم إيميل فقط</option>
+          <option value="phone">☎ لديهم هاتف/واتساب فقط</option>
+        </select>
         <select className="rounded border border-border bg-background px-2 py-1.5 text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">كل الحالات</option>
           {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
         <div className="flex-1" />
         <button className="px-3 py-1.5 rounded bg-primary text-primary-foreground text-sm" onClick={() => localBatch(10)}>
-          💻 اكتب لأفضل 10 على جهازي (مجاني)
+          {contact === "email" ? "💻 اكتب إيميلات لأفضل 10 (مجاني)" : contact === "phone" ? "💻 اكتب واتساب لأفضل 10 (مجاني)" : "💻 اكتب لأفضل 10 على جهازي (مجاني)"}
         </button>
         <button disabled={!!bulk} className="px-3 py-1.5 rounded border border-border text-sm" onClick={() => draftBatch(10)}>
           ✍️ اكتب لأفضل 10 (رصيد Lovable)
