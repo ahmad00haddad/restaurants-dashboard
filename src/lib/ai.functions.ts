@@ -83,13 +83,14 @@ function them(l: Lead) {
 }
 
 /** From the study of our 63 past clients: which language each kind of client actually works in. */
-const LANGUAGE_RULES = `Language (decide from their website/profile first; these defaults come from studying our own clients):
-- UN agencies, international NGOs, embassies, EU programmes, international brands → English, polished and simple.
-- Jordanian foundations and royal/semi-governmental institutions (QRTA, JOHUD, Jameel…) → formal Modern Standard Arabic; switch to English if their site is mainly English.
-- Local NGOs, charities and community associations → warm, refined Modern Standard Arabic.
-- Restaurants, cafés, bakeries, local shops and local brands → Arabic, respectful Jordanian tone (not slang).
-- Private schools, universities and companies → follow their website's main language; bilingual sites → Arabic.
-- Always write in ONE language per message, with correct, elegant grammar.`;
+const LANGUAGE_RULES = `Language — decide from their own website/profile first. Defaults, from studying our 62 real past clients
+(international bodies and companies work in English; local organisations and businesses in Arabic):
+- UN agencies, international NGOs and donors, EU programmes, embassies, international brands, tech/corporate companies → English: polished, plain, warm.
+- Jordanian royal/national foundations and institutions (QRTA, JOHUD, Jordan River…) → formal, elegant Modern Standard Arabic (English only if their site is English-only).
+- Local charities, community and youth initiatives → refined Modern Standard Arabic, warm and human.
+- Restaurants, cafés, roasteries, sweets, pharmacies, shops, salons, local brands → Arabic in a respectful, light Jordanian register (never slang).
+- Private schools, publishers, local companies → their website's main language; if bilingual → Arabic.
+- One language per message. If unsure for an international organisation in Jordan, choose English.`;
 
 const VOICE = (t: TeamSettings) => `You write as ${t.senderName} himself — an established photographer/director with a team and a strong body of work.
 The purpose of every message: introduce ourselves and our work to people worth knowing, and open a door to a working relationship.
