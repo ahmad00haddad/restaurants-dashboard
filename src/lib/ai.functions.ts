@@ -113,14 +113,13 @@ THE POSTURE — this decides everything:
 
 CRAFT:
 - Open with a precise observation from the profile hook: a real detail of their work, place or people. If removing the first line leaves the message unchanged, rewrite it.
-- Right after the observation, ONE quiet line that introduces the sender together with proof FROM THEIR OWN SECTOR, so a stranger knows who is writing:
-  restaurants/cafés/hotels → "I've filmed campaigns for Em Sherif and Khan Zaid" / "صوّرت حملات لأم شريف وخان زيد"; brands/shops → L'Occitane and Astrolabe;
-  schools/education → QRTA and Duroub School; NGOs/institutions → "I've documented similar stories for USAID and QRTA" / "وثّقت قصصاً مشابهة لـ USAID وأكاديمية الملكة رانيا".
-  Never mention NGO clients to a restaurant/brand, or restaurant clients to an NGO. For restaurants/brands the idea is a film or ad about their food/product/place, not a social-impact documentary.
+- Right after the observation, ONE quiet line introducing the sender by the NATURE of his work, with NO client names (his website shows the logos):
+  organisations → "I'm Ahmad Haddad, a director and cinematographer in Jordan; for years I've worked with organisations on films that show their impact through people." / "أنا أحمد حدّاد، مخرج ومدير تصوير من الأردن، أعمل منذ سنوات مع منظمات ومؤسسات على أفلام تروي أثر عملها من خلال الناس."
+  restaurants/cafés → "أنا أحمد حدّاد، مخرج ومدير تصوير، أصنع مع فريقي أفلاماً وإعلانات للمطاعم والمقاهي في الأردن." Vary the wording; never name past clients or projects.
 - Then one insight/idea about their story (one sentence, concrete, visual). Then the calm close. One close only; never add "I am available…".
 - Short: email 4–6 lines of body. WhatsApp/Instagram 2–3 lines. No bullets, bold, hashtags, emojis in emails; no exclamation marks; no em dashes in the body.
 - Subject (email): 2–5 calm words about THEM (their programme, place or story), never about us. No "collaboration", "proposal", "opportunity", "services".
-- Greeting: their organisation or the right person. Sign-off: ${t.senderName}, then ${t.senderRole}, ${t.company}, then ONE labelled link on its own line: "Selected work: <site>" (English) or "بعض أعمالي: <site>" (Arabic), choosing the site that fits them (see LINKS). That is the only link; never link a single project. WhatsApp/Instagram: no subject.
+- Greeting: their organisation or the right person. Sign-off: ${t.senderName}, then ${t.senderRole}, ${t.company}, then ONE labelled link on its own line: "Selected work and past clients: <site>" (English) or "بعض أعمالي ومن عملت معهم: <site>" (Arabic), choosing the site that fits them (see LINKS). That is the only link; never link a single project. WhatsApp/Instagram: no subject.
 ${LANGUAGE_RULES}
 - Never invent facts, clients, numbers, prices or links.
 - About OUR past work: say only the client's name and/or the work's title exactly as listed. Never add where, when, for whom else or what it was about (no cities, no topics, no years) — we don't know those details and inventing them would be a lie.

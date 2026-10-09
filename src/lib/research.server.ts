@@ -59,8 +59,11 @@ export async function readWebsite(website: string): Promise<SiteFindings | null>
   const blob = pages.join(" ");
 
   const host = new URL(start).host.replace(/^www\./, "");
-  const emails = [...new Set([...blob.matchAll(/mailto:([^"'?\s>]+)/gi)].map((m) => m[1]).concat(blob.match(EMAIL_RE) ?? []))]
-    .map((e) => decodeURIComponent(e).toLowerCase().replace(/\.$/, ""))
+  const emails = [...new Set([...blob.matchAll(/mailto:([^"'?\s>\\]+)/gi)].map((m) => m[1]).concat(blob.match(EMAIL_RE) ?? []))]
+    .map((e) => { try { return decodeURIComponent(e); } catch { return e; } })
+    .map((e) => e.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)?.[0] ?? "")
+    .filter(Boolean)
+    .map((e) => e.toLowerCase().replace(/\.$/, ""))
     .filter((e) => !BAD_EMAIL.test(e))
     .sort((a, b) => Number(b.endsWith(host)) - Number(a.endsWith(host)) ||
       Number(/^(info|contact|hello|media|comm|pr|marketing)/.test(b)) - Number(/^(info|contact|hello|media|comm|pr|marketing)/.test(a)));

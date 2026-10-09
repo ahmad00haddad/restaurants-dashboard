@@ -139,7 +139,10 @@ def send_email(to, subject, body):
     msg = build_mime(body)
     msg["Subject"] = subject or E.get("SENDER_NAME", "")
     msg["From"] = formataddr((E.get("SENDER_NAME", ""), E["GMAIL_USER"]))
-    msg["To"] = to
+    m = re.fullmatch(r"\s*([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})[\s\\/.,;]*", to or "")
+    if not m:
+        raise RuntimeError(f"عنوان الإيميل غير صالح: {to!r} — صحّحه في صفحة العميل")
+    msg["To"] = m.group(1)
     msg["Message-ID"] = make_msgid(domain=E["GMAIL_USER"].split("@")[-1])
     with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as s:
         s.login(E["GMAIL_USER"], E["GMAIL_APP_PASSWORD"].replace(" ", ""))
@@ -215,7 +218,7 @@ def gate(m, L):
     except Exception:
         wrong = []
     if wrong:
-        why.append(f"يذكر عملاء من مجال آخر لا يناسب هذه الجهة: {', '.join(wrong)}")
+        why.append(f"يذكر أسماء عملاء سابقين (قاعدتك: لا أسماء، الموقع يعرضهم): {', '.join(wrong)}")
     if L.get("status") in ("new", None) and not re.search(r"فيلم|أفلام|نصوّر|نصور|film|shoot|video|documentary", body, re.I):
         why.append("لا توضح أنها عرض تصوير/فيلم — قد تُفهم كتعليق أو شكوى")
     if re.search(r"(بعنوان|تحت عنوان|titled|entitled|called)\s*[«\"“'‘]", body, re.I):

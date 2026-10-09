@@ -140,7 +140,11 @@ def read_site(d):
     blob = " ".join(pages)
     dom = re.sub(r"^www\.", "", urllib.parse.urlparse(site).netloc)
     emails = []
-    for e in re.findall(r"mailto:([^\"'?\s>]+)", blob) + EMAIL_RE.findall(blob):
+    for e in re.findall(r"mailto:([^\"'?\s>\\]+)", blob) + EMAIL_RE.findall(blob):
+        m = EMAIL_RE.search(urllib.parse.unquote(e))  # keep only the address itself (no trailing \ or junk)
+        if not m:
+            continue
+        e = m.group(0)
         e = urllib.parse.unquote(e).lower().strip(".")
         if not BAD.search(e) and e not in emails:
             emails.append(e)

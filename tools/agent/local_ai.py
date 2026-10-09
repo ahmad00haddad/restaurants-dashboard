@@ -202,21 +202,48 @@ def sector(L):
     return "ngo"
 
 
-PROOF = {  # (english line, arabic line) — the only past-work claim the message may make
-    "food": ("I've filmed campaigns for Em Sherif and Khan Zaid", "صوّرت حملات لأم شريف وخان زيد"),
-    "brand": ("I've filmed campaigns for L'Occitane and Astrolabe", "صوّرت حملات لـ L'Occitane وإسطرلاب"),
-    "hotel": ("I've filmed campaigns for Em Sherif and Astrolabe", "صوّرت حملات لأم شريف وإسطرلاب"),
-    "education": ("I've made films for QRTA and Duroub School", "صنعت أفلاماً لأكاديمية الملكة رانيا ومدرسة دروب"),
-    "event": ("I've filmed events for Erasmus+ and UN Women", "صوّرت فعاليات لـ Erasmus+ وUN Women"),
-    "ngo": ("I've documented similar stories for USAID and QRTA", "وثّقت قصصاً مشابهة لـ USAID وأكاديمية الملكة رانيا"),
+INTROS = {  # no client names: the site's logos speak. Rotated per lead so emails don't repeat the same line.
+    "ngo": {
+        "ar": ["أنا أحمد حدّاد، مخرج ومدير تصوير من الأردن، أعمل منذ سنوات مع منظمات ومؤسسات على أفلام تروي أثر عملها من خلال الناس.",
+               "أنا أحمد حدّاد، مخرج ومدير تصوير، وجزء كبير من عملي أفلام وثائقية قصيرة لجهات تعمل في المجتمع.",
+               "أنا أحمد حدّاد، مخرج ومدير تصوير من الأردن، أصنع أفلاماً قصيرة عن الناس الذين يقفون خلف البرامج والمبادرات."],
+        "en": ["I'm Ahmad Haddad, a director and cinematographer in Jordan; for years I've worked with organisations on films that show their impact through people.",
+               "I'm Ahmad Haddad, a director and cinematographer; much of my work is short documentaries for organisations working in the community.",
+               "I'm Ahmad Haddad, a director and cinematographer based in Jordan, and I make short films about the people behind programmes and initiatives."],
+    },
+    "education": {
+        "ar": ["أنا أحمد حدّاد، مخرج ومدير تصوير من الأردن، صنعت أفلاماً لمؤسسات تعليمية تروي قصص طلابها ومعلميها.",
+               "أنا أحمد حدّاد، مخرج ومدير تصوير، وجزء من عملي أفلام قصيرة لمدارس ومؤسسات تعليمية."],
+        "en": ["I'm Ahmad Haddad, a director and cinematographer in Jordan; I've made films for educational institutions about their students and teachers.",
+               "I'm Ahmad Haddad, a director and cinematographer; part of my work is short films for schools and education programmes."],
+    },
+    "food": {
+        "ar": ["أنا أحمد حدّاد، مخرج ومدير تصوير، أصنع مع فريقي أفلاماً وإعلانات للمطاعم والمقاهي في الأردن.",
+               "أنا أحمد حدّاد، مخرج ومدير تصوير من إربد، أعمل مع فريقي على أفلام وإعلانات للمطاعم والمقاهي."],
+        "en": ["I'm Ahmad Haddad, a director and cinematographer; with my team I make films and ads for restaurants and cafés in Jordan.",
+               "I'm Ahmad Haddad, a director and cinematographer based in Jordan, making films and ads with my team for restaurants and cafés."],
+    },
+    "brand": {
+        "ar": ["أنا أحمد حدّاد، مخرج ومدير تصوير، أصنع مع فريقي إعلانات وأفلاماً للعلامات التجارية في الأردن.",
+               "أنا أحمد حدّاد، مخرج ومدير تصوير من الأردن، أعمل مع فريقي على حملات وأفلام للعلامات التجارية."],
+        "en": ["I'm Ahmad Haddad, a director and cinematographer; with my team I make ads and brand films in Jordan.",
+               "I'm Ahmad Haddad, a director and cinematographer based in Jordan, working with my team on campaigns and brand films."],
+    },
 }
+INTROS["hotel"] = INTROS["food"]
+INTROS["event"] = INTROS["ngo"]
+ALL_CLIENT_NAMES = NGO_PROOF + FOOD_PROOF + ["Duroub", "دروب", "رانيا", "Mercy Corps", "UNICEF", "UN Women", "Jameel"]
+
+
+def intro_for(L, lang):
+    import hashlib
+    opts = INTROS[sector(L)]["ar" if lang == "ar" else "en"]
+    return opts[int(hashlib.md5(str(L.get("id") or L.get("name")).encode()).hexdigest(), 16) % len(opts)]
 
 
 def wrong_proof(L, body):
-    """Names from another sector in this message (e.g. USAID offered to a restaurant)."""
-    sec = sector(L)
-    bad = NGO_PROOF if sec in ("food", "brand", "hotel") else FOOD_PROOF if sec in ("ngo", "education") else []
-    return [n for n in bad if n.lower() in body.lower()]
+    """Ahmad's rule: no client names in outreach — the website shows who he worked with."""
+    return [n for n in ALL_CLIENT_NAMES if n.lower() in body.lower()]
 
 
 
@@ -239,10 +266,8 @@ def _write_once(L, team, history, channel, mode, hint, model):
             + f"\nThe subject must be in {'Arabic' if lang == 'ar' else 'English'}."
             + "\nNEVER propose a title or name for a film (no 'titled', no 'بعنوان', no «…» names). Describe the idea in plain words."
             + "\nSTRUCTURE (mandatory): 1) greeting; 2) one specific observation about their work (the hook); "
-              "3) ONE quiet line introducing the sender with THIS proof (use it as given, it is chosen for their sector): "
-              + (f"'أنا أحمد حدّاد، مخرج ومدير تصوير من الأردن، {PROOF[sector(L)][1]}.' " if lang == "ar"
-                 else f"'I'm Ahmad Haddad, a director and cinematographer based in Jordan; {PROOF[sector(L)][0]}.' ")
-              + "Do not mention any other past client. 4) the idea for their story in one or two sentences, fitting their world "
+              "3) this exact introduction line: " + repr(intro_for(L, lang)) + " "
+              + "Mention NO past clients or projects by name. 4) the idea for their story in one or two sentences, fitting their world "
               + ("(a restaurant/brand: a short film or ad about their food/product/place, not a documentary about social impact)" if sector(L) in ("food", "brand", "hotel") else "")
               + "; 5) one calm closing line. "
               "Never write 'I am available'. Do NOT write a signature or any link; they are added for you."
@@ -321,34 +346,40 @@ def finish(body, L, team, lang="en"):
             paras[-1] = " ".join(kept)
             break
         paras.pop()
-    # The sector proof is part of the intro; if the model dropped it, add it after "I'm Ahmad Haddad…"
-    body_so_far = "\n\n".join(paras)
-    proof_en, proof_ar = PROOF[sector(L)]
-    if not any(n.lower() in body_so_far.lower() for n in NGO_PROOF + FOOD_PROOF + ["Duroub", "دروب", "رانيا"]):
-        # a vague, nameless proof ("وثّقت قصصاً مماثلة" / "documented similar stories") is replaced by the real one
-        vague = r"[،,;]?\s*(وثّقت|وثقت|صوّرت|صورت)\s+(قصصاً|قصصا|حملات|أفلاماً)\s+(مماثلة|مشابهة)(?!\s*لـ)|[;,]?\s*I(?:'ve| have)\s+(documented|filmed)\s+similar\s+(stories|campaigns)(?!\s+for)"
-        paras = [re.sub(vague, "", p_) for p_ in paras]
-        for i, p_ in enumerate(paras):
-            m = re.search(r"(أنا أحمد حدّاد[^.؟!\n]*|I(?:'m| am) Ahmad Haddad[^.;!\n]*)([.;]?)", p_)
-            if m:
-                add = f"، {proof_ar}" if lang == "ar" else f"; {proof_en}"
-                paras[i] = p_[:m.end(1)] + add + (m.group(2) or ".") + p_[m.end():]
-                break
+    # Our intro line replaces whatever intro the model wrote (no client names, rotated phrasing).
+    intro = intro_for(L, lang)
+    who = re.compile(r"(?:أنا\s+)?أحمد\s+حد+ّ?اد[^.؟!\n]*[.؟!]?|(?:I'm|I am)?\s*Ahmad Haddad,?[^.!\n]*[.!]?")
+    placed = False
+    for i, p_ in enumerate(paras):
+        if who.search(p_):
+            paras[i] = re.sub(r"\s{2,}", " ", who.sub(" " + intro + " ", p_, count=1)).strip()
+            paras[i] = re.sub(r"([.؟!])(?=[^\s])", r"\1 ", paras[i])
+            placed = True
+            break
+    if not placed and paras:
+        if len(paras) >= 2:
+            paras[1] = intro + " " + paras[1]
+        else:  # one paragraph: observation sentence, then our intro, then the rest
+            sents = [x for x in re.split(r"(?<=[.؟?!])\s+", paras[0]) if x.strip()]
+            paras = [sents[0], " ".join([intro] + sents[1:])]
+    # drop any sentence that still name-drops a client
+    paras = [" ".join(x for x in re.split(r"(?<=[.؟?!])\s+", p_) if not any(n.lower() in x.lower() for n in ALL_CLIENT_NAMES)).strip() for p_ in paras]
+    paras = [p_ for p_ in paras if p_]
     text = "\n\n".join(paras + [CLOSE[lang]])
     # Always one clean greeting: drop whatever greeting-ish lines the model wrote, then add ours.
     ls = text.splitlines()
     while ls and (not ls[0].strip() or len(ls[0]) < 70 and (re.match(r"\s*(dear|hello|hi|good (morning|evening|afternoon)|السادة|الأخوة|الإخوة|مرحب|تحية|السلام|إلى|مساء الخير|صباح الخير)", ls[0], re.I)
-                                                          or L["name"][:12] in ls[0] or ls[0].strip().endswith((",", "،")))):
+                                                          or ls[0].strip().endswith((",", "،")))):
         ls.pop(0)
     text = "\n".join(ls).strip()
     text = (f"السادة في {short_name(L['name'])} المحترمين،" if lang == "ar" else f"Dear {short_name(L['name'])} team,") + "\n\n" + text
     p = L.get("profile") or {}
     site = SITES.get(p.get("link_pick"), SITES["personal" if L.get("kind") in ("ngo", "org") else "team"])
     if lang == "ar":
-        sig = ["أحمد حدّاد", "مخرج ومدير تصوير، FAII HOUSE", f"بعض أعمالي: {site}"]
+        sig = ["أحمد حدّاد", "مخرج ومدير تصوير، FAII HOUSE", f"بعض أعمالي ومن عملت معهم: {site}"]
     else:
         role = team.get("senderRole") or "Director & Cinematographer"
-        sig = [name if re.match(r"[A-Za-z]", name) else "Ahmad Haddad", f"{role}, {team.get('company') or 'FAII HOUSE'}", f"Selected work: {site}"]
+        sig = [name if re.match(r"[A-Za-z]", name) else "Ahmad Haddad", f"{role}, {team.get('company') or 'FAII HOUSE'}", f"Selected work and past clients: {site}"]
     return text + "\n\n" + "\n".join(sig)
 
 
