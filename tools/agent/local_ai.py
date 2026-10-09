@@ -240,6 +240,9 @@ def find_people(L, model, limit=3):
         if pn not in body or not any(w in body.lower() for w in org):  # name verbatim + the organisation named in the same text
             continue
         people.append({"name": pn, "role": role[:80], "url": chunks[i][0], "top": bool(ROLE_TOP.search(role)), "status": "unverified", "as_of": chunks[i][2]})
+    from datetime import datetime, timedelta
+    cutoff = (datetime.now() - timedelta(days=548)).strftime("%Y-%m")  # sources older than ~18 months are dropped, not shown
+    people = [p for p in people if p["as_of"] == "?" or p["as_of"][:7] >= cutoff]
     people = list({p["name"]: p for p in people}.values())
     people.sort(key=lambda p: not p["top"])
     return people[:limit]
