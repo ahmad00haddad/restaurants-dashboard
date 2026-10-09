@@ -83,7 +83,7 @@ CTRL = re.compile("[" + "".join(chr(c) for c in list(range(0, 9)) + [11, 12] + l
 def clean(v):
     """Postgres text can't hold NUL (\u0000) — some websites contain it. Strip it (and other control chars) everywhere."""
     if isinstance(v, str):
-        return re.sub(r"[--]", "", v)
+        return CTRL.sub("", v)
     if isinstance(v, dict):
         return {k: clean(x) for k, x in v.items()}
     if isinstance(v, list):
