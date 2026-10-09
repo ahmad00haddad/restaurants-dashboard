@@ -7,6 +7,7 @@ and saves it, so "best new leads" and message writing work from it.
 import json, os, re, sys, time
 from pathlib import Path
 import httpx
+import emailcheck
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "harvester"))
 from harvest import read_site  # same website reader the collector uses (email, socials, text)
@@ -181,6 +182,20 @@ def recent_hook(L, recent, lang, model):
     return hook
 
 
+def tier_of(score, L, p):
+    """A = worth hand-checking and sending first; B = normal; C = low touch. Decided in code, never by the model.
+    A: strong fit AND a reachable person (named mailbox or phone) AND a concrete reason now (fresh news, live signal, or a personal mailbox)."""
+    ec = p.get("email_check") or {}
+    mail_ok = bool(L.get("email")) and ec.get("ok") is not False
+    named = mail_ok and not ec.get("role")
+    reachable = named or bool(L.get("phone")) or mail_ok
+    if score >= 70 and (named or L.get("phone")) and (p.get("hook_source") == "news" or L.get("signal") or named):
+        return "A"
+    if score >= 45 and reachable:
+        return "B"
+    return "C"
+
+
 def analyze(db, L, team, model):
     """Profile one lead. Returns the patch saved to the database."""
     patch = {}
@@ -208,12 +223,15 @@ def analyze(db, L, team, model):
     if p.get("link_pick") not in ("personal", "team", "behance"):
         p["link_pick"] = "personal" if L.get("kind") in ("ngo", "org") else "team"
     p["analysed_by"] = f"local:{model}"
+    if L.get("email"):
+        p["email_check"] = emailcheck.check(L["email"])
     if recent:
         p["recent"] = recent
         h = recent_hook(L, recent, p["lang"], model)
         if h:
             p["hook"] = h
             p["hook_source"] = "news"
+    p["tier"] = tier_of(score, L, p)
     patch.update(profile=p, score=score)
     db.patch("leads", {"id": L["id"]}, patch)
     return patch
@@ -276,8 +294,28 @@ def works_list(team):
     return "\n".join(out)
 
 
-CLOSE = {"en": "I'd be glad to discuss the possibility whenever time allows.",
-         "ar": "يسعدني مناقشة إمكانية ذلك عند توفّر الوقت."}
+CLOSES = {  # calm closes, rotated per lead so messages do not share one fingerprint
+    "en": ["I'd be glad to discuss the possibility whenever time allows.",
+           "If the idea fits, I'd be happy to talk it through.",
+           "I'm glad to share more about the idea if it's useful.",
+           "I'd welcome your thoughts on it.",
+           "The idea is yours to shape; I'm happy to hear what you think.",
+           "Happy to explain the idea further whenever suits you."],
+    "ar": ["يسعدني مناقشة إمكانية ذلك عند توفّر الوقت.",
+           "إن رأيتم أن الفكرة تناسبكم، يسعدني أن نتحدث عنها.",
+           "يسرّني أن أشرح الفكرة أكثر إن أحببتم.",
+           "يسعدني أن أسمع رأيكم فيها.",
+           "الفكرة قابلة للتعديل بما يناسبكم، وأرحّب بملاحظاتكم.",
+           "يسعدني الحديث عنها متى ناسبكم."],
+}
+
+
+def close_for(L, lang):
+    import hashlib
+    opts = CLOSES["ar" if lang == "ar" else "en"]
+    return opts[int(hashlib.md5(("close" + str(L.get("id") or L.get("name"))).encode()).hexdigest(), 16) % len(opts)]
+
+
 # Any closing line the model writes is replaced by Ahmad's chosen close (exactly one close per message).
 CLOSE_LIKE = re.compile(r"timing|conversation|discuss|talk|time allows|convenient|التوقيت|نتحدث|حديث|مناقشة|نناقش|نقاش|الحديث|الوقت|مناسب", re.I)
 FLATTERY = re.compile(r"\b(truly|commendable|impressive|amazing|incredible|inspiring|remarkable)\b|رائع|مذهل|ملهم|مبهر|نثمّن|نقدّر جهودكم", re.I)
@@ -485,7 +523,7 @@ def finish(body, L, team, lang="en"):
     # drop any sentence that still name-drops a client
     paras = [" ".join(x for x in re.split(r"(?<=[.؟?!])\s+", p_) if not any(n.lower() in x.lower() for n in ALL_CLIENT_NAMES)).strip() for p_ in paras]
     paras = [p_ for p_ in paras if p_]
-    text = "\n\n".join(paras + [CLOSE[lang]])
+    text = "\n\n".join(paras + [close_for(L, lang)])
     # Always one clean greeting: drop whatever greeting-ish lines the model wrote, then add ours.
     ls = text.splitlines()
     while ls and (not ls[0].strip() or len(ls[0]) < 70 and (re.match(r"\s*(dear|hello|hi|good (morning|evening|afternoon)|السادة|الأخوة|الإخوة|مرحب|تحية|السلام|إلى|مساء الخير|صباح الخير)", ls[0], re.I)

@@ -132,13 +132,76 @@ def build_mime(body):
     return alt
 
 
+def current_cap():
+    """Daily limit that grows only while mail stays healthy: DAILY_CAP, +RAMP_STEP every RAMP_DAYS sending days, up to DAILY_MAX.
+    Bounces (read from the inbox) freeze the growth, and a high rate sends the limit back to DAILY_CAP."""
+    base, top = int(E.get("DAILY_CAP", "20")), int(E.get("DAILY_MAX", "40"))
+    step, every = int(E.get("RAMP_STEP", "5")), int(E.get("RAMP_DAYS", "3"))
+    log_ = STATE.get("sent_log", {})
+    days_sent = sum(1 for v in log_.values() if v > 0)
+    cap = min(top, base + step * (days_sent // every))
+    week = [(date.today() - timedelta(days=i)).isoformat() for i in range(7)]
+    sent7, bad7 = sum(log_.get(d, 0) for d in week), sum(1 for d in STATE.get("bounces", {}).values() if d in week)
+    rate = bad7 / sent7 if sent7 >= 20 else 0
+    if rate > 0.08:
+        return base, rate
+    if rate > 0.04:
+        return min(cap, int(STATE.get("held_cap") or cap)), rate
+    STATE["held_cap"] = cap
+    return cap, rate
+
+
+def check_bounces():
+    """Read bounce notices (MAILER-DAEMON) from Gmail over IMAP, remember the failed addresses, mark those leads' email as bad."""
+    import imaplib, email as _email
+    since = (date.today() - timedelta(days=7)).strftime("%d-%b-%Y")
+    found = {}
+    box = imaplib.IMAP4_SSL("imap.gmail.com", timeout=30)
+    try:
+        box.login(E["GMAIL_USER"], E["GMAIL_APP_PASSWORD"].replace(" ", ""))
+        box.select("INBOX", readonly=True)
+        _, ids = box.search(None, f'(FROM "mailer-daemon" SINCE {since})')
+        for i in ids[0].split()[-100:]:
+            _, data = box.fetch(i, "(RFC822)")
+            msg = _email.message_from_bytes(data[0][1])
+            text = ""
+            for part in msg.walk():
+                if part.get_content_type() in ("text/plain", "message/delivery-status"):
+                    text += (part.get_payload(decode=True) or b"").decode("utf-8", "ignore") if part.get_content_type() == "text/plain" else str(part.get_payload())
+            for addr in set(re.findall(r"(?:Final-Recipient: rfc822;|wasn't delivered to|to the following address[^\n]*\n+)\s*<?([\w.+-]+@[\w.-]+\.\w+)", text, re.I)):
+                found[addr.lower()] = date.today().isoformat()
+    finally:
+        try:
+            box.logout()
+        except Exception:
+            pass
+    new = {a: d for a, d in found.items() if a not in STATE.setdefault("bounces", {}) and a != E["GMAIL_USER"].lower()}
+    for addr, d in new.items():
+        STATE["bounces"][addr] = d
+        for L in db.get("leads", select="id,profile", email=f"ilike.{addr}"):
+            prof = {**(L.get("profile") or {}), "email_check": {"ok": False, "role": False, "reason": "ارتدّ البريد (bounce)"}}
+            db.patch("leads", {"id": L["id"]}, {"profile": prof})
+    if new:
+        log(f"bounces: {list(new)}")
+        cap, rate = current_cap()
+        if rate > 0.04:
+            say(f"⚠️ ارتدادات البريد {rate:.0%} آخر 7 أيام — جمّدت رفع الحد (الحد اليوم {cap}). راجع قائمة الإيميلات.")
+    save_state()
+
+
 def send_email(to, subject, body):
-    cap = int(E.get("DAILY_CAP", "20"))
+    import emailcheck
+    cap, _rate = current_cap()
     today = date.today().isoformat()
     if STATE.get("sent_day") != today:
         STATE.update(sent_day=today, sent_count=0)
     if STATE["sent_count"] >= cap:
         raise RuntimeError(f"وصلت للحد اليومي ({cap}) — سيُرسل غداً")
+    chk = emailcheck.check(to)
+    if chk["ok"] is False:
+        raise RuntimeError(f"الإيميل لن يصل ({chk['reason']}): {to} — صحّحه أو استخدم واتساب")
+    if (to or "").strip().lower() in STATE.get("bounces", {}):
+        raise RuntimeError(f"هذا الإيميل ارتدّ سابقاً: {to}")
     msg = build_mime(body)
     msg["Subject"] = subject or E.get("SENDER_NAME", "")
     msg["From"] = formataddr((E.get("SENDER_NAME", ""), E["GMAIL_USER"]))
@@ -531,7 +594,7 @@ def main():
     import threading
     threading.Thread(target=worker, daemon=True).start()
     log("FAII Agent started. Open Telegram and send /start to your bot." if not STATE.get("chat") else "FAII Agent started.")
-    offset, last_push, report_hour = STATE.get("offset", 0), 0, int(E.get("REPORT_HOUR", "8"))
+    offset, last_push, last_bounce, report_hour = STATE.get("offset", 0), 0, 0, int(E.get("REPORT_HOUR", "8"))
     while True:
         try:
             ups = tg("getUpdates", offset=offset, timeout=20) or []
