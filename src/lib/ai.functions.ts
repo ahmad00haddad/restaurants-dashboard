@@ -187,12 +187,18 @@ export const draftMessage = createServerFn({ method: "POST" })
         `CONVERSATION SO FAR:\n${history || "(none)"}${learned}\n\nCHANNEL: ${data.channel}\nTASK: ${task}` +
         (data.hint ? `\nEXTRA INSTRUCTION FROM ${team.senderName}: ${data.hint}` : "") +
         `\n\nReturn JSON: {"subject":"${data.channel === "email" ? "short, human, not salesy" : ""}","body":"...",` +
-        `"intent":"${data.mode === "reply" ? "interested|question|price|not_now|no|other" : ""}","status":"${data.mode === "reply" ? "replied|meeting|lost" : ""}","summary":"one line for the CRM"}`,
+        `"intent":"${data.mode === "reply" ? "interested|question|price|not_now|no|other" : ""}","status":"${data.mode === "reply" ? "replied|meeting|lost" : ""}","summary":"one line for the CRM"}` +
+        `\nThe "body" must always contain the full message text. If you have a concern about this client, still write the best message and put the concern in "summary".`,
     );
+    // Models sometimes nest the text or use another key — find it, and never save an empty draft.
+    const text = [out.body, out.message, out.email, out.text, (out.message as any)?.body]
+      .find((v) => typeof v === "string" && v.trim().length > 20) as string | undefined;
+    if (!text) throw new Error(`لم يكتب الذكاء رسالة${out.summary ? ` — ملاحظته: ${out.summary}` : ""}. جرّب مرة أخرى أو أضف توجيهاً.`);
+    out.body = text.trim();
     await ctx.supabase.from("lead_messages").delete().eq("lead_id", data.id).eq("draft", true);
     await ctx.supabase.from("lead_messages").insert({
       lead_id: data.id, channel: data.channel, direction: "out", draft: true,
-      subject: (out.subject as string) || null, body: String(out.body ?? ""),
+      subject: (out.subject as string) || null, body: out.body,
     });
     if (data.mode === "reply" && out.status) {
       const note = `${new Date().toISOString().slice(0, 10)}: ${out.summary ?? ""}`;

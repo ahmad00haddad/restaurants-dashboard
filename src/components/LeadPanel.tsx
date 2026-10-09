@@ -58,7 +58,7 @@ export function LeadPanel({ id }: { id: string }) {
       const r = await draft({ data: { id, mode, channel, hint: hint || undefined } });
       setSubject(r.subject ?? "");
       setBody(r.body);
-      if (r.summary && mode === "reply") toast.push(`${r.intent ?? ""}: ${r.summary}`, "info");
+      if (r.summary) toast.push(mode === "reply" ? `${r.intent ?? ""}: ${r.summary}` : r.summary, "info");
     });
 
   const mode = lead.needs_reply ? "reply" : lead.status === "contacted" ? "followup" : lead.status === "new" ? "first" : "reply";
@@ -157,6 +157,7 @@ export function LeadPanel({ id }: { id: string }) {
         <input className={field} value={hint} onChange={(e) => setHint(e.target.value)} placeholder="توجيه اختياري: مثلاً 'اذكر أن عندهم ذكرى 20 سنة' أو 'اعرض تصوير المنيو'" />
         {body && (
           <>
+            <p className="text-xs text-green-600">✓ الرسالة جاهزة. راجعها وعدّل ما تريد، ثم اضغط «📤 للموافقة على الهاتف» لتصلك على Telegram، أو الزر الثاني لفتحها مباشرة.</p>
             {channel === "email" && <input className={field} value={subject} onChange={(e) => setSubject(e.target.value)} />}
             <textarea className={field} rows={8} value={body} onChange={(e) => setBody(e.target.value)} />
             <button className={primary} onClick={() => act.queueForApproval(id, channel, body, subject).then(() => {
