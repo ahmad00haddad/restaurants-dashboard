@@ -156,8 +156,10 @@ def works_list(team):
     return "\n".join(out)
 
 
-CLOSE = {"en": "If the timing is right on your side, I'd enjoy a conversation about it.",
-         "ar": "إن كان التوقيت مناسباً لديكم، يسعدني أن نتحدث."}
+CLOSE = {"en": "I'd be glad to discuss the possibility whenever time allows.",
+         "ar": "يسعدني مناقشة إمكانية ذلك عند توفّر الوقت."}
+# Any closing line the model writes is replaced by Ahmad's chosen close (exactly one close per message).
+CLOSE_LIKE = re.compile(r"timing|conversation|discuss|talk|time allows|convenient|التوقيت|نتحدث|حديث|مناقشة|نناقش|الحديث|الوقت|مناسب", re.I)
 FLATTERY = re.compile(r"\b(truly|commendable|impressive|amazing|incredible|inspiring|remarkable)\b|رائع|مذهل|ملهم|مبهر|نثمّن|نقدّر جهودكم", re.I)
 
 
@@ -247,8 +249,10 @@ def finish(body, L, team, lang="en"):
     text = "\n\n".join(split_long(p.strip()) for p in re.split(r"\n\s*\n", text) if p.strip())
     text = "\n".join(l for l in text.splitlines() if not re.fullmatch(r"\s*[\[\]{}()*_#>\-–]+\s*", l))  # stray brackets/markdown
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
-    if not re.search(r"timing|conversation|talk|التوقيت|نتحدث|حديث", text[-200:], re.I):
-        text += "\n\n" + CLOSE[lang]
+    paras = [p for p in text.split("\n\n") if p.strip()]
+    while paras and len(paras[-1]) < 160 and CLOSE_LIKE.search(paras[-1]):
+        paras.pop()  # drop the model's own close(s)
+    text = "\n\n".join(paras + [CLOSE[lang]])
     # Always one clean greeting: drop whatever greeting-ish lines the model wrote, then add ours.
     ls = text.splitlines()
     while ls and (not ls[0].strip() or len(ls[0]) < 70 and (re.match(r"\s*(dear|hello|hi|السادة|الأخوة|الإخوة|مرحب|تحية|السلام|إلى)", ls[0], re.I)

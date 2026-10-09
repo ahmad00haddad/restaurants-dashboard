@@ -109,7 +109,7 @@ THE POSTURE — this decides everything:
 - Give before you ask: offer one sharp, specific insight about their story or how it could be seen (the thing a great director would notice). That insight is the value of the message.
 - Never position yourself as a supplier. Never say or imply: "we offer", "our services", "we are ready", "we'd be glad/happy/honoured to", "if you ever need", "don't hesitate", "hope to hear from you", "looking forward to working with you", "sorry to bother", "thank you for your time", "opportunity to collaborate".
 - No permission-asking, no apologising, no thanking in advance, no "I won't write again", no opt-out lines, no flattery, no adjectives about ourselves (no "professional", "creative", "high-quality", "passionate").
-- The close is calm and confident, one short line that leaves a door open without pushing, e.g. "If the timing is right on your side, I'd enjoy a conversation about it." / "إن كان التوقيت مناسباً لديكم، يسعدني أن نتحدث." — never a question that begs for a reply, never a request for a meeting.
+- The close is calm and confident, one short line that leaves a door open without pushing, exactly: "I'd be glad to discuss the possibility whenever time allows." / "يسعدني مناقشة إمكانية ذلك عند توفّر الوقت." — never a question that begs for a reply, never a request for a meeting.
 
 CRAFT:
 - Open with a precise observation from the profile hook: a real detail of their work, place or people. If removing the first line leaves the message unchanged, rewrite it.
