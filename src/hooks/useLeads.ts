@@ -57,6 +57,19 @@ export function useApprovals() {
   });
 }
 
+/** Is the PC agent running? It writes a heartbeat every ~20s; silent for 90s (or "stopped") = off. */
+export function useAgentStatus() {
+  return useQuery({
+    queryKey: ["agent-status"],
+    refetchInterval: 15_000,
+    queryFn: async () => {
+      const { data } = await db.from("agent_status").select("last_seen,model,note").eq("id", 1).maybeSingle();
+      const seen = data?.last_seen ? Date.now() - new Date(data.last_seen).getTime() : Infinity;
+      return { online: seen < 90_000 && data?.note !== "stopped", model: data?.model as string | null, lastSeen: data?.last_seen as string | null };
+    },
+  });
+}
+
 export function useTeamSettings() {
   return useQuery({
     queryKey: ["team-settings"],
@@ -147,6 +160,13 @@ export function useLeadActions() {
     /** Mark the lead's current draft (written by the AI) as waiting for approval. */
     async queueDraft(leadId: string) {
       const { error } = await db.from("lead_messages").update({ review: "pending", tg_message_id: null }).eq("lead_id", leadId).eq("draft", true);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["approvals"] });
+    },
+    /** Cancel queued drafts (one, or every message still waiting for the PC to write it). */
+    async cancel(ids: string[]) {
+      if (!ids.length) return;
+      const { error } = await db.from("lead_messages").update({ review: "rejected" }).in("id", ids);
       if (error) throw error;
       qc.invalidateQueries({ queryKey: ["approvals"] });
     },

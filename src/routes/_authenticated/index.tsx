@@ -9,7 +9,7 @@ import { LeadPanel } from "@/components/LeadPanel";
 import { Approvals } from "@/components/Approvals";
 import { AddLead } from "@/components/AddLead";
 import { draftMessage } from "@/lib/ai.functions";
-import { useApprovals } from "@/hooks/useLeads";
+import { useAgentStatus, useApprovals } from "@/hooks/useLeads";
 import { KIND_LABEL, STATUS_LABEL, type Lead } from "@/lib/leads";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -65,6 +65,7 @@ function Home() {
 
   const draft = useServerFn(draftMessage);
   const { data: approvals = [] } = useApprovals();
+  const { data: agent } = useAgentStatus();
   /** Research + write first messages for the best new leads and queue them for phone approval. */
   const draftBatch = async (n: number) => {
     const queued = new Set(approvals.map((a) => a.lead_id));
@@ -88,6 +89,7 @@ function Home() {
 
   /** Same as draftBatch but written on the PC (Ollama) — no Lovable credit. */
   const localBatch = async (n: number) => {
+    if (!agent?.online) toast.push("⚠️ الوكيل متوقف — ستُكتب عند تشغيل run.bat", "info");
     const queued = new Set(approvals.map((a) => a.lead_id));
     const targets = [...groups.signals.filter((l) => l.status === "new"), ...groups.best]
       .filter((l, i, a) => a.indexOf(l) === i && !queued.has(l.id) && (l.email || l.phone)).slice(0, n);
@@ -148,6 +150,7 @@ function Home() {
           {stats.total} عميل · {stats.ngo} منظمة · {stats.analysed} محلَّل · تواصلنا {stats.contacted} · ردّ {stats.replied} · صفقات {stats.won} ({stats.revenue} د.أ) · قيد التفاوض {stats.pipeline} د.أ
         </span>
         <div className="flex-1" />
+        <span title="وكيل الجهاز: يكتب ويحلّل ويرسل">{agent?.online ? "🟢 الوكيل شغّال" : "🔴 الوكيل متوقف"}</span>
         <Link to="/settings" className="underline">الإعدادات</Link>
         <button className="underline" onClick={() => signOut()}>خروج</button>
       </header>

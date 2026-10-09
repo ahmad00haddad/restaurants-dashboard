@@ -436,6 +436,23 @@ def analyze_one():
         db.patch("leads", {"id": L["id"]}, {"profile": {"summary": "تعذّر التحليل المحلي", "why": str(e)[:200], "analysed_by": "failed"}, "score": 0})
 
 
+_hb = {"t": 0, "warned": False}
+
+
+def heartbeat(note=None):
+    """Tell the site the agent is alive (every ~20s). Missing table (migration not applied yet) is ignored."""
+    if time.time() - _hb["t"] < 20 and not note:
+        return
+    _hb["t"] = time.time()
+    try:
+        db.patch("agent_status", {"id": 1}, {"last_seen": datetime.utcnow().isoformat() + "Z",
+                                             "model": _local.get("model"), "note": note})
+    except Exception as e:
+        if not _hb["warned"]:
+            log("heartbeat off (apply migration 20261009230000_agent_heartbeat.sql):", str(e)[:120])
+            _hb["warned"] = True
+
+
 def write_requested():
     """Drafts the site asked this PC to write (review='write'), then they go to Telegram for approval."""
     rows = db.get("lead_messages", select="*,leads(*)", review="eq.write", order="created_at", limit="1")
@@ -484,6 +501,7 @@ def main():
                     on_text(u["message"])
             STATE["offset"] = offset
             save_state()
+            heartbeat()
             write_requested()
             analyze_one()
             if STATE.get("chat") and time.time() - last_push > 60:
@@ -502,4 +520,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import atexit
+    atexit.register(lambda: heartbeat("stopped"))
+    try:
+        main()
+    except KeyboardInterrupt:
+        heartbeat("stopped")
