@@ -110,7 +110,7 @@ def send_email(to, subject, body):
     msg["To"] = to
     msg["Message-ID"] = make_msgid(domain=E["GMAIL_USER"].split("@")[-1])
     with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as s:
-        s.login(E["GMAIL_USER"], E["GMAIL_APP_PASSWORD"])
+        s.login(E["GMAIL_USER"], E["GMAIL_APP_PASSWORD"].replace(" ", ""))
         s.send_message(msg)
     STATE["sent_count"] += 1
     save_state()
