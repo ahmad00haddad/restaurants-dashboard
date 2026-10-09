@@ -8,6 +8,13 @@
       "when": 1791557990945,
       "tag": "0000_approval_queue_and_settings_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791563687264,
+      "tag": "0001_agent_heartbeat",
+      "breakpoints": true
     }
   ]
 }
