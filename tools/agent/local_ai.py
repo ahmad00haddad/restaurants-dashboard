@@ -173,6 +173,9 @@ def write(L, team, history, channel, mode, hint, model):
             + (f"\nEXTRA INSTRUCTION FROM AHMAD: {hint}" if hint else "")
             + f"\n\nLANGUAGE: write the whole message in {'Arabic (elegant, correct Modern Standard Arabic)' if lang == 'ar' else 'English'}."
             + "\nNO praise words at all (no 'truly', 'commendable', 'impressive', 'رائع', 'ملهم'). State facts, not compliments."
+            + "\nABOUT OUR PAST WORK: say only the client name (e.g. 'USAID', 'QRTA') exactly as listed. NEVER add a city, topic, year or any detail "
+              "about that past work — you don't know them. 'We have documented similar stories for USAID' is right; 'for USAID in Ramtha' is a lie."
+            + "\nNEVER propose a title or name for a film (no 'titled', no 'بعنوان', no «…» names). Describe the idea in plain words."
             + "\nSTRUCTURE (mandatory): 1) greeting; 2) one specific observation about their work (the hook); "
               "3) ONE quiet line introducing the sender with the proof, e.g. 'I'm Ahmad Haddad, a director and photographer based in Jordan; "
               "I've documented similar stories for USAID and QRTA.' / 'أنا أحمد حدّاد، مخرج ومصوّر من الأردن، وثّقت قصصاً مشابهة لـ USAID وQRTA.' "
@@ -218,6 +221,10 @@ def finish(body, L, team, lang="en"):
     text = "\n".join(lines).strip()
     # Remove only the weak closing SENTENCE (never a whole line — the model sometimes writes everything on one line)
     text = re.sub(r"[^.؟?!\n]*(\b(I am|I'm) available\b|متاح(ون)? ل|يسعدني التواصل|لا تتردد)[^.؟?!\n]*[.؟?!]?", "", text, flags=re.I).strip()
+    # No proposed film titles (Ahmad's rule): drop 'بعنوان «…»' / 'titled "…"' and keep the plain description
+    text = re.sub(r"\s*(بعنوان|تحت عنوان)\s*«[^»]{1,60}»", "", text)
+    text = re.sub(r"\s*,?\s*(titled|entitled|called)\s*[\"“'‘][^\"”'’]{1,60}[\"”'’]", "", text, flags=re.I)
+
     def split_long(par):  # a wall of text → short paragraphs, one or two sentences each
         if len(par) <= 250:
             return par

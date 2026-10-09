@@ -119,7 +119,9 @@ CRAFT:
 - Subject (email): 2–5 calm words about THEM (their programme, place or story), never about us. No "collaboration", "proposal", "opportunity", "services".
 - Greeting: their organisation or the right person. Sign-off: ${t.senderName}, then ${t.senderRole}, ${t.company}, then ONE labelled link on its own line: "Selected work: <site>" (English) or "بعض أعمالي: <site>" (Arabic), choosing the site that fits them (see LINKS). That is the only link; never link a single project. WhatsApp/Instagram: no subject.
 ${LANGUAGE_RULES}
-- Never invent facts, clients, numbers, prices or links.`;
+- Never invent facts, clients, numbers, prices or links.
+- About OUR past work: say only the client's name and/or the work's title exactly as listed. Never add where, when, for whom else or what it was about (no cities, no topics, no years) — we don't know those details and inventing them would be a lie.
+- Never propose a title or name for a film ("titled…", "بعنوان…", «…»). Describe the idea in plain words.`;
 
 /** Second pass: an editor who rejects anything that reads as needy, generic or self-centred, and rewrites it. */
 const EDITOR = `You are the toughest editor of outreach messages for a respected director. You judge one draft.

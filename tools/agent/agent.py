@@ -142,6 +142,22 @@ def allowed_urls():
     return _allowed["urls"]
 
 
+PLACE_OR_YEAR = re.compile(
+    r"\b(19|20)\d{2}\b|[٠-٩]{4}|\b(in|at)\s+(amman|irbid|zarqa|ramtha|mafraq|aqaba|salt|madaba|jerash|karak|ajloun|azraq|zaatari|petra|tafileh|ma'?an|jordan valley)\b"
+    r"|في\s+(عمّ?ان|إ?اربد|الزرقاء|الرمثا|المفرق|العقبة|السلط|مادبا|جرش|الكرك|عجلون|الأزرق|الزعتري|البتراء|الطفيلة|معان|الأغوار|منطقة)", re.I)
+_clients = {"t": 0, "names": []}
+
+
+def past_client_names():
+    """Names from the PAST CLIENTS list in team settings (refreshed every 10 min)."""
+    if time.time() - _clients["t"] > 600:
+        st = (db.get("app_settings", select="data", id="eq.1") or [{}])[0].get("data") or {}
+        names = [l.split("|")[0].strip() for l in (st.get("pastClients") or "").splitlines() if l.strip()]
+        names += [re.sub(r"\s*\(.*?\)", "", n) for n in names] + re.findall(r"\(([A-Z]{2,8})\)", st.get("pastClients") or "")
+        _clients.update(t=time.time(), names=[n for n in set(names) if len(n) >= 3])
+    return _clients["names"]
+
+
 def gate(m, L):
     """Returns a list of reasons to block. Empty list = safe to send. Any doubt → block."""
     body, subj = m.get("body") or "", m.get("subject") or ""
@@ -161,6 +177,11 @@ def gate(m, L):
         n = u.rstrip("/.,").lower().replace("https://", "").replace("http://", "").replace("www.", "")
         if not any(n == a or n.startswith(a + "/") and a.count("/") >= n.count("/") - 1 and "gallery" not in n for a in ok):
             why.append(f"رابط غير مسموح (المسموح: موقعك، موقع الفريق، Behance فقط): {u}")
+    if re.search(r"(بعنوان|تحت عنوان|titled|entitled|called)\s*[«\"“'‘]", body, re.I):
+        why.append("يقترح اسماً/عنواناً لفيلم — ممنوع")
+    for sent in re.split(r"(?<=[.؟?!\n])", body):
+        if any(c and c.lower() in sent.lower() for c in past_client_names()) and PLACE_OR_YEAR.search(sent):
+            why.append(f"تفصيل غير موثّق عن عمل سابق (مكان/سنة): «{sent.strip()[:90]}»")
     if m["channel"] == "email" and len(body) > 1600 and not (L.get("status") in ("replied", "meeting")):
         why.append("أطول من اللازم لرسالة أولى")
     if L.get("status") in ("lost", "skip"):
