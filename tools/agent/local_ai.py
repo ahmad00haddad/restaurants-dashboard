@@ -21,7 +21,7 @@ Write the profile in Arabic, except names. Return JSON only."""
 
 SCHEMA = """{"summary":"who they are, one line","interests":["what they care about"],"content_needs":["visual content they likely need"],
 "best_service":"one of our services","other_services":["..."],"angle":"one concrete film/photo idea made for them",
-"hook":"a real specific detail from their info to open with (empty if none)","portfolio_pick":"name of the closest ★ work (no url)",
+"hook":"a real specific detail from their info to open with. If RECENT PUBLIC NEWS is given and relates to them, use the newest relevant item (say what happened, no date needed, never invent beyond it). Empty if none","portfolio_pick":"name of the closest ★ work (no url)",
 "link_pick":"personal | team | behance","tone":"formal|warm|casual","lang":"ar|en","channel":"email|whatsapp|instagram",
 "decision_maker":"role to address","score":0-100,"why":"one short line"}"""
 
@@ -100,6 +100,48 @@ def chat(model, system, user):
     return json.loads(m.group(0))
 
 
+# ---------------- Fresh facts (Exa web search, no key) ----------------
+EXA = "https://mcp.exa.ai/mcp"
+
+
+def fresh(L, months=12, limit=3):
+    """Recent public items about this client, newest first: [{date, title, url, text}]. Only items that mention the client
+    by name and are younger than `months`, so the hook is current and about the right organisation."""
+    from datetime import datetime, timedelta, timezone
+    name = (L.get("name") or "").strip()
+    if not name:
+        return []
+    q = f"{name} {L.get('city') or ''} news projects announcement".strip()
+    try:
+        r = httpx.post(EXA, timeout=40, headers={"Accept": "application/json, text/event-stream", "Content-Type": "application/json"},
+                       json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                             "params": {"name": "web_search_exa", "arguments": {"query": q, "numResults": 8}}})
+        data = next((json.loads(l[5:]) for l in r.text.splitlines() if l.startswith("data:")), {})
+        text = "".join(c.get("text", "") for c in data.get("result", {}).get("content", []))
+    except Exception:
+        return []
+    place = {"jordan", "amman", "irbid", "zarqa", "aqaba", "الأردن", "عمان", "عمّان", "إربد", "الزرقاء", "العقبة", "the", "of", "and"}
+    toks = [w for w in re.findall(r"\w+", re.sub(r"\s*[\(\-|–].*$", "", name).lower()) if len(w) > 1 and w not in place]         or re.findall(r"\w+", name.lower())  # distinctive words of the name; at least half must appear
+    need = max(1, (len(toks) + 1) // 2)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30 * months)
+    out = []
+    for chunk in re.split(r"(?m)^Title: ", text)[1:]:
+        title = chunk.splitlines()[0].strip()
+        url = (re.search(r"^URL: (\S+)", chunk, re.M) or [None, ""])[1]
+        pub = (re.search(r"^Published: (\S+)", chunk, re.M) or [None, ""])[1]
+        try:
+            when = datetime.fromisoformat(pub.replace("Z", "+00:00"))
+        except ValueError:
+            continue  # undated = can't prove it is current
+        body = chunk.split("Highlights:", 1)[-1]
+        hay = (title + " " + body).lower()
+        if when < cutoff or sum(t in hay for t in toks) < need:
+            continue
+        out.append({"date": pub[:10], "title": title[:160], "url": url, "text": re.sub(r"\s+", " ", body)[:400].strip()})
+    out.sort(key=lambda x: x["date"], reverse=True)
+    return out[:limit]
+
+
 def us(team):
     return "\n".join([
         f"Services:\n{team.get('services', '')}",
@@ -127,6 +169,9 @@ def analyze(db, L, team, model):
             if site.get(k) and not L.get(k):
                 patch[k] = site[k]
         L = {**L, **patch}
+    recent = fresh(L)
+    if recent:
+        L = {**L, "recent": recent}
     p = chat(model, SYSTEM, f"{us(team)}\n\n{LANG_HINT}\n\nCLIENT:\n{them(L)}\n\nReturn JSON exactly in this shape:\n{SCHEMA}")
     try:
         score = max(0, min(100, int(round(float(p.pop("score", 0))))))
@@ -142,6 +187,8 @@ def analyze(db, L, team, model):
     if p.get("link_pick") not in ("personal", "team", "behance"):
         p["link_pick"] = "personal" if L.get("kind") in ("ngo", "org") else "team"
     p["analysed_by"] = f"local:{model}"
+    if recent:
+        p["recent"] = recent
     patch.update(profile=p, score=score)
     db.patch("leads", {"id": L["id"]}, patch)
     return patch
