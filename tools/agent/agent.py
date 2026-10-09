@@ -1,0 +1,320 @@
+"""FAII Agent — runs on your PC.
+
+- Every draft queued from the site ("📤 للموافقة") arrives on your Telegram with ✅ / ✏️ / ❌.
+- ✅ on an email → sent from your Gmail and logged in the site. ✅ on WhatsApp → you get a one-tap link.
+- ✏️ → reply with the new text, it comes back for approval.
+- Morning report every day + /report /queue /pause /resume commands.
+Config: agent.env (see agent.env.example).
+"""
+import json, smtplib, sys, time, traceback
+from datetime import date, datetime, timedelta
+from email.mime.text import MIMEText
+from email.utils import formataddr, make_msgid
+from pathlib import Path
+from urllib.parse import quote
+import httpx
+
+sys.stdout.reconfigure(encoding="utf-8")
+HERE = Path(__file__).parent
+STATE_FILE = HERE / "state.json"
+
+
+def load_env():
+    env = {}
+    for line in (HERE / "agent.env").read_text(encoding="utf-8").splitlines():
+        if "=" in line and not line.strip().startswith("#"):
+            k, v = line.split("=", 1)
+            env[k.strip()] = v.strip()
+    return env
+
+
+E = load_env()
+STATE = json.loads(STATE_FILE.read_text()) if STATE_FILE.exists() else {}
+
+
+def save_state():
+    STATE_FILE.write_text(json.dumps(STATE))
+
+
+def log(*a):
+    print(datetime.now().strftime("%H:%M:%S"), *a, flush=True)
+
+
+# ---------------- Supabase (signed in as the agent's own team account) ----------------
+class DB:
+    def __init__(self):
+        self.url, self.key = E["SUPABASE_URL"].rstrip("/"), E["SUPABASE_KEY"]
+        self.token, self.refresh, self.exp = None, None, 0
+
+    def _auth(self):
+        if self.token and time.time() < self.exp - 60:
+            return
+        body = ({"grant_type": "refresh_token", "refresh_token": self.refresh} if self.refresh
+                else {"email": E["AGENT_EMAIL"], "password": E["AGENT_PASSWORD"]})
+        grant = "refresh_token" if self.refresh else "password"
+        r = httpx.post(f"{self.url}/auth/v1/token?grant_type={grant}", json=body, headers={"apikey": self.key}, timeout=30)
+        if r.status_code != 200:
+            self.refresh = None
+            raise RuntimeError(f"Supabase login failed: {r.text[:200]}")
+        j = r.json()
+        self.token, self.refresh, self.exp = j["access_token"], j["refresh_token"], time.time() + j["expires_in"]
+
+    def req(self, method, table, params=None, body=None, prefer=None):
+        self._auth()
+        h = {"apikey": self.key, "Authorization": f"Bearer {self.token}", "Content-Type": "application/json"}
+        if prefer:
+            h["Prefer"] = prefer
+        r = httpx.request(method, f"{self.url}/rest/v1/{table}", params=params, json=body, headers=h, timeout=30)
+        if r.status_code >= 300:
+            raise RuntimeError(f"{method} {table}: {r.text[:300]}")
+        return r.json() if r.text else None
+
+    def get(self, table, **params):
+        return self.req("GET", table, params)
+
+    def patch(self, table, match: dict, body):
+        return self.req("PATCH", table, {k: f"eq.{v}" for k, v in match.items()}, body)
+
+
+db = DB()
+
+
+# ---------------- Telegram ----------------
+TG = f"https://api.telegram.org/bot{E['TELEGRAM_TOKEN']}/"
+
+
+def tg(method, **p):
+    r = httpx.post(TG + method, json=p, timeout=70)
+    j = r.json()
+    if not j.get("ok"):
+        log("telegram error", method, j.get("description"))
+    return j.get("result")
+
+
+def say(text, **kw):
+    if STATE.get("chat"):
+        return tg("sendMessage", chat_id=STATE["chat"], text=text[:4096], disable_web_page_preview=True, **kw)
+
+
+# ---------------- Gmail ----------------
+def send_email(to, subject, body):
+    cap = int(E.get("DAILY_CAP", "20"))
+    today = date.today().isoformat()
+    if STATE.get("sent_day") != today:
+        STATE.update(sent_day=today, sent_count=0)
+    if STATE["sent_count"] >= cap:
+        raise RuntimeError(f"وصلت للحد اليومي ({cap}) — سيُرسل غداً")
+    msg = MIMEText(body, "plain", "utf-8")
+    msg["Subject"] = subject or E.get("SENDER_NAME", "")
+    msg["From"] = formataddr((E.get("SENDER_NAME", ""), E["GMAIL_USER"]))
+    msg["To"] = to
+    msg["Message-ID"] = make_msgid(domain=E["GMAIL_USER"].split("@")[-1])
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as s:
+        s.login(E["GMAIL_USER"], E["GMAIL_APP_PASSWORD"])
+        s.send_message(msg)
+    STATE["sent_count"] += 1
+    save_state()
+
+
+def wa_link(phone, text):
+    d = "".join(c for c in phone or "" if c.isdigit())
+    if d.startswith("00"):
+        d = d[2:]
+    if d.startswith("0"):
+        d = "962" + d[1:]
+    return f"https://wa.me/{d}?text={quote(text)}"
+
+
+# ---------------- Approval flow ----------------
+KIND = {"ngo": "منظمة", "org": "مؤسسة", "restaurant": "مطعم", "brand": "براند", "hotel": "فندق", "event": "فعاليات", "other": "أخرى"}
+CH = {"email": "✉️ إيميل", "whatsapp": "💬 واتساب", "instagram": "📷 إنستغرام"}
+
+
+def card(m):
+    L = m["leads"]
+    to = L.get("email") if m["channel"] == "email" else L.get("phone") if m["channel"] == "whatsapp" else L.get("instagram")
+    head = f"{CH.get(m['channel'], m['channel'])} → {L['name']} ({KIND.get(L['kind'], L['kind'])})\nإلى: {to or '— غير متوفر'}"
+    if L.get("score") is not None:
+        head += f" · تقييم {L['score']}"
+    if L.get("signal"):
+        head += f"\n🔔 {L['signal']}"
+    subj = f"\nالموضوع: {m['subject']}" if m.get("subject") else ""
+    return f"{head}{subj}\n────────\n{m['body']}"
+
+
+def buttons(mid):
+    return {"inline_keyboard": [[{"text": "✅ أرسل", "callback_data": f"ok:{mid}"},
+                                 {"text": "✏️ عدّل", "callback_data": f"ed:{mid}"},
+                                 {"text": "❌ ارفض", "callback_data": f"no:{mid}"}]]}
+
+
+def push_pending():
+    if STATE.get("paused"):
+        return
+    rows = db.get("lead_messages", select="*,leads(*)", review="eq.pending", tg_message_id="is.null", order="created_at", limit="10")
+    for m in rows:
+        r = say(card(m), reply_markup=buttons(m["id"]))
+        if r:
+            db.patch("lead_messages", {"id": m["id"]}, {"tg_message_id": r["message_id"]})
+
+
+def after_send(L):
+    if L["status"] in ("new", "skip"):
+        patch = {"status": "contacted", "next_action_at": (date.today() + timedelta(days=7)).isoformat(), "needs_reply": False}
+    elif L["status"] == "contacted":
+        patch = {"followups": L["followups"] + 1, "next_action_at": None, "needs_reply": False}
+    else:
+        patch = {"needs_reply": False}
+    db.patch("leads", {"id": L["id"]}, patch)
+
+
+def approve(mid, tg_mid):
+    m = db.get("lead_messages", select="*,leads(*)", id=f"eq.{mid}")[0]
+    L = m["leads"]
+    if m["review"] == "sent":
+        return "أُرسلت مسبقاً"
+    if m["channel"] == "email":
+        if not L.get("email"):
+            return "لا يوجد إيميل لهذا العميل"
+        send_email(L["email"], m.get("subject"), m["body"])
+        done = f"✅ أُرسلت إلى {L['email']}"
+    elif m["channel"] == "whatsapp":
+        if not L.get("phone"):
+            return "لا يوجد رقم لهذا العميل"
+        say(f"اضغط لإرسالها من واتسابك إلى {L['name']}:", reply_markup={"inline_keyboard": [[{"text": "💬 افتح واتساب", "url": wa_link(L["phone"], m["body"])}]]})
+        done = "✅ جاهزة في واتساب"
+    else:
+        say(m["body"])
+        done = f"✅ انسخ الرسالة أعلاه وأرسلها في الدايركت: {L.get('instagram') or ''}"
+    now = datetime.utcnow().isoformat()
+    db.patch("lead_messages", {"id": mid}, {"review": "sent", "draft": False, "sent_at": now, "created_at": now})
+    after_send(L)
+    return done
+
+
+def send_site_approved():
+    """Drafts approved from the site's Approvals tab are sent here too."""
+    for m in db.get("lead_messages", select="id,tg_message_id", review="eq.approved", limit="10"):
+        try:
+            say(approve(m["id"], m["tg_message_id"]))
+        except Exception as e:
+            db.patch("lead_messages", {"id": m["id"]}, {"review": "failed", "review_note": str(e)[:300]})
+            say(f"⚠️ {e}")
+
+
+def on_callback(q):
+    if str(q["message"]["chat"]["id"]) != str(STATE.get("chat")):
+        return
+    action, mid = q["data"].split(":", 1)
+    tg_mid = q["message"]["message_id"]
+    try:
+        if action == "ok":
+            res = approve(mid, tg_mid)
+        elif action == "no":
+            db.patch("lead_messages", {"id": mid}, {"review": "rejected"})
+            res = "❌ رُفضت"
+        else:
+            STATE["editing"] = mid
+            save_state()
+            res = "✏️ أرسل لي النص الجديد للرسالة كاملاً (أول سطر يبدأ بـ «الموضوع:» إن أردت تغيير العنوان)"
+    except Exception as e:
+        db.patch("lead_messages", {"id": mid}, {"review_note": str(e)[:300]})
+        res = f"⚠️ {e}"
+    tg("answerCallbackQuery", callback_query_id=q["id"])
+    tg("editMessageReplyMarkup", chat_id=STATE["chat"], message_id=tg_mid, reply_markup={"inline_keyboard": []})
+    say(res)
+
+
+def on_text(msg):
+    chat, text = msg["chat"]["id"], (msg.get("text") or "").strip()
+    if text == "/start" and not STATE.get("chat"):
+        STATE["chat"] = chat
+        save_state()
+        say("أهلاً أحمد 👋 ربطت هذا الحساب بالوكيل. ستصلك هنا الرسائل للموافقة والتقرير الصباحي.\nالأوامر: /report /queue /pause /resume")
+        return
+    if str(chat) != str(STATE.get("chat")):
+        return  # only the owner can control the agent
+    if STATE.get("editing") and not text.startswith("/"):
+        mid = STATE.pop("editing")
+        save_state()
+        patch = {"tg_message_id": None, "review": "pending"}
+        if text.startswith("الموضوع:"):
+            first, _, rest = text.partition("\n")
+            patch["subject"], text = first.replace("الموضوع:", "").strip(), rest.strip()
+        patch["body"] = text
+        db.patch("lead_messages", {"id": mid}, patch)
+        push_pending()
+        return
+    if text == "/report":
+        report()
+    elif text == "/queue":
+        n = len(db.get("lead_messages", select="id", review="eq.pending"))
+        say(f"في الانتظار: {n}")
+        db.req("PATCH", "lead_messages", {"review": "eq.pending"}, {"tg_message_id": None})
+        push_pending()
+    elif text == "/pause":
+        STATE["paused"] = True; save_state(); say("⏸ أوقفت إرسال المسودات. /resume للاستئناف")
+    elif text == "/resume":
+        STATE["paused"] = False; save_state(); say("▶️ استأنفت"); push_pending()
+
+
+# ---------------- Morning report ----------------
+def report():
+    leads = []
+    for off in range(0, 20000, 1000):
+        page = db.req("GET", "leads", {"select": "id,name,kind,status,score,email,phone,signal,signal_until,next_action_at,needs_reply,followups,deal_value",
+                                       "deleted_at": "is.null", "offset": off, "limit": 1000})
+        leads += page
+        if len(page) < 1000:
+            break
+    t = date.today().isoformat()
+    replies = [l for l in leads if l["needs_reply"]]
+    follow = [l for l in leads if l["status"] == "contacted" and l["next_action_at"] and l["next_action_at"] <= t and l["followups"] < 1]
+    signals = sorted([l for l in leads if l["signal"] and (not l["signal_until"] or l["signal_until"] >= t) and l["status"] not in ("won", "lost", "skip")],
+                     key=lambda l: l["signal_until"] or "9")
+    best = sorted([l for l in leads if l["status"] == "new" and l["score"] is not None and (l["email"] or l["phone"])], key=lambda l: -l["score"])
+    pending = db.get("lead_messages", select="id", review="eq.pending")
+    pipe = sum(float(l["deal_value"] or 0) for l in leads if l["status"] in ("replied", "meeting"))
+    won = sum(float(l["deal_value"] or 0) for l in leads if l["status"] == "won")
+    lines = [f"☀️ صباح الخير — تقرير {t}",
+             f"🔥 ردود تنتظرك: {len(replies)}" + "".join(f"\n   • {l['name']}" for l in replies[:5]),
+             f"🔔 فرص مفتوحة الآن: {len(signals)}" + "".join(f"\n   • {l['name']} — {l['signal'][:60]} ({l['signal_until'] or ''})" for l in signals[:5]),
+             f"↩️ متابعات مستحقة: {len(follow)}",
+             f"🎯 أفضل جدد: " + "، ".join(f"{l['name']} ({l['score']})" for l in best[:5]),
+             f"📤 مسودات بانتظار موافقتك: {len(pending)}",
+             f"📊 {len(leads)} عميل · تواصلنا مع {sum(1 for l in leads if l['status'] not in ('new', 'skip'))} · قيد التفاوض {pipe:.0f} د.أ · صفقات {won:.0f} د.أ"]
+    say("\n\n".join(lines))
+
+
+# ---------------- Main loop ----------------
+def main():
+    log("FAII Agent started. Open Telegram and send /start to your bot." if not STATE.get("chat") else "FAII Agent started.")
+    offset, last_push, report_hour = STATE.get("offset", 0), 0, int(E.get("REPORT_HOUR", "8"))
+    while True:
+        try:
+            ups = tg("getUpdates", offset=offset, timeout=50) or []
+            for u in ups:
+                offset = u["update_id"] + 1
+                if "callback_query" in u:
+                    on_callback(u["callback_query"])
+                elif "message" in u:
+                    on_text(u["message"])
+            STATE["offset"] = offset
+            save_state()
+            if STATE.get("chat") and time.time() - last_push > 60:
+                push_pending()
+                send_site_approved()
+                last_push = time.time()
+            today = date.today().isoformat()
+            if STATE.get("chat") and datetime.now().hour >= report_hour and STATE.get("report_day") != today:
+                report()
+                STATE["report_day"] = today
+                save_state()
+        except Exception as e:
+            log("error:", e)
+            traceback.print_exc()
+            time.sleep(15)
+
+
+if __name__ == "__main__":
+    main()

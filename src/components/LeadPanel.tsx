@@ -159,7 +159,10 @@ export function LeadPanel({ id }: { id: string }) {
           <>
             {channel === "email" && <input className={field} value={subject} onChange={(e) => setSubject(e.target.value)} />}
             <textarea className={field} rows={8} value={body} onChange={(e) => setBody(e.target.value)} />
-            <button className={primary} onClick={send}>
+            <button className={primary} onClick={() => act.queueForApproval(id, channel, body, subject).then(() => {
+              toast.push("📤 أُرسلت للموافقة على هاتفك"); setBody(""); setSubject("");
+            }, (e) => toast.push(e.message, "error"))}>📤 للموافقة على الهاتف</button>
+            <button className={btn} onClick={send}>
               {channel === "email" ? "فتح في Gmail وتسجيل الإرسال" : channel === "whatsapp" ? "فتح واتساب وتسجيل الإرسال" : "نسخ + فتح إنستغرام وتسجيل الإرسال"}
             </button>
           </>

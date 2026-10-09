@@ -6,6 +6,9 @@ import { useLeadActions, useLeads } from "@/hooks/useLeads";
 import { useToast } from "@/hooks/useToast";
 import { useAuth } from "@/hooks/useAuth";
 import { LeadPanel } from "@/components/LeadPanel";
+import { Approvals } from "@/components/Approvals";
+import { draftMessage } from "@/lib/ai.functions";
+import { useApprovals } from "@/hooks/useLeads";
 import { KIND_LABEL, STATUS_LABEL, type Lead } from "@/lib/leads";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -13,7 +16,7 @@ export const Route = createFileRoute("/_authenticated/")({
   component: Home,
 });
 
-type View = "today" | "signals" | "reply" | "followup" | "best" | "all";
+type View = "today" | "signals" | "reply" | "followup" | "best" | "all" | "approvals";
 const today = () => new Date().toISOString().slice(0, 10);
 
 function Home() {
@@ -58,6 +61,29 @@ function Home() {
     }
     return L;
   }, [leads, groups, view, kind, status, q]);
+
+  const draft = useServerFn(draftMessage);
+  const { data: approvals = [] } = useApprovals();
+  /** Research + write first messages for the best new leads and queue them for phone approval. */
+  const draftBatch = async (n: number) => {
+    const queued = new Set(approvals.map((a) => a.lead_id));
+    const targets = [...groups.signals.filter((l) => l.status === "new"), ...groups.best]
+      .filter((l, i, a) => a.indexOf(l) === i && !queued.has(l.id) && (l.email || l.phone)).slice(0, n);
+    for (let i = 0; i < targets.length; i++) {
+      const l = targets[i];
+      setBulk(`كتابة ${i + 1}/${targets.length}: ${l.name}`);
+      try {
+        if (!l.profile) await research({ data: { id: l.id, refetch: false } });
+        await draft({ data: { id: l.id, mode: "first", channel: l.email ? "email" : "whatsapp" } });
+        await act.queueDraft(l.id);
+      } catch (e) {
+        toast.push(`${l.name}: ${(e as Error).message}`, "error");
+        if (/رصيد|حد الاستخدام/.test((e as Error).message)) break;
+      }
+    }
+    setBulk(null);
+    toast.push("📤 المسودات في طريقها إلى هاتفك");
+  };
 
   const analyseBatch = async (n: number) => {
     const targets = leads
@@ -123,6 +149,7 @@ function Home() {
         {tab("followup", "↩️ متابعات", groups.followup.length)}
         {tab("best", "🎯 أفضل جدد", groups.best.length)}
         {tab("all", "الكل", leads.length)}
+        {tab("approvals", "📤 الموافقات", approvals.length)}
         <input className="rounded border border-border bg-background px-2 py-1.5 text-sm" placeholder="بحث" value={q} onChange={(e) => setQ(e.target.value)} />
         <select className="rounded border border-border bg-background px-2 py-1.5 text-sm" value={kind} onChange={(e) => setKind(e.target.value)}>
           <option value="">كل الأنواع</option>
@@ -133,6 +160,9 @@ function Home() {
           {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
         <div className="flex-1" />
+        <button disabled={!!bulk} className="px-3 py-1.5 rounded border border-border text-sm" onClick={() => draftBatch(10)}>
+          ✍️ اكتب لأفضل 10 وأرسلها للموافقة
+        </button>
         <button disabled={!!bulk} className="px-3 py-1.5 rounded border border-border text-sm" onClick={() => analyseBatch(20)}>
           {bulk ?? "🧠 حلّل 20 عميل"}
         </button>
@@ -140,6 +170,7 @@ function Home() {
         <input ref={fileRef} type="file" accept=".json" hidden onChange={(e) => e.target.files?.[0] && importFile(e.target.files[0])} />
       </div>
 
+      {view === "approvals" ? <Approvals items={approvals} onOpen={(id) => { setSel(id); setView("all"); }} /> : (
       <div className="grid md:grid-cols-[1fr_520px]">
         <div className="overflow-auto md:h-[calc(100vh-100px)]">
           {isLoading && <p className="p-4 text-muted-foreground">...</p>}
@@ -178,6 +209,7 @@ function Home() {
           {sel ? <LeadPanel key={sel} id={sel} /> : <p className="p-6 text-muted-foreground">اختر عميلاً.</p>}
         </aside>
       </div>
+      )}
     </div>
   );
 }

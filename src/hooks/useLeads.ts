@@ -36,6 +36,25 @@ export function useLead(id: string | null) {
   });
 }
 
+export interface Approval extends LeadMessage {
+  review: string;
+  review_note: string | null;
+  leads: Lead;
+}
+
+export function useApprovals() {
+  return useQuery({
+    queryKey: ["approvals"],
+    refetchInterval: 20_000,
+    queryFn: async (): Promise<Approval[]> => {
+      const { data, error } = await db.from("lead_messages").select("*,leads(*)")
+        .in("review", ["pending", "approved", "failed"]).order("created_at");
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 export function useTeamSettings() {
   return useQuery({
     queryKey: ["team-settings"],
@@ -106,6 +125,25 @@ export function useLeadActions() {
     async logTheirReply(lead: Lead, channel: string, body: string) {
       await db.from("lead_messages").insert({ lead_id: lead.id, channel, direction: "in", body });
       await update(lead.id, { status: lead.status === "meeting" ? "meeting" : "replied", needs_reply: true });
+    },
+    /** Put a draft in the approval queue — the PC agent sends it to Telegram, then from Gmail once approved. */
+    async queueForApproval(leadId: string, channel: Channel, body: string, subject?: string) {
+      await db.from("lead_messages").delete().eq("lead_id", leadId).eq("draft", true);
+      const { error } = await db.from("lead_messages").insert({ lead_id: leadId, channel, direction: "out", draft: true, review: "pending", body, subject: subject || null });
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["approvals"] });
+      refresh(leadId);
+    },
+    /** Mark the lead's current draft (written by the AI) as waiting for approval. */
+    async queueDraft(leadId: string) {
+      const { error } = await db.from("lead_messages").update({ review: "pending", tg_message_id: null }).eq("lead_id", leadId).eq("draft", true);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["approvals"] });
+    },
+    async review(id: string, review: "approved" | "rejected", body?: string, subject?: string | null) {
+      const { error } = await db.from("lead_messages").update({ review, ...(body != null ? { body, subject } : {}) }).eq("id", id);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["approvals"] });
     },
     async saveSettings(s: TeamSettings) {
       const { error } = await db.from("app_settings").update({ data: s, updated_at: new Date().toISOString() }).eq("id", 1);
