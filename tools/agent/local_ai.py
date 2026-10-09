@@ -32,6 +32,7 @@ restaurants, companies, campaigns; behance only for creative agencies."""
 
 
 NV_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
+NV_SMALL = "nv:nvidia/nemotron-3-super-120b-a12b"
 
 
 def _nv_key():
@@ -53,12 +54,12 @@ def available(model):
 
 
 def _nv_chat(model, messages, temperature):
-    """NVIDIA's hosted models (free tier, OpenAI-compatible). Retries a rate limit once."""
+    """NVIDIA's hosted models (free tier, OpenAI-compatible). Retries a rate limit / server error once."""
     for attempt in range(2):
         r = httpx.post(NV_URL, timeout=120, headers={"Authorization": "Bearer " + _nv_key()},
                        json={"model": model[3:], "temperature": temperature, "max_tokens": 2048, "messages": messages,
                              "chat_template_kwargs": {"enable_thinking": False}})
-        if r.status_code == 429 and attempt == 0:
+        if (r.status_code == 429 or r.status_code >= 500) and attempt == 0:
             time.sleep(8)
             continue
         r.raise_for_status()
@@ -78,14 +79,16 @@ def complete(model, system, user, temperature=0.2, as_json=True):
     """One call to the chosen model. 'nv:<id>' = NVIDIA; if it fails, the local Ollama model (OLLAMA_MODEL) takes over."""
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     if is_nv(model):
-        try:
-            return _nv_chat(model, messages, temperature)
-        except Exception as e:
-            fb = os.environ.get("OLLAMA_MODEL", "qwen2.5:14b")
-            if not available(fb):
-                raise
-            print(f"NVIDIA failed ({str(e)[:80]}), using local {fb}", flush=True)
-            model = fb
+        err = None
+        for m in dict.fromkeys([model, NV_SMALL]):  # big model first, then the faster NVIDIA one, then local
+            try:
+                return _nv_chat(m, messages, temperature)
+            except Exception as e:
+                err = e
+        model = os.environ.get("OLLAMA_MODEL", "qwen2.5:14b")
+        if not available(model):
+            raise err
+        print(f"NVIDIA failed ({str(err)[:80]}), using local {model}", flush=True)
     return _ollama_chat(model, messages, temperature, as_json)
 
 
@@ -204,7 +207,7 @@ def works_list(team):
 CLOSE = {"en": "I'd be glad to discuss the possibility whenever time allows.",
          "ar": "يسعدني مناقشة إمكانية ذلك عند توفّر الوقت."}
 # Any closing line the model writes is replaced by Ahmad's chosen close (exactly one close per message).
-CLOSE_LIKE = re.compile(r"timing|conversation|discuss|talk|time allows|convenient|التوقيت|نتحدث|حديث|مناقشة|نناقش|الحديث|الوقت|مناسب", re.I)
+CLOSE_LIKE = re.compile(r"timing|conversation|discuss|talk|time allows|convenient|التوقيت|نتحدث|حديث|مناقشة|نناقش|نقاش|الحديث|الوقت|مناسب", re.I)
 FLATTERY = re.compile(r"\b(truly|commendable|impressive|amazing|incredible|inspiring|remarkable)\b|رائع|مذهل|ملهم|مبهر|نثمّن|نقدّر جهودكم", re.I)
 
 
@@ -357,7 +360,7 @@ def finish(body, L, team, lang="en"):
     lines = body.splitlines()
     # only short trailing lines can be a signature the model wrote — never the body itself
     while lines and (not lines[-1].strip() or len(lines[-1]) < 60 and (name.split()[0] in lines[-1] or "حدّاد" in lines[-1] or "حداد" in lines[-1]
-                                                                      or re.search(r"FAII|regards|تحياتي|مع التقدير|مع خالص", lines[-1], re.I))):
+                                                                      or re.search(r"FAII|regards|تحياتي|مع التقدير|مع خالص|www\.|\.com|@|https?:", lines[-1], re.I))):
         lines.pop()  # drop any signature the model wrote itself
     text = "\n".join(lines).strip()
     # Remove only the weak closing SENTENCE (never a whole line — the model sometimes writes everything on one line)

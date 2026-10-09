@@ -422,7 +422,7 @@ _local = {"team": None, "t": 0, "model": None, "done": 0, "warned": False}
 
 def nv_model():
     """NVIDIA hosted model (free tier) when a key is set; Ollama stays the automatic fallback."""
-    return "nv:" + E.get("NVIDIA_MODEL", "nvidia/nemotron-3-super-120b-a12b") if E.get("NVIDIA_API_KEY") else None
+    return "nv:" + E.get("NVIDIA_MODEL", "nvidia/nemotron-3-ultra-550b-a55b") if E.get("NVIDIA_API_KEY") else None
 
 
 def local_model():
