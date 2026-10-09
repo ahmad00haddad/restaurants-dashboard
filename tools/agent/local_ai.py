@@ -4,7 +4,7 @@ Reads each new lead's website, builds the same profile the site's AI builds (who
 content needs, best service, angle, hook, closest flagship work, which site to link, language, score)
 and saves it, so "best new leads" and message writing work from it.
 """
-import json, re, sys
+import json, os, re, sys, time
 from pathlib import Path
 import httpx
 
@@ -31,7 +31,20 @@ Their own website's main language wins. link_pick: personal for organisations/NG
 restaurants, companies, campaigns; behance only for creative agencies."""
 
 
+NV_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
+
+
+def _nv_key():
+    return os.environ.get("NVIDIA_API_KEY", "").strip()
+
+
+def is_nv(model):
+    return str(model).startswith("nv:")
+
+
 def available(model):
+    if is_nv(model):
+        return bool(_nv_key())
     try:
         names = [m["name"] for m in httpx.get(f"{OLLAMA}/api/tags", timeout=5).json()["models"]]
         return model in names or f"{model}:latest" in names
@@ -39,13 +52,45 @@ def available(model):
         return False
 
 
-def chat(model, system, user):
-    r = httpx.post(f"{OLLAMA}/api/chat", timeout=300, json={
-        "model": model, "stream": False, "format": "json",
-        "options": {"temperature": 0.2, "num_ctx": 8192},
-        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]})
+def _nv_chat(model, messages, temperature):
+    """NVIDIA's hosted models (free tier, OpenAI-compatible). Retries a rate limit once."""
+    for attempt in range(2):
+        r = httpx.post(NV_URL, timeout=120, headers={"Authorization": "Bearer " + _nv_key()},
+                       json={"model": model[3:], "temperature": temperature, "max_tokens": 2048, "messages": messages,
+                             "chat_template_kwargs": {"enable_thinking": False}})
+        if r.status_code == 429 and attempt == 0:
+            time.sleep(8)
+            continue
+        r.raise_for_status()
+        return r.json()["choices"][0]["message"]["content"] or ""
+
+
+def _ollama_chat(model, messages, temperature, as_json):
+    body = {"model": model, "stream": False, "options": {"temperature": temperature, "num_ctx": 8192}, "messages": messages}
+    if as_json:
+        body["format"] = "json"
+    r = httpx.post(f"{OLLAMA}/api/chat", timeout=300, json=body)
     r.raise_for_status()
-    txt = r.json()["message"]["content"]
+    return r.json()["message"]["content"]
+
+
+def complete(model, system, user, temperature=0.2, as_json=True):
+    """One call to the chosen model. 'nv:<id>' = NVIDIA; if it fails, the local Ollama model (OLLAMA_MODEL) takes over."""
+    messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+    if is_nv(model):
+        try:
+            return _nv_chat(model, messages, temperature)
+        except Exception as e:
+            fb = os.environ.get("OLLAMA_MODEL", "qwen2.5:14b")
+            if not available(fb):
+                raise
+            print(f"NVIDIA failed ({str(e)[:80]}), using local {fb}", flush=True)
+            model = fb
+    return _ollama_chat(model, messages, temperature, as_json)
+
+
+def chat(model, system, user):
+    txt = complete(model, system, user)
     m = re.search(r"\{.*\}", txt, re.S)
     if not m:
         raise ValueError("model returned no JSON")
@@ -385,14 +430,12 @@ def finish(body, L, team, lang="en"):
 
 def translate_ar(text, model=None):
     """Arabic translation of an English draft, shown to Ahmad only (never sent).
-    Uses Gemma (Qwen sometimes drifts into Chinese). Any non-Arabic script → retry once, then give up silently."""
-    model = "gemma3:12b" if available("gemma3:12b") else model
+    Uses Gemma locally (Qwen sometimes drifts into Chinese). Any non-Arabic script → retry once, then give up silently."""
+    if not is_nv(model):
+        model = "gemma3:12b" if available("gemma3:12b") else model
+    system = "أنت مترجم. ترجم الرسالة التالية إلى العربية الفصحى الواضحة. اكتب الترجمة فقط بالعربية، بدون أي شرح وبدون أي لغة أخرى. أبقِ أسماء الأشخاص والمنظمات والروابط كما هي."
     for _ in range(2):
-        r = httpx.post(f"{OLLAMA}/api/chat", timeout=300, json={
-            "model": model, "stream": False, "options": {"temperature": 0.1, "num_ctx": 8192},
-            "messages": [{"role": "system", "content": "أنت مترجم. ترجم الرسالة التالية إلى العربية الفصحى الواضحة. اكتب الترجمة فقط بالعربية، بدون أي شرح وبدون أي لغة أخرى. أبقِ أسماء الأشخاص والمنظمات والروابط كما هي."},
-                         {"role": "user", "content": text}]})
-        ar = r.json()["message"]["content"].strip()
+        ar = complete(model, system, text, temperature=0.1, as_json=False).strip()
         if ar and not re.search(r"[぀-ヿ㐀-鿿가-힯Ѐ-ӿ]", ar):
             return ar
     return ""

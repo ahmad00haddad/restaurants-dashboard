@@ -6,7 +6,7 @@
 - Morning report every day + /report /queue /pause /resume commands.
 Config: agent.env (see agent.env.example).
 """
-import json, re, smtplib, sys, time, traceback
+import json, os, re, smtplib, sys, time, traceback
 from datetime import date, datetime, timedelta
 from email.mime.text import MIMEText
 from email.utils import formataddr, make_msgid
@@ -29,6 +29,9 @@ def load_env():
 
 
 E = load_env()
+for _k in ("NVIDIA_API_KEY", "OLLAMA_MODEL"):  # local_ai reads these from the environment
+    if E.get(_k):
+        os.environ[_k] = E[_k]
 STATE = json.loads(STATE_FILE.read_text()) if STATE_FILE.exists() else {}
 
 
@@ -417,8 +420,15 @@ def report():
 _local = {"team": None, "t": 0, "model": None, "done": 0, "warned": False}
 
 
+def nv_model():
+    """NVIDIA hosted model (free tier) when a key is set; Ollama stays the automatic fallback."""
+    return "nv:" + E.get("NVIDIA_MODEL", "nvidia/nemotron-3-super-120b-a12b") if E.get("NVIDIA_API_KEY") else None
+
+
 def local_model():
     import local_ai
+    if nv_model():
+        return nv_model()
     for m in [E.get("OLLAMA_MODEL", "qwen2.5:14b"), "qwen2.5:14b", "qwen2.5-coder:7b"]:
         if local_ai.available(m):
             return m
@@ -491,7 +501,7 @@ def write_requested():
         if not L.get("profile"):
             local_ai.analyze(db, L, _local["team"], _local["model"])
             L = db.get("leads", select="*", id=f"eq.{L['id']}")[0]
-        writer = E.get("WRITE_MODEL", "gemma3:12b")  # better Arabic; analysis stays on the faster model
+        writer = nv_model() or E.get("WRITE_MODEL", "gemma3:12b")  # better Arabic; analysis stays on the faster model
         writer = writer if local_ai.available(writer) else _local["model"]
         subject, body = local_ai.write(L, _local["team"], history, m["channel"], mode, m.get("review_note"), writer)
         if m["channel"] != "email":
