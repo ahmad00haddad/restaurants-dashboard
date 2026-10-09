@@ -196,7 +196,17 @@ def push_pending():
         return
     rows = db.get("lead_messages", select="*,leads(*)", review="eq.pending", tg_message_id="is.null", order="created_at", limit="10")
     for m in rows:
-        r = say(card(m), reply_markup=buttons(m["id"]))
+        text = card(m)
+        body = m.get("body") or ""
+        if len(re.findall(r"[A-Za-z]", body)) > 3 * len(re.findall(r"[؀-ۿ]", body)) + 20:  # mostly English
+            try:
+                import local_ai
+                model = _local.get("model") or local_model()
+                if model:
+                    text += "\n\n🔤 الترجمة لك فقط (لا تُرسل):\n" + local_ai.translate_ar(body, model)
+            except Exception as e:
+                log("translation failed:", e)
+        r = say(text, reply_markup=buttons(m["id"]))
         if r:
             db.patch("lead_messages", {"id": m["id"]}, {"tg_message_id": r["message_id"]})
 
@@ -400,6 +410,8 @@ def write_requested():
         writer = E.get("WRITE_MODEL", "gemma3:12b")  # better Arabic; analysis stays on the faster model
         writer = writer if local_ai.available(writer) else _local["model"]
         subject, body = local_ai.write(L, _local["team"], history, m["channel"], mode, m.get("review_note"), writer)
+        if m["channel"] != "email":
+            subject = None  # WhatsApp / Instagram have no subject
         db.patch("lead_messages", {"id": m["id"]}, {"subject": subject, "body": body, "review": "pending", "review_note": None, "tg_message_id": None})
         log(f"✍️ wrote {mode} for {L['name']}")
         push_pending()

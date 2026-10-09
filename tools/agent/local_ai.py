@@ -173,9 +173,11 @@ def write(L, team, history, channel, mode, hint, model):
             + (f"\nEXTRA INSTRUCTION FROM AHMAD: {hint}" if hint else "")
             + f"\n\nLANGUAGE: write the whole message in {'Arabic (elegant, correct Modern Standard Arabic)' if lang == 'ar' else 'English'}."
             + "\nNO praise words at all (no 'truly', 'commendable', 'impressive', 'رائع', 'ملهم'). State facts, not compliments."
-            + "\nSTRUCTURE (mandatory): 1) greeting to the organisation; 2) one specific observation about their work; 3) the idea for their story; "
-              "4) one natural sentence naming our closest ★ work (and one past client only if close); 5) a one-line calm close. "
-              "Do NOT write a signature or any link; they are added for you."
+            + "\nSTRUCTURE (mandatory): 1) greeting; 2) one specific observation about their work (the hook); "
+              "3) ONE quiet line introducing the sender with the proof, e.g. 'I'm Ahmad Haddad, a director and photographer based in Jordan; "
+              "I've documented similar stories for USAID and QRTA.' / 'أنا أحمد حدّاد، مخرج ومصوّر من الأردن، وثّقت قصصاً مشابهة لـ USAID وQRTA.' "
+              "(only past clients/★ works close to them); 4) the idea for their story in one or two sentences; 5) one calm closing line. "
+              "Never write 'I am available'. Do NOT write a signature or any link; they are added for you."
             + '\n\nReturn JSON: {"subject":"' + ("2-5 calm words about them" if channel == "email" else "") + '","body":"the full message"}')
     out = chat(model, voice + "\nReturn JSON only.", user)
     body = next((v for v in (out.get("body"), out.get("message"), out.get("text")) if isinstance(v, str) and len(v.strip()) > 20), None)
@@ -214,6 +216,18 @@ def finish(body, L, team, lang="en"):
     while lines and (name.split()[0] in lines[-1] or not lines[-1].strip()):
         lines.pop()  # drop any signature the model wrote itself
     text = "\n".join(lines).strip()
+    # Remove only the weak closing SENTENCE (never a whole line — the model sometimes writes everything on one line)
+    text = re.sub(r"[^.؟?!\n]*(\b(I am|I'm) available\b|متاح(ون)? ل|يسعدني التواصل|لا تتردد)[^.؟?!\n]*[.؟?!]?", "", text, flags=re.I).strip()
+    def split_long(par):  # a wall of text → short paragraphs, one or two sentences each
+        if len(par) <= 250:
+            return par
+        out, cur = [], ""
+        for x in [x for x in re.split(r"(?<=[.؟?!])\s+", par) if x.strip()]:
+            cur = (cur + " " + x).strip()
+            if len(cur) > 140:
+                out.append(cur); cur = ""
+        return "\n\n".join(out + ([cur] if cur else []))
+    text = "\n\n".join(split_long(p.strip()) for p in re.split(r"\n\s*\n", text) if p.strip())
     text = "\n".join(l for l in text.splitlines() if not re.fullmatch(r"\s*[\[\]{}()*_#>\-–]+\s*", l))  # stray brackets/markdown
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
     if not re.search(r"timing|conversation|talk|التوقيت|نتحدث|حديث", text[-200:], re.I):
@@ -228,8 +242,14 @@ def finish(body, L, team, lang="en"):
     p = L.get("profile") or {}
     site = SITES.get(p.get("link_pick"), SITES["personal" if L.get("kind") in ("ngo", "org") else "team"])
     if lang == "ar":
-        sig = ["أحمد حدّاد", "مخرج ومصوّر، FAII HOUSE", site]
+        sig = ["أحمد حدّاد", "مخرج ومصوّر، FAII HOUSE", f"بعض أعمالي: {site}"]
     else:
         role = team.get("senderRole") or "Director & Photographer"
-        sig = [name if re.match(r"[A-Za-z]", name) else "Ahmad Haddad", f"{role}, {team.get('company') or 'FAII HOUSE'}", site]
+        sig = [name if re.match(r"[A-Za-z]", name) else "Ahmad Haddad", f"{role}, {team.get('company') or 'FAII HOUSE'}", f"Selected work: {site}"]
     return text + "\n\n" + "\n".join(sig)
+
+
+def translate_ar(text, model):
+    """Arabic translation of an English draft, shown to Ahmad only (never sent)."""
+    out = chat(model, "Translate the message into clear, natural Arabic for the sender to understand it. Keep names as they are. Return JSON only: {\"ar\": \"...\"}", text)
+    return (out.get("ar") or "").strip()

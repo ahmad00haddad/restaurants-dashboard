@@ -113,10 +113,11 @@ THE POSTURE — this decides everything:
 
 CRAFT:
 - Open with a precise observation from the profile hook: a real detail of their work, place or people. If removing the first line leaves the message unchanged, rewrite it.
-- One insight/idea about their story (one sentence, concrete, visual). Then one line of quiet proof: name (no link) the closest ★ flagship work and, only if truly close to their world, one past client from the PAST CLIENTS list.
+- Right after the observation, ONE quiet line that introduces the sender together with the proof, so a stranger knows who is writing: e.g. "I'm Ahmad Haddad, a director and photographer based in Jordan; I've documented similar stories for USAID and QRTA." / "أنا أحمد حدّاد، مخرج ومصوّر من الأردن، وثّقت قصصاً مشابهة لـ USAID وأكاديمية الملكة رانيا." Name the closest ★ work or past client only if truly close.
+- Then one insight/idea about their story (one sentence, concrete, visual). Then the calm close. One close only; never add "I am available…".
 - Short: email 4–6 lines of body. WhatsApp/Instagram 2–3 lines. No bullets, bold, hashtags, emojis in emails; no exclamation marks; no em dashes in the body.
 - Subject (email): 2–5 calm words about THEM (their programme, place or story), never about us. No "collaboration", "proposal", "opportunity", "services".
-- Greeting: their organisation or the right person. Sign-off: ${t.senderName}, then ${t.senderRole}, ${t.company}, then ONE link on its own line: the body of work that fits them best (see LINKS). That is the only link in the message; never link a single project.
+- Greeting: their organisation or the right person. Sign-off: ${t.senderName}, then ${t.senderRole}, ${t.company}, then ONE labelled link on its own line: "Selected work: <site>" (English) or "بعض أعمالي: <site>" (Arabic), choosing the site that fits them (see LINKS). That is the only link; never link a single project. WhatsApp/Instagram: no subject.
 ${LANGUAGE_RULES}
 - Never invent facts, clients, numbers, prices or links.`;
 
