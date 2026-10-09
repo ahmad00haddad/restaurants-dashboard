@@ -95,7 +95,11 @@ export type Database = {
           draft: boolean
           id: string
           lead_id: string
+          review: string | null
+          review_note: string | null
+          sent_at: string | null
           subject: string | null
+          tg_message_id: number | null
         }
         Insert: {
           body: string
@@ -106,7 +110,11 @@ export type Database = {
           draft?: boolean
           id?: string
           lead_id: string
+          review?: string | null
+          review_note?: string | null
+          sent_at?: string | null
           subject?: string | null
+          tg_message_id?: number | null
         }
         Update: {
           body?: string
@@ -117,7 +125,11 @@ export type Database = {
           draft?: boolean
           id?: string
           lead_id?: string
+          review?: string | null
+          review_note?: string | null
+          sent_at?: string | null
           subject?: string | null
+          tg_message_id?: number | null
         }
         Relationships: [
           {
