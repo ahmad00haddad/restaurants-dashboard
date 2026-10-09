@@ -66,7 +66,7 @@ function us(t: TeamSettings) {
     t.portfolioSite ? `Full portfolio website (may be mentioned once as "the rest of our work"): ${t.portfolioSite}` : "",
     `PAST CLIENTS we really worked with (name | sector | language) — the only names you may mention:
 ${t.pastClients || "(none listed — mention no client names)"}`,
-    `Portfolio (title | url | tags). Lines starting with ★ are our FLAGSHIP works — always choose a ★ work when one is reasonably related; use others only if no ★ fits:\n${t.portfolio || "(none added yet — don't invent links)"}`,
+    `Portfolio (title | url | tags). Lines starting with ★ are our FLAGSHIP works — always choose a ★ work when one is reasonably related; use others only if no ★ fits. A work whose tags say "ONLY …" may be used only in that case (e.g. only for schools, only around Ramadan):\n${t.portfolio || "(none added yet — don't invent links)"}`,
   ].join("\n");
 }
 
