@@ -397,7 +397,9 @@ def write_requested():
         if not L.get("profile"):
             local_ai.analyze(db, L, _local["team"], _local["model"])
             L = db.get("leads", select="*", id=f"eq.{L['id']}")[0]
-        subject, body = local_ai.write(L, _local["team"], history, m["channel"], mode, m.get("review_note"), _local["model"])
+        writer = E.get("WRITE_MODEL", "gemma3:12b")  # better Arabic; analysis stays on the faster model
+        writer = writer if local_ai.available(writer) else _local["model"]
+        subject, body = local_ai.write(L, _local["team"], history, m["channel"], mode, m.get("review_note"), writer)
         db.patch("lead_messages", {"id": m["id"]}, {"subject": subject, "body": body, "review": "pending", "review_note": None, "tg_message_id": None})
         log(f"✍️ wrote {mode} for {L['name']}")
         push_pending()

@@ -214,7 +214,8 @@ def finish(body, L, team, lang="en"):
     while lines and (name.split()[0] in lines[-1] or not lines[-1].strip()):
         lines.pop()  # drop any signature the model wrote itself
     text = "\n".join(lines).strip()
-    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = "\n".join(l for l in text.splitlines() if not re.fullmatch(r"\s*[\[\]{}()*_#>\-–]+\s*", l))  # stray brackets/markdown
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
     if not re.search(r"timing|conversation|talk|التوقيت|نتحدث|حديث", text[-200:], re.I):
         text += "\n\n" + CLOSE[lang]
     # Always one clean greeting: drop whatever greeting-ish lines the model wrote, then add ours.
