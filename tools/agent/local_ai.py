@@ -182,6 +182,81 @@ def recent_hook(L, recent, lang, model):
     return hook
 
 
+PEOPLE_SYSTEM = """You find who to address at an organisation, from web search snippets. Rules:
+- Only people the snippet says CURRENTLY work at that exact organisation (same country office if the snippet says so).
+- Skip anyone described as former / ex- / left / "after N years" / "new job", people at other organisations or other country offices, and posts about someone else.
+- name must be copied EXACTLY as written in the snippet. Never guess, never complete a name.
+- role = their title as written. Prefer communications / media / marketing / outreach / partnerships / fundraising, then director / head / owner / founder / general manager.
+Return JSON only: {"people":[{"name":"...","role":"...","url":"...","index":<snippet number>}]}. Empty list when unsure."""
+ROLE_OK = re.compile(r"communicat|comms|media|marketing|outreach|advocacy|public information|brand|content|social media|fundrais|partnership|resource mobili|director|head of|manager|owner|founder|ceo|chief|president|coordinator|officer", re.I)
+ROLE_TOP = re.compile(r"communicat|comms|media|marketing|outreach|advocacy|public information|brand|content|social media|fundrais|partnership", re.I)
+STALE = re.compile(r"\b(former|formerly|ex-|previously|past)\b|\bafter \d+ years\b|new job|i'?m now|officially (left|leaving)", re.I)
+ORG_KINDS = {"ngo", "org", "hotel", "brand", "event"}
+
+
+def _exa(query, n=8):
+    r = httpx.post(EXA, timeout=40, headers={"Accept": "application/json, text/event-stream", "Content-Type": "application/json"},
+                   json={"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "web_search_exa", "arguments": {"query": query, "numResults": n}}})
+    data = next((json.loads(l[5:]) for l in r.text.splitlines() if l.startswith("data:")), {})
+    return "".join(c.get("text", "") for c in data.get("result", {}).get("content", []))
+
+
+def find_people(L, model, limit=3):
+    """Candidate decision makers: [{name, role, url, top, status:'unverified'}]. Every name must appear verbatim in the search
+    text and pass the staleness filter. Still candidates, never facts: a human checks before anyone is addressed by name."""
+    name, city = (L.get("name") or "").strip(), (L.get("city") or "").strip()
+    if not name:
+        return []
+    try:
+        text = _exa(f"{name} {city} communications marketing director head linkedin.com/in") + "\n" + _exa(f"{name} team staff communications director")
+    except Exception:
+        return []
+    chunks = []
+    for ch in re.split(r"(?m)^Title: ", text)[1:]:
+        url = (re.search(r"^URL: (\S+)", ch, re.M) or [None, ""])[1]
+        if STALE.search(ch[:900]) or "/posts/" in url:
+            continue
+        pub = (re.search(r"^Published: (\S+)", ch, re.M) or [None, ""])[1]
+        ym = re.search(r"/(20\d\d)-(\d\d)/", url)
+        asof = pub[:10] if re.match(r"20\d\d", pub) else (f"{ym.group(1)}-{ym.group(2)}" if ym else "?")
+        chunks.append((url, "Title: " + ch[:900], asof))
+    if not chunks:
+        return []
+    snippets = "\n\n".join(f"[{i}] {c[1]}" for i, c in enumerate(chunks[:10]))
+    try:
+        out = chat(model, PEOPLE_SYSTEM, f"ORGANISATION: {name} ({city})\n\nSNIPPETS:\n{snippets}")
+    except Exception:
+        return []
+    org = [w for w in re.findall(r"\w+", name.lower()) if len(w) > 2 and w not in {"jordan", "the", "for", "and"}]
+    people = []
+    for x in out.get("people") or []:
+        try:
+            i, pn, role = int(x.get("index")), str(x.get("name") or "").strip(), str(x.get("role") or "").strip()
+        except (TypeError, ValueError):
+            continue
+        if not 0 <= i < min(len(chunks), 10) or len(pn) < 4 or not ROLE_OK.search(role):
+            continue
+        body = chunks[i][1]
+        if pn not in body or not any(w in body.lower() for w in org):  # name verbatim + the organisation named in the same text
+            continue
+        people.append({"name": pn, "role": role[:80], "url": chunks[i][0], "top": bool(ROLE_TOP.search(role)), "status": "unverified", "as_of": chunks[i][2]})
+    people = list({p["name"]: p for p in people}.values())
+    people.sort(key=lambda p: not p["top"])
+    return people[:limit]
+
+
+def addressable(L, people):
+    """A person we may greet by name: only when the email address itself carries their name (strong evidence it is theirs)."""
+    local = re.sub(r"[^a-z]", "", (L.get("email") or "").split("@")[0].lower())
+    if not local or emailcheck.check(L["email"]).get("role"):
+        return None
+    for pr in people:
+        parts = [w for w in re.findall(r"[a-z]+", pr["name"].lower()) if len(w) >= 3]
+        if parts and any(w in local for w in parts):
+            return pr
+    return None
+
+
 def tier_of(score, L, p):
     """A = worth hand-checking and sending first; B = normal; C = low touch. Decided in code, never by the model.
     A: strong fit AND a reachable person (named mailbox or phone) AND a concrete reason now (fresh news, live signal, or a personal mailbox)."""
@@ -231,6 +306,14 @@ def analyze(db, L, team, model):
         if h:
             p["hook"] = h
             p["hook_source"] = "news"
+    if L.get("kind") in ORG_KINDS and score >= 60:
+        people = find_people(L, model)
+        if people:
+            p["people"] = people
+            p["decision_maker"] = f"{people[0]['name']} — {people[0]['role']} (مرشّح غير مؤكد، المصدر {people[0]['as_of']})"
+            who = addressable(L, people)
+            if who:
+                p["contact"] = who
     p["tier"] = tier_of(score, L, p)
     patch.update(profile=p, score=score)
     db.patch("leads", {"id": L["id"]}, patch)
@@ -411,7 +494,7 @@ def _write_once(L, team, history, channel, mode, hint, model):
     # Past clients are NOT given to the model any more: the one proof line is chosen in code by sector (see PROOF).
     ctx = (f"Sender: {team.get('senderName')}, {team.get('company')}\nWho we are: {team.get('whoWeAre', '')}\n"
            "Never open with 'I would like to propose' / 'أود أن أقترح' — open with them.")
-    user = (f"{ctx}\n\nCLIENT:\n{them(L)}\n\nWHAT WE KNOW ABOUT THEM:\n{json.dumps(L.get('profile') or {}, ensure_ascii=False)}\n\n"
+    user = (f"{ctx}\n\nCLIENT:\n{them(L)}\n\nWHAT WE KNOW ABOUT THEM:\n{json.dumps({k: v for k, v in (L.get('profile') or {}).items() if k not in ('people', 'email_check', 'contact', 'recent')}, ensure_ascii=False)}\n\n"
             f"CONVERSATION SO FAR:\n{history or '(none)'}\n\nCHANNEL: {channel}\nTASK: {TASKS[mode]}"
             + (f"\nEXTRA INSTRUCTION FROM AHMAD: {hint}" if hint else "")
             + f"\n\nLANGUAGE: write the whole message in {'Arabic (elegant, correct Modern Standard Arabic)' if lang == 'ar' else 'English'}."
@@ -530,7 +613,9 @@ def finish(body, L, team, lang="en"):
                                                           or ls[0].strip().endswith((",", "،")))):
         ls.pop(0)
     text = "\n".join(ls).strip()
-    text = (f"السادة في {short_name(L['name'])} المحترمين،" if lang == "ar" else f"Dear {short_name(L['name'])} team,") + "\n\n" + text
+    c = (L.get("profile") or {}).get("contact")  # a person whose name is in the email address itself; English only (gender unknown in Arabic)
+    first = re.match(r"[A-Za-z]{3,}", c["name"]).group(0).capitalize() if c and re.match(r"[A-Za-z]{3,}", c["name"]) else None
+    text = (f"السادة في {short_name(L['name'])} المحترمين،" if lang == "ar" else f"Dear {first}," if first else f"Dear {short_name(L['name'])} team,") + "\n\n" + text
     p = L.get("profile") or {}
     site = SITES.get(p.get("link_pick"), SITES["personal" if L.get("kind") in ("ngo", "org") else "team"])
     if lang == "ar":
