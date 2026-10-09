@@ -163,6 +163,25 @@ CLOSE_LIKE = re.compile(r"timing|conversation|discuss|talk|time allows|convenien
 FLATTERY = re.compile(r"\b(truly|commendable|impressive|amazing|incredible|inspiring|remarkable)\b|رائع|مذهل|ملهم|مبهر|نثمّن|نقدّر جهودكم", re.I)
 
 
+OFFER = re.compile(r"فيلم|أفلام|نصوّر|نصور|نوثّق بالصورة|film|shoot|video", re.I)  # not "تصوير": it is in the title "مدير تصوير"
+
+
+def write(L, team, history, channel, mode, hint, model):
+    """Write, and retry once if the model skipped the idea or cleanup left too little (never queue a hollow message)."""
+    last = None
+    for attempt in range(2):
+        try:
+            subject, final = _write_once(L, team, history, channel, mode,
+                                         hint if attempt == 0 else ((hint or "") + " The idea sentence is mandatory: say plainly what short film we could shoot for them."), model)
+            core = " ".join(final.split("\n\n")[1:-2])
+            if mode != "first" or OFFER.search(core):
+                return subject, final
+            last = ValueError("the message has no clear film idea")
+        except ValueError as e:
+            last = e
+    raise last
+
+
 # ---------------- Sector-matched proof (decided in code, never by the model) ----------------
 NGO_PROOF = ["USAID", "UNICEF", "Mercy Corps", "UN Women", "QRTA", "Erasmus"]
 FOOD_PROOF = ["Em Sherif", "Khan Zaid", "Astrolabe", "Arafah", "Arafa", "L'Occitane", "أم شريف", "خان زيد", "إسطرلاب", "اسطرلاب", "عرفة", "لوكسيتان"]
@@ -201,7 +220,7 @@ def wrong_proof(L, body):
 
 
 
-def write(L, team, history, channel, mode, hint, model):
+def _write_once(L, team, history, channel, mode, hint, model):
     voice, editor, links = rules(team)
     lang = lang_for(L)
     # Past clients are NOT given to the model any more: the one proof line is chosen in code by sector (see PROOF).
@@ -290,8 +309,31 @@ def finish(body, L, team, lang="en"):
     text = "\n".join(l for l in text.splitlines() if not re.fullmatch(r"\s*[\[\]{}()*_#>\-–]+\s*", l))  # stray brackets/markdown
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
     paras = [p for p in text.split("\n\n") if p.strip()]
-    while paras and len(paras[-1]) < 160 and CLOSE_LIKE.search(paras[-1]):
-        paras.pop()  # drop the model's own close(s)
+    # Drop the model's own closing SENTENCES only — it sometimes glues the intro and the close into one paragraph.
+    while paras:
+        sents = [x for x in re.split(r"(?<=[.؟?!])\s+", paras[-1].strip()) if x.strip()]
+        kept = list(sents)
+        while kept and len(kept[-1]) < 160 and CLOSE_LIKE.search(kept[-1]):
+            kept.pop()
+        if kept == sents:
+            break
+        if kept:
+            paras[-1] = " ".join(kept)
+            break
+        paras.pop()
+    # The sector proof is part of the intro; if the model dropped it, add it after "I'm Ahmad Haddad…"
+    body_so_far = "\n\n".join(paras)
+    proof_en, proof_ar = PROOF[sector(L)]
+    if not any(n.lower() in body_so_far.lower() for n in NGO_PROOF + FOOD_PROOF + ["Duroub", "دروب", "رانيا"]):
+        # a vague, nameless proof ("وثّقت قصصاً مماثلة" / "documented similar stories") is replaced by the real one
+        vague = r"[،,;]?\s*(وثّقت|وثقت|صوّرت|صورت)\s+(قصصاً|قصصا|حملات|أفلاماً)\s+(مماثلة|مشابهة)(?!\s*لـ)|[;,]?\s*I(?:'ve| have)\s+(documented|filmed)\s+similar\s+(stories|campaigns)(?!\s+for)"
+        paras = [re.sub(vague, "", p_) for p_ in paras]
+        for i, p_ in enumerate(paras):
+            m = re.search(r"(أنا أحمد حدّاد[^.؟!\n]*|I(?:'m| am) Ahmad Haddad[^.;!\n]*)([.;]?)", p_)
+            if m:
+                add = f"، {proof_ar}" if lang == "ar" else f"; {proof_en}"
+                paras[i] = p_[:m.end(1)] + add + (m.group(2) or ".") + p_[m.end():]
+                break
     text = "\n\n".join(paras + [CLOSE[lang]])
     # Always one clean greeting: drop whatever greeting-ish lines the model wrote, then add ours.
     ls = text.splitlines()

@@ -216,7 +216,7 @@ def gate(m, L):
         wrong = []
     if wrong:
         why.append(f"يذكر عملاء من مجال آخر لا يناسب هذه الجهة: {', '.join(wrong)}")
-    if L.get("status") in ("new", None) and not re.search(r"فيلم|أفلام|تصوير|نصوّر|نصور|مخرج|مصوّر|مصور|film|shoot|photograph|video|documentar|director", body, re.I):
+    if L.get("status") in ("new", None) and not re.search(r"فيلم|أفلام|نصوّر|نصور|film|shoot|video|documentary", body, re.I):
         why.append("لا توضح أنها عرض تصوير/فيلم — قد تُفهم كتعليق أو شكوى")
     if re.search(r"(بعنوان|تحت عنوان|titled|entitled|called)\s*[«\"“'‘]", body, re.I):
         why.append("يقترح اسماً/عنواناً لفيلم — ممنوع")
