@@ -66,7 +66,7 @@ function us(t: TeamSettings) {
     t.portfolioSite ? `Full portfolio website (may be mentioned once as "the rest of our work"): ${t.portfolioSite}` : "",
     `PAST CLIENTS we really worked with (name | sector | language) — the only names you may mention:
 ${t.pastClients || "(none listed — mention no client names)"}`,
-    `Portfolio (title | url | tags):\n${t.portfolio || "(none added yet — don't invent links)"}`,
+    `Portfolio (title | url | tags). Lines starting with ★ are our FLAGSHIP works — always choose a ★ work when one is reasonably related; use others only if no ★ fits:\n${t.portfolio || "(none added yet — don't invent links)"}`,
   ].join("\n");
 }
 
@@ -92,31 +92,32 @@ const LANGUAGE_RULES = `Language — decide from their own website/profile first
 - Private schools, publishers, local companies → their website's main language; if bilingual → Arabic.
 - One language per message. If unsure for an international organisation in Jordan, choose English.`;
 
-const VOICE = (t: TeamSettings) => `You write as ${t.senderName} himself — an established photographer/director with a team and a strong body of work.
-The purpose of every message: introduce ourselves and our work to people worth knowing, and open a door to a working relationship.
-We are not asking for anything. We are offering — if they ever need photography or film, we're ready. Dignity and restraint above all.
+const VOICE = (t: TeamSettings) => `You write as ${t.senderName}, a director and photographer whose work speaks for itself (UNICEF, USAID, Mercy Corps, UN Women, QRTA and many Jordanian brands).
+You are not selling and you are not asking. You noticed something genuinely interesting in their world, and you're opening a conversation between two people who care about good work.
 
-Posture (most important):
-- Peer to peer. Write like a respected professional introducing himself to another professional — calm, confident, generous.
-- Never salesy, never needy, never pushy. No urgency, no discounts, no "limited", no chasing, no flattery, no begging for a call.
-- Let the work speak. The portfolio piece is the centre of the introduction, presented with quiet confidence, not hype.
-- Leave them free: the close is an open door ("if a project ever calls for it, we'd be glad to be part of it" / "happy to share more whenever useful"), not a demand for a meeting.
+THE POSTURE — this decides everything:
+- Write as an equal, from abundance. Someone with a full calendar who chose to write because their story caught his eye.
+- The message is about THEM and their story. We appear only as quiet evidence: one fact, one piece of work.
+- Give before you ask: offer one sharp, specific insight about their story or how it could be seen (the thing a great director would notice). That insight is the value of the message.
+- Never position yourself as a supplier. Never say or imply: "we offer", "our services", "we are ready", "we'd be glad/happy/honoured to", "if you ever need", "don't hesitate", "hope to hear from you", "looking forward to working with you", "sorry to bother", "thank you for your time", "opportunity to collaborate".
+- No permission-asking, no apologising, no thanking in advance, no "I won't write again", no opt-out lines, no flattery, no adjectives about ourselves (no "professional", "creative", "high-quality", "passionate").
+- The close is calm and confident, one short line that leaves a door open without pushing, e.g. "If the timing is right on your side, I'd enjoy a conversation about it." / "إن كان التوقيت مناسباً لديكم، يسعدني أن نتحدث." — never a question that begs for a reply, never a request for a meeting.
 
-Craft:
-- Written for THIS client only. Open with a genuine, specific observation about their work (from the profile hook) — informed, not flattering.
-- Connect what they do to what we do in one thoughtful sentence: why their story/place/work deserves to be seen well. One concrete idea at most, offered lightly.
-- One portfolio link, the closest match. Never invent links, clients, numbers or prices.
-- Short and well-composed: email 4–7 lines, WhatsApp/Instagram 2–4 lines. No bullets, bold, hashtags or emojis in emails; at most one emoji elsewhere and only if it fits.
+CRAFT:
+- Open with a precise observation from the profile hook: a real detail of their work, place or people. If removing the first line leaves the message unchanged, rewrite it.
+- One insight/idea about their story (one sentence, concrete, visual). Then one line of quiet proof: the single best matching work (prefer ★ flagship works) and, only if truly close to their world, one past client name from the PAST CLIENTS list.
+- Short: email 4–6 lines of body. WhatsApp/Instagram 2–3 lines. No bullets, bold, hashtags, emojis in emails; no exclamation marks; no em dashes in the body.
+- Subject (email): 2–5 calm words about THEM (their programme, place or story), never about us. No "collaboration", "proposal", "opportunity", "services".
+- Greeting: their organisation or the right person. Sign-off: ${t.senderName}, then ${t.senderRole}, ${t.company}, then the portfolio site on its own line if given.
 ${LANGUAGE_RULES}
-- Social proof, quietly: if a past client of ours is close to this client's world (same sector or same kind of organisation), mention ONE or TWO by name in a single modest clause (e.g. "we've had the chance to work with Mercy Corps and UN Women on similar stories"). Only names from the PAST CLIENTS list. Never brag, never list many.
-- Personalisation must connect to the reason for writing: if the opening line could be deleted and the message still made sense, rewrite it.
-- "You/your" over "I/we". Don't open with who we are.
-- Subject (email): 2–5 plain words, like a colleague would write. No pitch, no emojis, no fake "Re:".
-- Close with a light interest question or an open door, never a request for a long meeting.
-- Avoid AI tells: no em dashes in the body, no "it's not X, it's Y", no self-answered questions, no "Here's the thing".
-- End emails with one quiet line letting them say no ("If this isn't relevant, just tell me and I won't write again" / "إن لم يكن هذا ضمن اهتمامكم، يكفي أن تخبروني"), then the signature.
-- Proper greeting with their name/organisation; sign off with ${t.senderName}, ${t.senderRole}, ${t.company}, Irbid, Jordan.
-- Banned: "I hope this finds you well", "I wanted to reach out", "just following up", "quick call", "leverage", "elevate", "take your brand to the next level", "unlock", "in today's", "best price", "offer", "discount", "يسعدنا أن نضع بين أيديكم", "في ظل", "نفخر بتقديم", "حلول متكاملة", "نقلة نوعية", "لا تتردد", "عرض خاص", "أسعار منافسة", exclamation marks.`;
+- Never invent facts, clients, numbers, prices or links.`;
+
+/** Second pass: an editor who rejects anything that reads as needy, generic or self-centred, and rewrites it. */
+const EDITOR = `You are the toughest editor of outreach messages for a respected director. You judge one draft.
+Score 1-10 on each: dignity (zero neediness, no supplier tone, no begging/thanking/apologising), specificity (could only have been written to this client),
+insight (gives them a real idea about their own story), restraint (short, calm, no adjectives about us), language (natural, elegant, correct for this audience).
+If ANY score is below 9, rewrite the message to score 10 on all, keeping the same language, facts, link and signature. Never add new facts, links or client names.
+Return JSON only: {"scores":{"dignity":n,"specificity":n,"insight":n,"restraint":n,"language":n},"subject":"...","body":"final message"}`;
 
 // ---------- 1) Research + profile ----------
 export const researchLead = createServerFn({ method: "POST" })
@@ -143,7 +144,7 @@ Return JSON only.`,
       `${us(team)}\n\nCLIENT:\n${them(lead)}\n\nReturn JSON:
 {"summary":"who they are, one line","interests":["what they care about"],"content_needs":["visual content they likely need"],
 "best_service":"one of our services","other_services":["..."],"angle":"one concrete film/photo idea made for them",
-"hook":"a real specific detail from their info to open with (empty if none)","portfolio_pick":"url from our portfolio or empty",
+"hook":"a real specific detail from their info to open with (empty if none)","portfolio_pick":"url from our portfolio (prefer ★ flagship works) or empty",
 "tone":"formal|warm|casual","lang":"ar|en","channel":"email|whatsapp|instagram","decision_maker":"role to address, e.g. Communications Officer",
 "score":0-100,"why":"one short line"}`,
     )) as unknown as LeadProfile & { score: number };
@@ -195,6 +196,23 @@ export const draftMessage = createServerFn({ method: "POST" })
       .find((v) => typeof v === "string" && v.trim().length > 20) as string | undefined;
     if (!text) throw new Error(`لم يكتب الذكاء رسالة${out.summary ? ` — ملاحظته: ${out.summary}` : ""}. جرّب مرة أخرى أو أضف توجيهاً.`);
     out.body = text.trim();
+    // Editor pass: catch anything needy or generic before Ahmad ever sees it.
+    try {
+      const ed = await ask(EDITOR, `CLIENT:
+${them(lead)}
+
+WHAT WE KNOW:
+${JSON.stringify(lead.profile ?? {})}
+
+CHANNEL: ${data.channel}
+SUBJECT: ${out.subject ?? ""}
+DRAFT:
+${out.body}`);
+      if (typeof ed.body === "string" && ed.body.trim().length > 20) {
+        out.body = ed.body.trim();
+        if (typeof ed.subject === "string" && ed.subject.trim()) out.subject = ed.subject.trim();
+      }
+    } catch { /* keep the first draft if the editor fails */ }
     await ctx.supabase.from("lead_messages").delete().eq("lead_id", data.id).eq("draft", true);
     await ctx.supabase.from("lead_messages").insert({
       lead_id: data.id, channel: data.channel, direction: "out", draft: true,
