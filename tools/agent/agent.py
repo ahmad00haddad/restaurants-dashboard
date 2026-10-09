@@ -61,6 +61,7 @@ class DB:
 
     def req(self, method, table, params=None, body=None, prefer=None):
         self._auth()
+        body = clean(body)
         h = {"apikey": self.key, "Authorization": f"Bearer {self.token}", "Content-Type": "application/json"}
         if prefer:
             h["Prefer"] = prefer
@@ -74,6 +75,20 @@ class DB:
 
     def patch(self, table, match: dict, body):
         return self.req("PATCH", table, {k: f"eq.{v}" for k, v in match.items()}, body)
+
+
+CTRL = re.compile("[" + "".join(chr(c) for c in list(range(0, 9)) + [11, 12] + list(range(14, 32))) + "]")
+
+
+def clean(v):
+    """Postgres text can't hold NUL (\u0000) — some websites contain it. Strip it (and other control chars) everywhere."""
+    if isinstance(v, str):
+        return re.sub(r"[--]", "", v)
+    if isinstance(v, dict):
+        return {k: clean(x) for k, x in v.items()}
+    if isinstance(v, list):
+        return [clean(x) for x in v]
+    return v
 
 
 db = DB()
@@ -313,6 +328,7 @@ def on_callback(q):
         return
     action, mid = q["data"].split(":", 1)
     tg_mid = q["message"]["message_id"]
+    tg("answerCallbackQuery", callback_query_id=q["id"], text="⏳")  # instantly, so Telegram never times out
     try:
         if action == "ok":
             res = approve(mid, tg_mid)
@@ -326,7 +342,6 @@ def on_callback(q):
     except Exception as e:
         db.patch("lead_messages", {"id": mid}, {"review_note": str(e)[:300]})
         res = f"⚠️ {e}"
-    tg("answerCallbackQuery", callback_query_id=q["id"])
     tg("editMessageReplyMarkup", chat_id=STATE["chat"], message_id=tg_mid, reply_markup={"inline_keyboard": []})
     say(res)
 
@@ -487,7 +502,21 @@ def write_requested():
 
 
 # ---------------- Main loop ----------------
+def worker():
+    """Local AI work (writing + analysis) in its own thread: a 40s Gemma call never blocks the Telegram buttons."""
+    while True:
+        try:
+            if not STATE.get("paused"):
+                write_requested()
+                analyze_one()
+        except Exception as e:
+            log("worker error:", e)
+        time.sleep(3)
+
+
 def main():
+    import threading
+    threading.Thread(target=worker, daemon=True).start()
     log("FAII Agent started. Open Telegram and send /start to your bot." if not STATE.get("chat") else "FAII Agent started.")
     offset, last_push, report_hour = STATE.get("offset", 0), 0, int(E.get("REPORT_HOUR", "8"))
     while True:
@@ -502,8 +531,6 @@ def main():
             STATE["offset"] = offset
             save_state()
             heartbeat()
-            write_requested()
-            analyze_one()
             if STATE.get("chat") and time.time() - last_push > 60:
                 push_pending()
                 send_site_approved()
