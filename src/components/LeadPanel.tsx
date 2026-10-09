@@ -96,6 +96,20 @@ export function LeadPanel({ id }: { id: string }) {
         </div>
       </div>
 
+      {(() => {
+        const last = msgs.filter((m) => m.direction === "out").at(-1);
+        const theirs = msgs.filter((m) => m.direction === "in").at(-1);
+        if (!last && !theirs) return null;
+        const waiting = data?.msgs.find((m) => m.draft && (m as any).review === "pending");
+        return (
+          <div className="rounded border border-green-600/40 bg-green-500/10 p-2 text-xs space-y-0.5">
+            {last && <div>✅ أُرسلت آخر رسالة عبر {last.channel} في {last.created_at.slice(0, 16).replace("T", " ")}</div>}
+            {theirs ? <div>💬 ردّوا في {theirs.created_at.slice(0, 10)}</div> : last && <div>⏳ بانتظار ردّهم{lead.next_action_at ? ` — المتابعة الهادئة يوم ${lead.next_action_at}` : ""}</div>}
+            {waiting && <div>📤 هناك رسالة بانتظار موافقتك على Telegram</div>}
+          </div>
+        );
+      })()}
+
       {lead.signal && (
         <div className="rounded border border-amber-500/50 bg-amber-500/10 p-2">
           🔔 <b>فرصة الآن:</b> {lead.signal}

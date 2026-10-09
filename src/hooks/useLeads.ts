@@ -18,12 +18,14 @@ async function fetchLeads(): Promise<Lead[]> {
 }
 
 export function useLeads() {
-  return useQuery({ queryKey: ["leads"], queryFn: fetchLeads, staleTime: 30_000 });
+  // The PC agent changes leads too (sends, statuses) — poll so the site reflects it without a reload.
+  return useQuery({ queryKey: ["leads"], queryFn: fetchLeads, staleTime: 15_000, refetchInterval: 30_000 });
 }
 
 export function useLead(id: string | null) {
   return useQuery({
     queryKey: ["lead", id],
+    refetchInterval: 15_000,
     enabled: !!id,
     queryFn: async () => {
       const [{ data: lead, error }, { data: msgs }] = await Promise.all([
