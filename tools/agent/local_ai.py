@@ -160,6 +160,27 @@ def them(L):
     return "\n".join(lines)
 
 
+HOOK_SYSTEM = """You pick ONE recent news item to open an outreach message with. Rules:
+- The item must be about the client itself doing something (launch, partnership, event, award, programme, opening).
+- Skip bad news (funding cuts, crises, deaths, scandals, appeals) and items about other organisations or generic pages.
+- Pick the newest item that passes. If none passes, answer index -1.
+- hook = ONE plain factual sentence stating what happened, using only words found in the item. No praise, no dates, no invented detail.
+Return JSON only: {"index": <number or -1>, "hook": "..."}"""
+
+
+def recent_hook(L, recent, lang, model):
+    """Hook built from the newest verified news item. Returns '' when no safe item exists (caller keeps the old hook)."""
+    items = "\n".join(f"[{i}] {x['date']} · {x['title']} — {x['text'][:300]}" for i, x in enumerate(recent))
+    try:
+        out = chat(model, HOOK_SYSTEM, f"CLIENT: {L.get('name')}\nWrite the hook in {'Arabic' if lang == 'ar' else 'English'}.\nITEMS:\n{items}")
+        i, hook = int(out.get("index", -1)), str(out.get("hook") or "").strip()
+    except Exception:
+        return ""
+    if not 0 <= i < len(recent) or len(hook) < 15 or len(hook) > 300 or hook[-1] not in ".!؟?":  # cut-off sentence = unsafe
+        return ""
+    return hook
+
+
 def analyze(db, L, team, model):
     """Profile one lead. Returns the patch saved to the database."""
     patch = {}
@@ -189,6 +210,10 @@ def analyze(db, L, team, model):
     p["analysed_by"] = f"local:{model}"
     if recent:
         p["recent"] = recent
+        h = recent_hook(L, recent, p["lang"], model)
+        if h:
+            p["hook"] = h
+            p["hook_source"] = "news"
     patch.update(profile=p, score=score)
     db.patch("leads", {"id": L["id"]}, patch)
     return patch
