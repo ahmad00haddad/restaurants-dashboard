@@ -5,6 +5,7 @@ content needs, best service, angle, hook, closest flagship work, which site to l
 and saves it, so "best new leads" and message writing work from it.
 """
 import json, os, re, sys, time
+from datetime import date
 from pathlib import Path
 import httpx
 import emailcheck
@@ -182,6 +183,41 @@ def recent_hook(L, recent, lang, model):
     return hook
 
 
+SIGNAL_SYSTEM = """You spot BUYING SIGNALS: a recent event that makes an organisation more likely to hire a film director / cinematographer NOW.
+Signal types: project_launch, grant_funding, campaign, new_branch, event_conference, annual_report, product_launch, rebrand, new_programme, anniversary, award, partnership.
+Pick ONE item from the list that is a real signal of one of these types, about the client itself, positive or neutral (no crises, funding cuts, appeals, deaths).
+- text = one short Arabic sentence saying what happened and why it creates a need for film or photo content. Use only facts in the item.
+- until = the date of the upcoming event/deadline ONLY if it is written in the item, else null.
+Return JSON only: {"index": <number or -1>, "type": "<one of the types>", "text": "...", "until": "YYYY-MM-DD or null"}. index -1 when nothing qualifies."""
+SIGNAL_TYPES = {"project_launch", "grant_funding", "campaign", "new_branch", "event_conference", "annual_report", "product_launch", "rebrand",
+                "new_programme", "anniversary", "award", "partnership"}
+
+
+def buying_signal(L, recent, model):
+    """{type, text, url, until} for the newest qualifying news item, or None. The model picks, code checks dates:
+    the signal lives 45 days from the news date (or until the written upcoming date), so only 'happening now' counts."""
+    from datetime import date, timedelta
+    items = "\n".join(f"[{i}] {x['date']} · {x['title']} — {x['text'][:300]}" for i, x in enumerate(recent))
+    try:
+        out = chat(model, SIGNAL_SYSTEM, f"CLIENT: {L.get('name')}\nITEMS:\n{items}")
+        i, typ, text = int(out.get("index", -1)), out.get("type"), str(out.get("text") or "").strip()
+    except Exception:
+        return None
+    if not 0 <= i < len(recent) or typ not in SIGNAL_TYPES or len(text) < 15 or text[-1] not in ".!؟?":
+        return None
+    today, news_day = date.today(), date.fromisoformat(recent[i]["date"])
+    until = news_day + timedelta(days=45)
+    try:
+        written = date.fromisoformat(str(out.get("until"))) if out.get("until") else None
+    except ValueError:
+        written = None
+    if written and written >= today and written.isoformat() in (recent[i]["text"] + recent[i]["title"]):
+        until = max(until, written)
+    if until < today:
+        return None  # older than 45 days with no upcoming date: not "now"
+    return {"type": typ, "text": text, "url": recent[i]["url"], "until": until.isoformat()}
+
+
 PEOPLE_SYSTEM = """You find who to address at an organisation, from web search snippets. Rules:
 - Only people the snippet says CURRENTLY work at that exact organisation (same country office if the snippet says so).
 - Skip anyone described as former / ex- / left / "after N years" / "new job", people at other organisations or other country offices, and posts about someone else.
@@ -309,6 +345,14 @@ def analyze(db, L, team, model):
         if h:
             p["hook"] = h
             p["hook_source"] = "news"
+    active = bool(L.get("signal")) and (not L.get("signal_until") or L["signal_until"] >= date.today().isoformat())
+    if recent and not active:
+        sig = buying_signal(L, recent, model)
+        if sig:
+            patch.update(signal=f"{sig['type']}: {sig['text']}", signal_url=sig["url"], signal_until=sig["until"])
+            L = {**L, "signal": patch["signal"]}
+            p["signal_type"] = sig["type"]
+            score = min(100, score + 10)  # something is happening now
     if L.get("kind") in ORG_KINDS and score >= 60:
         people = find_people(L, model)
         if people:

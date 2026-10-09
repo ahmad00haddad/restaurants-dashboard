@@ -420,7 +420,7 @@ def on_text(msg):
     if text == "/start" and not STATE.get("chat"):
         STATE["chat"] = chat
         save_state()
-        say("أهلاً أحمد 👋 ربطت هذا الحساب بالوكيل. ستصلك هنا الرسائل للموافقة والتقرير الصباحي.\nالأوامر: /report /queue /analyze /pause /resume")
+        say("أهلاً أحمد 👋 ربطت هذا الحساب بالوكيل. ستصلك هنا الرسائل للموافقة والتقرير الصباحي.\nالأوامر: /report /queue /analyze /opps /pause /resume")
         return
     if str(chat) != str(STATE.get("chat")):
         return  # only the owner can control the agent
@@ -445,6 +445,9 @@ def on_text(msg):
     elif text == "/analyze":
         left = len(db.get("leads", select="id", profile="is.null", deleted_at="is.null", limit="2000"))
         say(f"🧠 التحليل المحلي ({_local['model'] or 'متوقف — Ollama غير شغّال'}): حلّلت {_local['done']} منذ التشغيل، وبقي {left}")
+    elif text == "/opps":
+        import threading
+        threading.Thread(target=lambda: (run_opportunities(manual=True)), daemon=True).start()
     elif text == "/pause":
         STATE["paused"] = True; save_state(); say("⏸ أوقفت إرسال المسودات. /resume للاستئناف")
     elif text == "/resume":
@@ -575,6 +578,30 @@ def write_requested():
     except Exception as e:
         db.patch("lead_messages", {"id": m["id"]}, {"review": "failed", "review_note": f"الكتابة المحلية فشلت: {e}"[:300]})
         log(f"write failed for {L['name']}: {e}")
+
+
+# ---------------- Global opportunities (tenders + prospects abroad) ----------------
+def run_opportunities(manual=False):
+    """Daily scan (or /opps). New finds are saved as leads with a live signal and announced on Telegram right away."""
+    import opportunities
+    model = _local.get("model") or local_model()
+    if not model:
+        if manual:
+            say("لا يوجد نموذج متاح للبحث (NVIDIA أو Ollama).")
+        return
+    say("🌍 أبحث عن عطاءات وفرص جديدة (الأردن أولاً ثم العالم)…") if manual else None
+    saved, seen = opportunities.scan(db, model, STATE.get("opp_seen", []), log=log)
+    STATE["opp_seen"], STATE["opp_day"] = seen, date.today().isoformat()
+    save_state()
+    if not saved:
+        say("🌍 لا فرص جديدة الآن.") if manual else None
+        return
+    lines = [f"🌍 {len(saved)} فرصة جديدة (الأردن أولاً):"]
+    for o in saved[:8]:
+        due = f" — آخر موعد {o['deadline']}" if o["deadline"] else ""
+        lines.append(f"\n{'🇯🇴 ' if o.get('jo') else ''}{o['org']}{due}\n{o['what'][:150]}\n{o['url']}")
+    lines.append("\nتجدها في الموقع: تبويب 🔔 فرص الآن. اكتب لها من زر «اكتب لأفضل 10».")
+    say("\n".join(lines))
 
 
 # ---------------- Main loop ----------------
