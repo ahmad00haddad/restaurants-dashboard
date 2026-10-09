@@ -163,13 +163,50 @@ CLOSE_LIKE = re.compile(r"timing|conversation|discuss|talk|time allows|convenien
 FLATTERY = re.compile(r"\b(truly|commendable|impressive|amazing|incredible|inspiring|remarkable)\b|رائع|مذهل|ملهم|مبهر|نثمّن|نقدّر جهودكم", re.I)
 
 
+# ---------------- Sector-matched proof (decided in code, never by the model) ----------------
+NGO_PROOF = ["USAID", "UNICEF", "Mercy Corps", "UN Women", "QRTA", "Erasmus"]
+FOOD_PROOF = ["Em Sherif", "Khan Zaid", "Astrolabe", "Arafah", "Arafa", "L'Occitane", "أم شريف", "خان زيد", "إسطرلاب", "اسطرلاب", "عرفة", "لوكسيتان"]
+
+
+def sector(L):
+    c = f"{L.get('category') or ''} {L.get('name') or ''}".lower()
+    if L.get("kind") in ("restaurant",) or re.search(r"restaurant|cafe|café|coffee|bakery|sweets|dessert|roaster|مطعم|كافيه|مقهى|مخبز|حلويات|محمص|فرن", c):
+        return "food"
+    if L.get("kind") == "brand" or re.search(r"store|shop|boutique|cosmetic|perfume|jewel|salon|متجر|عطور|مجوهرات|تجميل", c):
+        return "brand"
+    if L.get("kind") == "hotel":
+        return "hotel"
+    if re.search(r"school|university|academy|college|education|مدرسة|جامعة|أكاديمية|كلية|تعليم", c):
+        return "education"
+    if L.get("kind") == "event":
+        return "event"
+    return "ngo"
+
+
+PROOF = {  # (english line, arabic line) — the only past-work claim the message may make
+    "food": ("I've filmed campaigns for Em Sherif and Khan Zaid", "صوّرت حملات لأم شريف وخان زيد"),
+    "brand": ("I've filmed campaigns for L'Occitane and Astrolabe", "صوّرت حملات لـ L'Occitane وإسطرلاب"),
+    "hotel": ("I've filmed campaigns for Em Sherif and Astrolabe", "صوّرت حملات لأم شريف وإسطرلاب"),
+    "education": ("I've made films for QRTA and Duroub School", "صنعت أفلاماً لأكاديمية الملكة رانيا ومدرسة دروب"),
+    "event": ("I've filmed events for Erasmus+ and UN Women", "صوّرت فعاليات لـ Erasmus+ وUN Women"),
+    "ngo": ("I've documented similar stories for USAID and QRTA", "وثّقت قصصاً مشابهة لـ USAID وأكاديمية الملكة رانيا"),
+}
+
+
+def wrong_proof(L, body):
+    """Names from another sector in this message (e.g. USAID offered to a restaurant)."""
+    sec = sector(L)
+    bad = NGO_PROOF if sec in ("food", "brand", "hotel") else FOOD_PROOF if sec in ("ngo", "education") else []
+    return [n for n in bad if n.lower() in body.lower()]
+
+
+
 def write(L, team, history, channel, mode, hint, model):
     voice, editor, links = rules(team)
     lang = lang_for(L)
+    # Past clients are NOT given to the model any more: the one proof line is chosen in code by sector (see PROOF).
     ctx = (f"Sender: {team.get('senderName')}, {team.get('company')}\nWho we are: {team.get('whoWeAre', '')}\n"
-           f"PAST CLIENTS (the only names you may mention):\n{team.get('pastClients', '')}\n\n"
-           f"OUR WORKS you may NAME as proof (★ = flagship, prefer them; respect 'ONLY …'). Write the name naturally in a sentence. Never open with 'I would like to propose' / 'أود أن أقترح' — open with them, "
-           f"e.g. 'we told a similar story for USAID in Rajaa' — never copy the brackets:\n{works_list(team)}")
+           "Never open with 'I would like to propose' / 'أود أن أقترح' — open with them.")
     user = (f"{ctx}\n\nCLIENT:\n{them(L)}\n\nWHAT WE KNOW ABOUT THEM:\n{json.dumps(L.get('profile') or {}, ensure_ascii=False)}\n\n"
             f"CONVERSATION SO FAR:\n{history or '(none)'}\n\nCHANNEL: {channel}\nTASK: {TASKS[mode]}"
             + (f"\nEXTRA INSTRUCTION FROM AHMAD: {hint}" if hint else "")
@@ -183,9 +220,12 @@ def write(L, team, history, channel, mode, hint, model):
             + f"\nThe subject must be in {'Arabic' if lang == 'ar' else 'English'}."
             + "\nNEVER propose a title or name for a film (no 'titled', no 'بعنوان', no «…» names). Describe the idea in plain words."
             + "\nSTRUCTURE (mandatory): 1) greeting; 2) one specific observation about their work (the hook); "
-              "3) ONE quiet line introducing the sender with the proof, e.g. 'I'm Ahmad Haddad, a director and cinematographer based in Jordan; "
-              "I've documented similar stories for USAID and QRTA.' / 'أنا أحمد حدّاد، مخرج ومدير تصوير من الأردن، وثّقت قصصاً مشابهة لـ USAID وQRTA.' "
-              "(only past clients/★ works close to them); 4) the idea for their story in one or two sentences; 5) one calm closing line. "
+              "3) ONE quiet line introducing the sender with THIS proof (use it as given, it is chosen for their sector): "
+              + (f"'أنا أحمد حدّاد، مخرج ومدير تصوير من الأردن، {PROOF[sector(L)][1]}.' " if lang == "ar"
+                 else f"'I'm Ahmad Haddad, a director and cinematographer based in Jordan; {PROOF[sector(L)][0]}.' ")
+              + "Do not mention any other past client. 4) the idea for their story in one or two sentences, fitting their world "
+              + ("(a restaurant/brand: a short film or ad about their food/product/place, not a documentary about social impact)" if sector(L) in ("food", "brand", "hotel") else "")
+              + "; 5) one calm closing line. "
               "Never write 'I am available'. Do NOT write a signature or any link; they are added for you."
             + '\n\nReturn JSON: {"subject":"' + ("2-5 calm words about them" if channel == "email" else "") + '","body":"the full message"}')
     out = chat(model, voice + "\nReturn JSON only.", user)

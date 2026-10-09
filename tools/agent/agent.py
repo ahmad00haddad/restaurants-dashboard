@@ -194,6 +194,13 @@ def gate(m, L):
         n = u.rstrip("/.,").lower().replace("https://", "").replace("http://", "").replace("www.", "")
         if not any(n == a or n.startswith(a + "/") and a.count("/") >= n.count("/") - 1 and "gallery" not in n for a in ok):
             why.append(f"رابط غير مسموح (المسموح: موقعك، موقع الفريق، Behance فقط): {u}")
+    try:
+        import local_ai
+        wrong = local_ai.wrong_proof(L, body) if L.get("kind") else []
+    except Exception:
+        wrong = []
+    if wrong:
+        why.append(f"يذكر عملاء من مجال آخر لا يناسب هذه الجهة: {', '.join(wrong)}")
     if L.get("status") in ("new", None) and not re.search(r"فيلم|أفلام|تصوير|نصوّر|نصور|مخرج|مصوّر|مصور|film|shoot|photograph|video|documentar|director", body, re.I):
         why.append("لا توضح أنها عرض تصوير/فيلم — قد تُفهم كتعليق أو شكوى")
     if re.search(r"(بعنوان|تحت عنوان|titled|entitled|called)\s*[«\"“'‘]", body, re.I):

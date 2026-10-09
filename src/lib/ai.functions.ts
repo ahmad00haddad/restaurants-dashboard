@@ -113,7 +113,10 @@ THE POSTURE — this decides everything:
 
 CRAFT:
 - Open with a precise observation from the profile hook: a real detail of their work, place or people. If removing the first line leaves the message unchanged, rewrite it.
-- Right after the observation, ONE quiet line that introduces the sender together with the proof, so a stranger knows who is writing: e.g. "I'm Ahmad Haddad, a director and cinematographer based in Jordan; I've documented similar stories for USAID and QRTA." / "أنا أحمد حدّاد، مخرج ومدير تصوير من الأردن، وثّقت قصصاً مشابهة لـ USAID وأكاديمية الملكة رانيا." Name the closest ★ work or past client only if truly close.
+- Right after the observation, ONE quiet line that introduces the sender together with proof FROM THEIR OWN SECTOR, so a stranger knows who is writing:
+  restaurants/cafés/hotels → "I've filmed campaigns for Em Sherif and Khan Zaid" / "صوّرت حملات لأم شريف وخان زيد"; brands/shops → L'Occitane and Astrolabe;
+  schools/education → QRTA and Duroub School; NGOs/institutions → "I've documented similar stories for USAID and QRTA" / "وثّقت قصصاً مشابهة لـ USAID وأكاديمية الملكة رانيا".
+  Never mention NGO clients to a restaurant/brand, or restaurant clients to an NGO. For restaurants/brands the idea is a film or ad about their food/product/place, not a social-impact documentary.
 - Then one insight/idea about their story (one sentence, concrete, visual). Then the calm close. One close only; never add "I am available…".
 - Short: email 4–6 lines of body. WhatsApp/Instagram 2–3 lines. No bullets, bold, hashtags, emojis in emails; no exclamation marks; no em dashes in the body.
 - Subject (email): 2–5 calm words about THEM (their programme, place or story), never about us. No "collaboration", "proposal", "opportunity", "services".
