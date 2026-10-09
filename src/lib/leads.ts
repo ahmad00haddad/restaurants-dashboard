@@ -26,7 +26,20 @@ export interface LeadProfile {
   channel: Channel;
   decision_maker: string;   // who to address (role) if inferable
   why: string;
+  tier?: "A" | "B" | "C";   // A = send first, B = normal, C = low touch (decided by the PC agent)
+  email_check?: { ok: boolean | null; role: boolean; reason: string };
+  hook_source?: string;
 }
+
+const TIER_RANK = { A: 0, B: 1, C: 2 } as const;
+/** Tier from the agent when analysed; otherwise a rough guess from the score so every lead can be sorted. */
+export function tierOf(l: { profile: LeadProfile | null; score: number | null }): "A" | "B" | "C" {
+  if (l.profile?.tier) return l.profile.tier;
+  return (l.score ?? 0) >= 70 ? "A" : (l.score ?? 0) >= 45 ? "B" : "C";
+}
+export const tierRank = (l: { profile: LeadProfile | null; score: number | null }) => TIER_RANK[tierOf(l)];
+/** An email the agent proved bad (no MX, bounced) must not be a reason to pick a lead. */
+export const emailBad = (l: { profile: LeadProfile | null }) => l.profile?.email_check?.ok === false;
 
 export interface Lead {
   id: string;

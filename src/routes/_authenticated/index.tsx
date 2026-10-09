@@ -10,14 +10,15 @@ import { Approvals } from "@/components/Approvals";
 import { AddLead } from "@/components/AddLead";
 import { draftMessage } from "@/lib/ai.functions";
 import { useAgentStatus, useApprovals } from "@/hooks/useLeads";
-import { KIND_LABEL, STATUS_LABEL, type Lead } from "@/lib/leads";
+import { Funnel } from "@/components/Funnel";
+import { KIND_LABEL, STATUS_LABEL, emailBad, tierOf, tierRank, type Lead } from "@/lib/leads";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({ meta: [{ title: "FAII — Sales" }] }),
   component: Home,
 });
 
-type View = "today" | "signals" | "reply" | "followup" | "best" | "all" | "approvals";
+type View = "today" | "signals" | "reply" | "followup" | "best" | "all" | "approvals" | "stats";
 const today = () => new Date().toISOString().slice(0, 10);
 
 function Home() {
@@ -44,7 +45,9 @@ function Home() {
     const reply = leads.filter((l) => l.needs_reply);
     const followup = leads.filter((l) => l.status === "contacted" && l.next_action_at && l.next_action_at <= t && l.followups < 1);
     const meeting = leads.filter((l) => l.status === "meeting" || (l.status === "replied" && l.next_action_at && l.next_action_at <= t && !l.needs_reply));
-    const best = leads.filter((l) => l.status === "new" && l.score != null && (l.email || l.phone || l.instagram));
+    // Tier A first, then score; a lead whose only way in is a proven-bad email is not "best".
+    const best = leads.filter((l) => l.status === "new" && l.score != null && ((l.email && !emailBad(l)) || l.phone || l.instagram))
+      .sort((a, b) => tierRank(a) - tierRank(b) || (b.score ?? 0) - (a.score ?? 0));
     const signals = leads.filter((l) => l.signal && (!l.signal_until || l.signal_until >= t) && !["won", "lost", "skip"].includes(l.status))
       .sort((a, b) => (a.signal_until ?? "9").localeCompare(b.signal_until ?? "9"));
     return { reply, followup, meeting, best, signals };
@@ -169,9 +172,10 @@ function Home() {
         {tab("signals", "🔔 فرص الآن", groups.signals.length)}
         {tab("reply", "🔥 يحتاج رد", groups.reply.length)}
         {tab("followup", "↩️ متابعات", groups.followup.length)}
-        {tab("best", "🎯 أفضل جدد", groups.best.length)}
+        {tab("best", `🎯 أفضل جدد · A=${groups.best.filter((l) => tierOf(l) === "A").length}`, groups.best.length)}
         {tab("all", "الكل", leads.length)}
         {tab("approvals", "📤 الموافقات", approvals.length)}
+        {tab("stats", "📊 القياس")}
         <input className="rounded border border-border bg-background px-2 py-1.5 text-sm" placeholder="بحث" value={q} onChange={(e) => setQ(e.target.value)} />
         <select className="rounded border border-border bg-background px-2 py-1.5 text-sm" value={kind} onChange={(e) => setKind(e.target.value)}>
           <option value="">كل الأنواع</option>
@@ -201,7 +205,7 @@ function Home() {
         <input ref={fileRef} type="file" accept=".json" hidden onChange={(e) => e.target.files?.[0] && importFile(e.target.files[0])} />
       </div>
 
-      {view === "approvals" ? <Approvals items={approvals} onOpen={(id) => { setSel(id); setView("all"); }} /> : (
+      {view === "stats" ? <Funnel leads={leads} /> : view === "approvals" ? <Approvals items={approvals} onOpen={(id) => { setSel(id); setView("all"); }} /> : (
       <div className="grid md:grid-cols-[1fr_520px]">
         <div className="overflow-auto md:h-[calc(100vh-100px)]">
           {isLoading && <p className="p-4 text-muted-foreground">...</p>}
