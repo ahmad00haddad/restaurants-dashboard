@@ -13,7 +13,7 @@ from harvest import read_site  # same website reader the collector uses (email, 
 
 OLLAMA = "http://127.0.0.1:11434"
 
-SYSTEM = """You research potential clients for Ahmad Haddad, a director/photographer with a team (FAII House) in Jordan,
+SYSTEM = """You research potential clients for Ahmad Haddad, a director/cinematographer with a team (FAII House) in Jordan,
 before anyone contacts them. Figure out what kind of client this is, what they care about, and what visual content would
 genuinely help them. Be honest: weak signals = low score. Organisations with programmes, beneficiaries, donors, campaigns
 or anniversaries are strong documentary fits; brands, restaurants and cafés fit brand films, ads and social content.
@@ -183,8 +183,8 @@ def write(L, team, history, channel, mode, hint, model):
             + f"\nThe subject must be in {'Arabic' if lang == 'ar' else 'English'}."
             + "\nNEVER propose a title or name for a film (no 'titled', no 'بعنوان', no «…» names). Describe the idea in plain words."
             + "\nSTRUCTURE (mandatory): 1) greeting; 2) one specific observation about their work (the hook); "
-              "3) ONE quiet line introducing the sender with the proof, e.g. 'I'm Ahmad Haddad, a director and photographer based in Jordan; "
-              "I've documented similar stories for USAID and QRTA.' / 'أنا أحمد حدّاد، مخرج ومصوّر من الأردن، وثّقت قصصاً مشابهة لـ USAID وQRTA.' "
+              "3) ONE quiet line introducing the sender with the proof, e.g. 'I'm Ahmad Haddad, a director and cinematographer based in Jordan; "
+              "I've documented similar stories for USAID and QRTA.' / 'أنا أحمد حدّاد، مخرج ومدير تصوير من الأردن، وثّقت قصصاً مشابهة لـ USAID وQRTA.' "
               "(only past clients/★ works close to them); 4) the idea for their story in one or two sentences; 5) one calm closing line. "
               "Never write 'I am available'. Do NOT write a signature or any link; they are added for you."
             + '\n\nReturn JSON: {"subject":"' + ("2-5 calm words about them" if channel == "email" else "") + '","body":"the full message"}')
@@ -263,9 +263,9 @@ def finish(body, L, team, lang="en"):
     p = L.get("profile") or {}
     site = SITES.get(p.get("link_pick"), SITES["personal" if L.get("kind") in ("ngo", "org") else "team"])
     if lang == "ar":
-        sig = ["أحمد حدّاد", "مخرج ومصوّر، FAII HOUSE", f"بعض أعمالي: {site}"]
+        sig = ["أحمد حدّاد", "مخرج ومدير تصوير، FAII HOUSE", f"بعض أعمالي: {site}"]
     else:
-        role = team.get("senderRole") or "Director & Photographer"
+        role = team.get("senderRole") or "Director & Cinematographer"
         sig = [name if re.match(r"[A-Za-z]", name) else "Ahmad Haddad", f"{role}, {team.get('company') or 'FAII HOUSE'}", f"Selected work: {site}"]
     return text + "\n\n" + "\n".join(sig)
 

@@ -87,9 +87,9 @@ export interface TeamSettings {
 
 export const DEFAULT_TEAM: TeamSettings = {
   senderName: "أحمد حداد",
-  senderRole: "Photographer & Director",
+  senderRole: "Director & Cinematographer",
   company: "FAII HOUSE",
-  whoWeAre: "مصور ومخرج فريلانس مع فريق صغير في الأردن. نصوّر كل شيء: وثائقيات، أفلام للمنظمات، إعلانات، تصوير منتجات وأكل، فعاليات، ومحتوى سوشال ميديا.",
+  whoWeAre: "مخرج ومدير تصوير فريلانس مع فريق صغير في الأردن. نصوّر كل شيء: وثائقيات، أفلام للمنظمات، إعلانات، تصوير منتجات وأكل، فعاليات، ومحتوى سوشال ميديا.",
   services: [
     "Documentary / impact film — منظمات، مشاريع، قصص مستفيدين، تقارير للمانحين",
     "Brand film / commercial — شركات، براندات، فنادق",
