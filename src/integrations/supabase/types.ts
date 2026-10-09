@@ -10,10 +10,28 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          data: Json
+          id: number
+          updated_at: string
+        }
+        Insert: {
+          data?: Json
+          id?: number
+          updated_at?: string
+        }
+        Update: {
+          data?: Json
+          id?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       crm_states: {
         Row: {
           created_at: string
@@ -66,6 +84,176 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      lead_messages: {
+        Row: {
+          body: string
+          channel: string
+          created_at: string
+          created_by: string | null
+          direction: string
+          draft: boolean
+          id: string
+          lead_id: string
+          review: string | null
+          review_note: string | null
+          sent_at: string | null
+          subject: string | null
+          tg_message_id: number | null
+        }
+        Insert: {
+          body: string
+          channel: string
+          created_at?: string
+          created_by?: string | null
+          direction: string
+          draft?: boolean
+          id?: string
+          lead_id: string
+          review?: string | null
+          review_note?: string | null
+          sent_at?: string | null
+          subject?: string | null
+          tg_message_id?: number | null
+        }
+        Update: {
+          body?: string
+          channel?: string
+          created_at?: string
+          created_by?: string | null
+          direction?: string
+          draft?: boolean
+          id?: string
+          lead_id?: string
+          review?: string | null
+          review_note?: string | null
+          sent_at?: string | null
+          subject?: string | null
+          tg_message_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_messages_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leads: {
+        Row: {
+          about: string | null
+          address: string | null
+          category: string | null
+          city: string | null
+          created_at: string
+          deal_value: number | null
+          deleted_at: string | null
+          domain: string | null
+          email: string | null
+          facebook: string | null
+          followups: number
+          id: string
+          instagram: string | null
+          kind: string
+          linkedin: string | null
+          maps_url: string | null
+          name: string
+          name_key: string | null
+          needs_reply: boolean
+          next_action_at: string | null
+          notes: string | null
+          phone: string | null
+          phone_key: string | null
+          profile: Json | null
+          rating: number | null
+          score: number | null
+          signal: string | null
+          signal_until: string | null
+          signal_url: string | null
+          source: string | null
+          status: string
+          tiktok: string | null
+          updated_at: string
+          website: string | null
+          youtube: string | null
+        }
+        Insert: {
+          about?: string | null
+          address?: string | null
+          category?: string | null
+          city?: string | null
+          created_at?: string
+          deal_value?: number | null
+          deleted_at?: string | null
+          domain?: string | null
+          email?: string | null
+          facebook?: string | null
+          followups?: number
+          id?: string
+          instagram?: string | null
+          kind?: string
+          linkedin?: string | null
+          maps_url?: string | null
+          name: string
+          name_key?: string | null
+          needs_reply?: boolean
+          next_action_at?: string | null
+          notes?: string | null
+          phone?: string | null
+          phone_key?: string | null
+          profile?: Json | null
+          rating?: number | null
+          score?: number | null
+          signal?: string | null
+          signal_until?: string | null
+          signal_url?: string | null
+          source?: string | null
+          status?: string
+          tiktok?: string | null
+          updated_at?: string
+          website?: string | null
+          youtube?: string | null
+        }
+        Update: {
+          about?: string | null
+          address?: string | null
+          category?: string | null
+          city?: string | null
+          created_at?: string
+          deal_value?: number | null
+          deleted_at?: string | null
+          domain?: string | null
+          email?: string | null
+          facebook?: string | null
+          followups?: number
+          id?: string
+          instagram?: string | null
+          kind?: string
+          linkedin?: string | null
+          maps_url?: string | null
+          name?: string
+          name_key?: string | null
+          needs_reply?: boolean
+          next_action_at?: string | null
+          notes?: string | null
+          phone?: string | null
+          phone_key?: string | null
+          profile?: Json | null
+          rating?: number | null
+          score?: number | null
+          signal?: string | null
+          signal_until?: string | null
+          signal_url?: string | null
+          source?: string | null
+          status?: string
+          tiktok?: string | null
+          updated_at?: string
+          website?: string | null
+          youtube?: string | null
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -174,6 +362,15 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      ingest_leads: { Args: { rows: Json }; Returns: Json }
+      leads_keys_of: {
+        Args: { t: Database["public"]["Tables"]["leads"]["Row"] }
+        Returns: {
+          domain: string
+          name_key: string
+          phone_key: string
+        }[]
       }
     }
     Enums: {
