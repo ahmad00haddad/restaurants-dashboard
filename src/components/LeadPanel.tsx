@@ -165,6 +165,10 @@ export function LeadPanel({ id }: { id: string }) {
           <button className={primary} disabled={!!busy} onClick={() => write(mode)}>
             {busy && busy !== "research" ? "يكتب…" : { first: "✍️ اكتب رسالة أولى", followup: "↩️ اكتب متابعة", reply: "💬 اكتب ردّاً" }[mode]}
           </button>
+          <button className={btn} disabled={!!busy} onClick={() => act.requestLocalWrite(id, channel, hint || undefined)
+            .then(() => toast.push("💻 جهازك يكتبها الآن — ستصلك على Telegram خلال دقيقة"), (e) => toast.push(e.message, "error"))}>
+            💻 اكتب على جهازي (مجاني)
+          </button>
           {mode !== "first" && <button className={btn} disabled={!!busy} onClick={() => write("first")}>رسالة أولى جديدة</button>}
           {["replied", "meeting"].includes(lead.status) && <button className={btn} disabled={!!busy} onClick={() => write("proposal")}>📄 اكتب عرضاً</button>}
         </div>

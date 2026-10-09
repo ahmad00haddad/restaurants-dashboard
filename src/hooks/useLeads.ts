@@ -50,7 +50,7 @@ export function useApprovals() {
     refetchInterval: 20_000,
     queryFn: async (): Promise<Approval[]> => {
       const { data, error } = await db.from("lead_messages").select("*,leads(*)")
-        .in("review", ["pending", "approved", "failed"]).order("created_at");
+        .in("review", ["write", "pending", "approved", "failed"]).order("created_at");
       if (error) throw error;
       return data;
     },
@@ -132,6 +132,14 @@ export function useLeadActions() {
     async queueForApproval(leadId: string, channel: Channel, body: string, subject?: string) {
       await db.from("lead_messages").delete().eq("lead_id", leadId).eq("draft", true);
       const { error } = await db.from("lead_messages").insert({ lead_id: leadId, channel, direction: "out", draft: true, review: "pending", body, subject: subject || null });
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["approvals"] });
+      refresh(leadId);
+    },
+    /** Ask the PC agent to write the message locally with Ollama (free); it then arrives on Telegram for approval. */
+    async requestLocalWrite(leadId: string, channel: Channel, hint?: string) {
+      await db.from("lead_messages").delete().eq("lead_id", leadId).eq("draft", true);
+      const { error } = await db.from("lead_messages").insert({ lead_id: leadId, channel, direction: "out", draft: true, review: "write", body: "", review_note: hint || null });
       if (error) throw error;
       qc.invalidateQueries({ queryKey: ["approvals"] });
       refresh(leadId);

@@ -86,6 +86,15 @@ function Home() {
     toast.push("📤 المسودات في طريقها إلى هاتفك");
   };
 
+  /** Same as draftBatch but written on the PC (Ollama) — no Lovable credit. */
+  const localBatch = async (n: number) => {
+    const queued = new Set(approvals.map((a) => a.lead_id));
+    const targets = [...groups.signals.filter((l) => l.status === "new"), ...groups.best]
+      .filter((l, i, a) => a.indexOf(l) === i && !queued.has(l.id) && (l.email || l.phone)).slice(0, n);
+    for (const l of targets) await act.requestLocalWrite(l.id, l.email ? "email" : "whatsapp");
+    toast.push(`💻 ${targets.length} رسائل في طابور جهازك — تصلك على Telegram تباعاً`);
+  };
+
   const analyseBatch = async (n: number) => {
     const targets = leads
       .filter((l) => !l.profile && (kind ? l.kind === kind : true) && (l.email || l.phone || l.instagram))
@@ -161,8 +170,11 @@ function Home() {
           {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
         <div className="flex-1" />
+        <button className="px-3 py-1.5 rounded bg-primary text-primary-foreground text-sm" onClick={() => localBatch(10)}>
+          💻 اكتب لأفضل 10 على جهازي (مجاني)
+        </button>
         <button disabled={!!bulk} className="px-3 py-1.5 rounded border border-border text-sm" onClick={() => draftBatch(10)}>
-          ✍️ اكتب لأفضل 10 وأرسلها للموافقة
+          ✍️ اكتب لأفضل 10 (رصيد Lovable)
         </button>
         <button disabled={!!bulk} className="px-3 py-1.5 rounded border border-border text-sm" onClick={() => analyseBatch(20)}>
           {bulk ?? "🧠 حلّل 20 (رصيد Lovable)"}

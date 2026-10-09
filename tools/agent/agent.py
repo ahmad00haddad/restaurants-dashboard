@@ -377,6 +377,35 @@ def analyze_one():
         db.patch("leads", {"id": L["id"]}, {"profile": {"summary": "تعذّر التحليل المحلي", "why": str(e)[:200], "analysed_by": "failed"}, "score": 0})
 
 
+def write_requested():
+    """Drafts the site asked this PC to write (review='write'), then they go to Telegram for approval."""
+    rows = db.get("lead_messages", select="*,leads(*)", review="eq.write", order="created_at", limit="1")
+    if not rows:
+        return
+    import local_ai
+    if time.time() - _local["t"] > 600 or not _local["team"]:
+        _local.update(t=time.time(), model=local_model(),
+                      team=((db.get("app_settings", select="data", id="eq.1") or [{}])[0].get("data") or {}))
+    m, L = rows[0], rows[0]["leads"]
+    if not _local["model"]:
+        db.patch("lead_messages", {"id": m["id"]}, {"review": "failed", "review_note": "Ollama غير شغّال على الجهاز"})
+        return
+    hist = db.get("lead_messages", select="direction,channel,body,created_at", lead_id=f"eq.{L['id']}", draft="eq.false", order="created_at")
+    history = "\n\n".join(f"[{'THEM' if h['direction'] == 'in' else 'US'} · {h['channel']} · {h['created_at'][:10]}]\n{h['body']}" for h in hist)
+    mode = "reply" if L.get("needs_reply") else "followup" if L.get("status") == "contacted" else "first" if L.get("status") in ("new", "skip") else "reply"
+    try:
+        if not L.get("profile"):
+            local_ai.analyze(db, L, _local["team"], _local["model"])
+            L = db.get("leads", select="*", id=f"eq.{L['id']}")[0]
+        subject, body = local_ai.write(L, _local["team"], history, m["channel"], mode, m.get("review_note"), _local["model"])
+        db.patch("lead_messages", {"id": m["id"]}, {"subject": subject, "body": body, "review": "pending", "review_note": None, "tg_message_id": None})
+        log(f"✍️ wrote {mode} for {L['name']}")
+        push_pending()
+    except Exception as e:
+        db.patch("lead_messages", {"id": m["id"]}, {"review": "failed", "review_note": f"الكتابة المحلية فشلت: {e}"[:300]})
+        log(f"write failed for {L['name']}: {e}")
+
+
 # ---------------- Main loop ----------------
 def main():
     log("FAII Agent started. Open Telegram and send /start to your bot." if not STATE.get("chat") else "FAII Agent started.")
@@ -392,6 +421,7 @@ def main():
                     on_text(u["message"])
             STATE["offset"] = offset
             save_state()
+            write_requested()
             analyze_one()
             if STATE.get("chat") and time.time() - last_push > 60:
                 push_pending()

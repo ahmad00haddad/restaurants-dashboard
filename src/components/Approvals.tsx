@@ -3,7 +3,7 @@ import { useLeadActions, type Approval } from "@/hooks/useLeads";
 import { useToast } from "@/hooks/useToast";
 import { KIND_LABEL } from "@/lib/leads";
 
-const STATE: Record<string, string> = { pending: "بانتظار موافقتك", approved: "موافق — سيُرسلها الوكيل خلال دقيقة", failed: "فشل الإرسال" };
+const STATE: Record<string, string> = { write: "💻 جهازك يكتبها الآن…", pending: "بانتظار موافقتك", approved: "موافق — سيُرسلها الوكيل خلال دقيقة", failed: "فشل الإرسال" };
 
 /** Same queue as Telegram — approve here if the phone isn't at hand. The PC agent does the actual sending. */
 export function Approvals({ items, onOpen }: { items: Approval[]; onOpen: (leadId: string) => void }) {
@@ -35,7 +35,7 @@ function Item({ m, onOpen }: { m: Approval; onOpen: (id: string) => void }) {
       <div className={`text-xs ${m.review === "failed" ? "text-red-600" : "text-muted-foreground"}`}>{STATE[m.review]}{m.review_note ? `: ${m.review_note}` : ""}</div>
       {m.channel === "email" && <input className="w-full rounded border border-border bg-background px-2 py-1.5" value={subject} onChange={(e) => setSubject(e.target.value)} />}
       <textarea className="w-full rounded border border-border bg-background px-2 py-1.5" rows={7} value={body} onChange={(e) => setBody(e.target.value)} />
-      {m.review !== "approved" && (
+      {!["approved", "write"].includes(m.review) && (
         <div className="flex gap-2">
           <button className="px-3 py-1.5 rounded bg-primary text-primary-foreground" onClick={() => go("approved")}>✅ وافق وأرسل</button>
           <button className="px-3 py-1.5 rounded border border-border" onClick={() => go("rejected")}>❌ ارفض</button>
