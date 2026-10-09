@@ -198,7 +198,11 @@ def write(L, team, history, channel, mode, hint, model):
             body, subject = ed["body"], ed.get("subject") or subject
     except Exception:
         pass
-    return subject.strip() or None, finish(body, L, team, lang)
+    final = finish(body, L, team, lang)
+    core = final.split("\n\n")[1:-2]  # between greeting and close+signature
+    if len(" ".join(core)) < max(80, len(body) * 0.4):
+        raise ValueError("cleanup removed the message body — not queued")  # never send an empty-looking message
+    return subject.strip() or None, final
 
 
 SITES = {"personal": "https://ahmadhaddad.lovable.app", "team": "https://faiihouse.lovable.app", "behance": "https://www.behance.net/ahmad00haddad"}
@@ -220,7 +224,9 @@ def finish(body, L, team, lang="en"):
     body = re.sub(r"[ \t]*\b(truly|really)\s+", " ", body, flags=re.I)
     name = team.get("senderName") or "Ahmad Haddad"
     lines = body.splitlines()
-    while lines and (name.split()[0] in lines[-1] or not lines[-1].strip()):
+    # only short trailing lines can be a signature the model wrote — never the body itself
+    while lines and (not lines[-1].strip() or len(lines[-1]) < 60 and (name.split()[0] in lines[-1] or "حدّاد" in lines[-1] or "حداد" in lines[-1]
+                                                                      or re.search(r"FAII|regards|تحياتي|مع التقدير|مع خالص", lines[-1], re.I))):
         lines.pop()  # drop any signature the model wrote itself
     text = "\n".join(lines).strip()
     # Remove only the weak closing SENTENCE (never a whole line — the model sometimes writes everything on one line)

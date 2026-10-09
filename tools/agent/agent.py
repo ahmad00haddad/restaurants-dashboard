@@ -97,6 +97,23 @@ def say(text, **kw):
 
 
 # ---------------- Gmail ----------------
+def build_mime(body):
+    """Plain text for English. Arabic gets an HTML part with dir=rtl (Gmail shows plain text left-to-right) plus the plain-text fallback."""
+    if len(re.findall(r"[؀-ۿ]", body)) < len(re.findall(r"[A-Za-z]", body)):
+        return MIMEText(body, "plain", "utf-8")
+    from email.mime.multipart import MIMEMultipart
+    import html as _html
+    esc = _html.escape(body)
+    esc = re.sub(r"(https?://[^\s<]+)", r'<a href="\1" dir="ltr">\1</a>', esc)
+    paras = "".join(f'<p dir="rtl" style="margin:0 0 14px">{p.replace(chr(10), "<br>")}</p>' for p in esc.split("\n\n"))
+    html_body = (f'<div dir="rtl" lang="ar" style="direction:rtl;text-align:right;font-family:Tahoma,Arial,sans-serif;'
+                 f'font-size:15px;line-height:1.8;color:#222">{paras}</div>')
+    alt = MIMEMultipart("alternative")
+    alt.attach(MIMEText(body, "plain", "utf-8"))
+    alt.attach(MIMEText(html_body, "html", "utf-8"))
+    return alt
+
+
 def send_email(to, subject, body):
     cap = int(E.get("DAILY_CAP", "20"))
     today = date.today().isoformat()
@@ -104,7 +121,7 @@ def send_email(to, subject, body):
         STATE.update(sent_day=today, sent_count=0)
     if STATE["sent_count"] >= cap:
         raise RuntimeError(f"وصلت للحد اليومي ({cap}) — سيُرسل غداً")
-    msg = MIMEText(body, "plain", "utf-8")
+    msg = build_mime(body)
     msg["Subject"] = subject or E.get("SENDER_NAME", "")
     msg["From"] = formataddr((E.get("SENDER_NAME", ""), E["GMAIL_USER"]))
     msg["To"] = to
