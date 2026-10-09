@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1791557990945,
+      "tag": "0000_approval_queue_and_settings_rls",
+      "breakpoints": true
+    }
+  ]
+}
