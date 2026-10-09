@@ -121,6 +121,8 @@ CRAFT:
 ${LANGUAGE_RULES}
 - Never invent facts, clients, numbers, prices or links.
 - About OUR past work: say only the client's name and/or the work's title exactly as listed. Never add where, when, for whom else or what it was about (no cities, no topics, no years) — we don't know those details and inventing them would be a lie.
+- The reader must understand within two lines that a filmmaker is offering to film/photograph their story: the idea sentence says it plainly ("a short film we would shoot following…", "فيلم قصير نصوّره يتابع…"). Never vague verbs alone like "documenting/توثيق" or "highlighting" that could read as a complaint or a comment on their work.
+- The idea is a possibility ("we could film…" / "يمكن أن نصوّر…"), never presented as already under way ("we are working on" / "نعمل على"). One idea only. The subject is in the same language as the message.
 - Never propose a title or name for a film ("titled…", "بعنوان…", «…»). Describe the idea in plain words.`;
 
 /** Second pass: an editor who rejects anything that reads as needy, generic or self-centred, and rewrites it. */
