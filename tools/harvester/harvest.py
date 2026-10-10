@@ -68,16 +68,38 @@ def wait_if_blocked(pg, show):
     return False
 
 
-def maps(queries, per_query, show):
+def ckpt_path(kind):
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), f".progress-{kind}.json")
+
+
+def ckpt_load(kind):
+    try:
+        return json.load(open(ckpt_path(kind), encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"rows": [], "seen": [], "queries_done": []}
+
+
+def ckpt_save(kind, ck):
+    tmp = ckpt_path(kind) + ".tmp"
+    json.dump(ck, open(tmp, "w", encoding="utf-8"), ensure_ascii=False)
+    os.replace(tmp, ckpt_path(kind))  # never a half-written progress file, even if the window is closed mid-save
+
+
+def maps(queries, per_query, show, ck, kind_key):
+    """Saves progress after every place; places and searches already in `ck` are skipped, so a closed window loses nothing."""
     import random
     from playwright.sync_api import sync_playwright
-    out = []
+    out = ck["rows"]
+    seen = set(ck["seen"])
     with sync_playwright() as p:
         # persistent profile: once a check is solved, Google remembers it for the next runs
         b = p.chromium.launch_persistent_context(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".gprofile"),
                                                  headless=not show, locale="en-US")
         pg = b.pages[0] if b.pages else b.new_page()
         for kind, text, city in queries:
+            if text in ck["queries_done"]:
+                print("\n✔ already done:", text)
+                continue
             print(f"\n🔎 {text}")
             try:
                 pg.goto("https://www.google.com/maps/search/" + urllib.parse.quote(text) + "?hl=en", timeout=60000)
@@ -93,6 +115,8 @@ def maps(queries, per_query, show):
             print(f"   {len(links)} places")
             stop = False
             for url in links:
+                if url.split("?")[0] in seen:
+                    continue
                 try:
                     pg.goto(url, timeout=45000)
                     pg.wait_for_timeout(random.randint(1200, 3200))  # a human pace: fewer checks from Google
@@ -103,15 +127,21 @@ def maps(queries, per_query, show):
                     d = place(pg)
                 except Exception:
                     continue
+                seen.add(url.split("?")[0])
+                ck["seen"] = sorted(seen)
                 if is_blocked(d):
                     print("  ✗ skipped (blocklist):", d["name"])
+                    ckpt_save(kind_key, ck)
                     continue
                 d.update(kind=kind, city=d.get("city") or city, maps_url=url.split("?")[0], source="maps: " + text)
                 out.append(d)
+                ckpt_save(kind_key, ck)
                 print("  +", d["name"], d.get("phone") or "", d.get("website") or "")
             if stop:
                 print("  (stopping the search here; everything found so far is still saved)")
                 break
+            ck["queries_done"].append(text)
+            ckpt_save(kind_key, ck)
         b.close()
     return out
 
@@ -357,7 +387,14 @@ if __name__ == "__main__":
 
     qs = [(kind, f"{t} in {c} Jordan", c) for c in cities for t in terms]
     print(f"\n{len(qs)} searches…")
-    rows = dedupe(maps(qs, per, show))
+    ck = ckpt_load(kind)
+    if ck["rows"] or ck["queries_done"]:
+        print(f"↻ resuming the previous run: {len(ck['rows'])} places and {len(ck['queries_done'])} searches already saved")
+    try:
+        maps(qs, per, show, ck, kind)
+    except KeyboardInterrupt:
+        print("\n⏹ stopped by you: processing what was collected so far (run again to continue the rest)")
+    rows = dedupe(ck["rows"])
     print(f"\n🌐 reading {sum(1 for r in rows if r.get('website'))} websites…")
     with ThreadPoolExecutor(8) as ex:
         rows = list(ex.map(read_site, rows))
@@ -365,5 +402,10 @@ if __name__ == "__main__":
         rows = deepen(rows)
     path = f"leads-{kind}-{date.today()}.json"
     json.dump(rows, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    if len(ck["queries_done"]) >= len(qs):
+        try:
+            os.remove(ckpt_path(kind))  # finished: the next run starts fresh
+        except OSError:
+            pass
     print(f"\n✅ {len(rows)} unique leads, {sum(1 for r in rows if r.get('email'))} with email → {path}")
     print("Upload it in the site: ⬆️ استيراد من الجامع")

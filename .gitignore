@@ -39,3 +39,7 @@ tools/agent/state.bak
 tools/agent/state.tmp
 
 tools/harvester/.gprofile/
+
+tools/harvester/.progress-*.json
+
+tools/harvester/.progress-*.json
