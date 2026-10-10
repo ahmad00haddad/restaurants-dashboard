@@ -941,7 +941,7 @@ def finish(body, L, team, lang="en", mode="first"):
         sig = ["أحمد حدّاد", "مخرج ومدير تصوير، FAII HOUSE", f"بعض أعمالي ومن عملت معهم: {site}"]
     else:
         role = team.get("senderRole") or "Director & Cinematographer"
-        sig = [name if re.match(r"[A-Za-z]", name) else "Ahmad Haddad", f"{role}, {team.get('company') or 'FAII HOUSE'}", f"Selected work and past clients: {site}"]
+        sig = [name if re.match(r"[A-Za-z]", name) else "Ahmad Haddad", f"{role}, {team.get('company') or 'FAII HOUSE'}", f"Selected work: {site}"]
     return text + "\n\n" + "\n".join(sig)
 
 

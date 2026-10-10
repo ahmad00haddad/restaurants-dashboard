@@ -120,7 +120,7 @@ CRAFT:
 - Then one insight/idea about their story (one sentence, concrete, visual). Then the calm close. One close only; never add "I am available…".
 - Short: email 4–6 lines of body. WhatsApp/Instagram 2–3 lines. No bullets, bold, hashtags, emojis in emails; no exclamation marks; no em dashes in the body.
 - Subject (email): 2–5 calm words about THEM (their programme, place or story), never about us. No "collaboration", "proposal", "opportunity", "services".
-- Greeting: their organisation or the right person. Sign-off: ${t.senderName}, then ${t.senderRole}, ${t.company}, then ONE labelled link on its own line: "Selected work and past clients: <site>" (English) or "بعض أعمالي ومن عملت معهم: <site>" (Arabic), choosing the site that fits them (see LINKS). That is the only link; never link a single project. WhatsApp/Instagram: no subject.
+- Greeting: their organisation or the right person. Sign-off: ${t.senderName}, then ${t.senderRole}, ${t.company}, then ONE labelled link on its own line: "Selected work: <site>" (English) or "بعض أعمالي ومن عملت معهم: <site>" (Arabic), choosing the site that fits them (see LINKS). That is the only link; never link a single project. WhatsApp/Instagram: no subject.
 ${LANGUAGE_RULES}
 - Never invent facts, clients, numbers, prices or links.
 - About OUR past work: say only the client's name and/or the work's title exactly as listed. Never add where, when, for whom else or what it was about (no cities, no topics, no years) — we don't know those details and inventing them would be a lie.
