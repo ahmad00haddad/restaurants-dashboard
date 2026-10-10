@@ -18,7 +18,7 @@ PRESETS = {
             "tech company", "conference center", "clinic"],
     "roastery": ["coffee roastery", "specialty coffee roasters", "coffee roasters", "محمصة قهوة", "محامص قهوة مختصة", "محمص بن"],
     "pharmacy": ["pharmacy", "صيدلية", "pharmacy chain", "صيدليات", "drugstore", "medical center pharmacy"],
-    "school": ["private school", "مدرسة خاصة", "international school", "academy school", "kindergarten", "nursery", "مدارس"],
+    "school": ["private school", "مدرسة خاصة", "international school", "private academy", "kindergarten", "nursery", "مدارس خاصة", "مدرسة دولية", "حضانة", "روضة أطفال"],
     "restaurant": ["restaurant", "cafe", "fine dining restaurant", "bakery", "coffee roastery", "dessert shop"],
     "hotel": ["hotel", "resort", "eco lodge", "tour operator", "guest house"],
     "brand": ["clothing store", "cosmetics brand", "furniture store", "jewelry store", "car dealership", "gym"],
@@ -46,6 +46,20 @@ def is_blocked(d):
         return False
     blob = " ".join(str(d.get(k) or "") for k in ("name", "website", "instagram", "facebook", "email"))
     return bool(rx.search(blob))
+
+
+PRIVATE_WORDS = re.compile(r"private|international|american|british|IB|igcse|cambridge|bilingual|academy|kindergarten|nursery|montessori|preschool|"
+                           r"خاصة|الخاصة|دولية|الدولية|أكاديمية|الأكاديمية|الأمريكية|البريطانية|حضانة|روضة|رياض الأطفال|مدارس ال", re.I)
+PUBLIC_WORDS = re.compile(r"public school|government|governmental|ministry of education|directorate|unrwa|حكومية|الحكومية|وزارة التربية|مديرية|الأونروا|الاونروا|"
+                          r"الثانوية (للبنين|للبنات|الشاملة)|الأساسية|الاساسية|الإعدادية|للبنين|للبنات", re.I)
+
+
+def school_ok(d):
+    """Private schools, nurseries and kindergartens only. Government and UNRWA schools have no budget for cinematic work."""
+    t = f"{d.get('name') or ''} {d.get('category') or ''}"
+    if re.search(r"private", d.get("category") or "", re.I) or PRIVATE_WORDS.search(t):
+        return True
+    return not PUBLIC_WORDS.search(t)
 
 
 def roastery_ok(d):
@@ -142,6 +156,10 @@ def maps(queries, per_query, show, ck, kind_key):
                     continue
                 seen.add(url.split("?")[0])
                 ck["seen"] = sorted(seen)
+                if kind == "school" and not school_ok(d):
+                    print("  ✗ not a private school:", d["name"], "|", d.get("category"))
+                    ckpt_save(kind_key, ck)
+                    continue
                 if kind == "roastery" and not roastery_ok(d):
                     print("  ✗ not a coffee roastery:", d["name"], "|", d.get("category"))
                     ckpt_save(kind_key, ck)

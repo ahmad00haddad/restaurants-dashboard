@@ -843,7 +843,11 @@ def analyze_one():
         db.patch("leads", {"id": L["id"]}, {"status": "skip", "notes": "قائمة الاستبعاد (عميل قديم أو سلسلة كبيرة)",
                                              "profile": {"summary": "مستبعد", "analysed_by": "blocklist"}, "score": 0})
         log(f"⛔ {L['name']} is on the blocklist, skipped")
-    rows = [r for r in rows if not local_ai.is_blocked(r)]
+    for L in [r for r in rows if r.get("kind") == "school" and not local_ai.school_ok(r)]:  # government schools: no budget
+        db.patch("leads", {"id": L["id"]}, {"status": "skip", "notes": "مدرسة حكومية: لا ميزانية للتصوير السينمائي",
+                                             "profile": {"summary": "مدرسة حكومية", "analysed_by": "filter"}, "score": 0})
+        log(f"⛔ {L['name']} looks like a government school, skipped")
+    rows = [r for r in rows if not local_ai.is_blocked(r) and not (r.get("kind") == "school" and not local_ai.school_ok(r))]
     if not rows:
         return
     rank = {"roastery": 0, "pharmacy": 0, "school": 0, "ngo": 1, "org": 2, "hotel": 3, "brand": 4, "event": 5, "restaurant": 6}
