@@ -282,7 +282,9 @@ def find_people(L, model, limit=3):
         body = chunks[i][1]
         if pn not in body or not any(w in body.lower() for w in org):  # name verbatim + the organisation named in the same text
             continue
-        people.append({"name": pn, "role": role[:80], "url": chunks[i][0], "top": bool(ROLE_TOP.search(role)), "status": "unverified", "as_of": chunks[i][2]})
+        mails = re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", body)  # an address printed in the same public text
+        people.append({"name": pn, "role": role[:80], "url": chunks[i][0], "top": bool(ROLE_TOP.search(role)), "status": "unverified",
+                       "as_of": chunks[i][2], "emails": mails[:5]})
     from datetime import datetime, timedelta
     cutoff = (datetime.now() - timedelta(days=548)).strftime("%Y-%m")  # sources older than ~18 months are dropped, not shown
     people = [p for p in people if p["as_of"] == "?" or p["as_of"][:7] >= cutoff]
@@ -303,12 +305,49 @@ def addressable(L, people):
     return None
 
 
+def _org_domain(L):
+    for v in (L.get("email") or "", L.get("website") or ""):
+        d = (v.split("@")[-1] if "@" in v else re.sub(r"^https?://", "", v).split("/")[0]).lower().removeprefix("www.")
+        if "." in d and d not in FREE_MAIL:
+            return d
+    return None
+
+
+FREE_MAIL = {"gmail.com", "googlemail.com", "hotmail.com", "outlook.com", "live.com", "yahoo.com", "icloud.com", "me.com", "aol.com"}
+
+
+def person_email(L, people, site_emails=None):
+    """The decision maker's OWN address, only when it is printed publicly (their organisation's site or the search text about
+    them), sits on the organisation's domain and carries their name. Never guessed from a pattern: a guess bounces and hurts us.
+    Returns {name, role, email, url, as_of} or None."""
+    dom = _org_domain(L)
+    if not dom or not people:
+        return None
+    if site_emails is None and L.get("website"):
+        try:
+            site_emails = read_site({"name": L.get("name"), "website": L["website"]}).get("emails") or []
+        except Exception:
+            site_emails = []
+    pool = {e.lower().strip(".") for e in (site_emails or [])}
+    for pr in people:
+        pool |= {e.lower().strip(".") for e in pr.get("emails") or []}
+    for pr in people:  # people are already ordered: communications / marketing roles first
+        parts = [w for w in re.findall(r"[a-z]+", pr["name"].lower()) if len(w) >= 3]
+        for e in sorted(pool):
+            local, _, d = e.partition("@")
+            if not (d == dom or d.endswith("." + dom)) or emailcheck.check(e).get("role"):
+                continue
+            if parts and any(w in re.sub(r"[^a-z]", "", local) for w in parts) and emailcheck.check(e).get("ok") is not False:
+                return {"name": pr["name"], "role": pr["role"], "email": e, "url": pr.get("url"), "as_of": pr.get("as_of")}
+    return None
+
+
 def tier_of(score, L, p):
     """A = worth hand-checking and sending first; B = normal; C = low touch. Decided in code, never by the model.
     A: strong fit AND a reachable person (named mailbox or phone) AND a concrete reason now (fresh news, live signal, or a personal mailbox)."""
     ec = p.get("email_check") or {}
     mail_ok = bool(L.get("email")) and ec.get("ok") is not False
-    named = mail_ok and not ec.get("role")
+    named = mail_ok and not ec.get("role") or bool((p.get("contact") or {}).get("email"))  # their own mailbox, or the decision maker's
     reachable = named or bool(L.get("phone")) or mail_ok
     if score >= 70 and (named or L.get("phone")) and (p.get("hook_source") == "news" or L.get("signal") or named):
         return "A"
@@ -319,9 +358,10 @@ def tier_of(score, L, p):
 
 def analyze(db, L, team, model):
     """Profile one lead. Returns the patch saved to the database."""
-    patch = {}
+    patch, site_emails = {}, None
     if L.get("website") and not L.get("about"):
         site = read_site({"name": L["name"], "website": L["website"]})
+        site_emails = site.get("emails") or []
         for k in ("about", "email", "instagram", "facebook", "linkedin", "youtube", "tiktok"):
             if site.get(k) and not L.get(k):
                 patch[k] = site[k]
@@ -365,7 +405,7 @@ def analyze(db, L, team, model):
         if people:
             p["people"] = people
             p["decision_maker"] = f"{people[0]['name']} — {people[0]['role']} (مرشّح غير مؤكد، المصدر {people[0]['as_of']})"
-            who = addressable(L, people)
+            who = addressable(L, people) or person_email(L, people, site_emails)
             if who:
                 p["contact"] = who
     p["tier"] = tier_of(score, L, p)

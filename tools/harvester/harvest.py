@@ -151,6 +151,7 @@ def read_site(d):
     emails.sort(key=lambda e: (not e.endswith(dom), not re.match(r"(info|contact|hello|media|comm|pr|marketing)", e)))
     if emails:
         d["email"] = emails[0]
+        d["emails"] = emails[:15]  # all addresses on the site: the agent looks among them for a named decision maker
     for k, rx in SOCIAL.items():
         m = re.search(rx, blob)
         if m and not d.get(k) and not re.search(r"/(sharer|share|tr|plugins|intent)\b", m.group(0)):

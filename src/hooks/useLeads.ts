@@ -202,6 +202,12 @@ export function useLeadActions() {
       if (error) throw error;
       qc.invalidateQueries({ queryKey: ["approvals"] });
     },
+    /** ⚡ Send now: skips the working-hours queue (for an opportunity that must not be missed). */
+    async rush(id: string, body?: string, subject?: string | null) {
+      const { error } = await db.from("lead_messages").update({ review: "approved", review_note: "⚡ عاجل", ...(body != null ? { body, subject } : {}) }).eq("id", id);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["approvals"] });
+    },
     async saveSettings(s: TeamSettings) {
       const { error } = await db.from("app_settings").update({ data: s, updated_at: new Date().toISOString() }).eq("id", 1);
       if (error) throw error;

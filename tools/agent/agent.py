@@ -6,7 +6,7 @@
 - Morning report every day + /report /queue /pause /resume commands.
 Config: agent.env (see agent.env.example).
 """
-import json, os, re, smtplib, sys, threading, time, traceback
+import json, os, random, re, smtplib, sys, threading, time, traceback
 from datetime import date, datetime, timedelta
 from email.mime.text import MIMEText
 from email.utils import formataddr, make_msgid
@@ -200,6 +200,9 @@ def check_bounces():
     new = {a: d for a, d in found.items() if a not in STATE.setdefault("bounces", {}) and a != E["GMAIL_USER"].lower()}
     for addr, d in new.items():
         STATE["bounces"][addr] = d
+        for L in db.get("leads", select="id,profile", **{"profile->contact->>email": f"eq.{addr}"}):
+            prof = {k: v for k, v in (L.get("profile") or {}).items() if k != "contact"}  # their address bounced: back to info@
+            db.patch("leads", {"id": L["id"]}, {"profile": prof})
         for L in db.get("leads", select="id,profile", email=f"ilike.{addr}"):
             prof = {**(L.get("profile") or {}), "email_check": {"ok": False, "role": False, "reason": "ارتدّ البريد (bounce)"}}
             db.patch("leads", {"id": L["id"]}, {"profile": prof})
@@ -242,7 +245,8 @@ def _plain_body(msg):
 def _lead_for(addr, is_reply):
     """The lead this sender belongs to: exact email first, else same company domain (never for gmail/hotmail…) among leads we
     wrote to, and only when the mail really answers something (Re: / In-Reply-To) — a newsletter from their domain is not a reply."""
-    rows = db.get("leads", select="id,name,status,email,followups", email=f"ilike.{addr}", deleted_at="is.null", limit="2")
+    rows = db.get("leads", select="id,name,status,email,followups", email=f"ilike.{addr}", deleted_at="is.null", limit="2") \
+        or db.get("leads", select="id,name,status,email,followups", deleted_at="is.null", limit="2", **{"profile->contact->>email": f"eq.{addr}"})
     if rows:
         return rows[0]
     dom = addr.split("@")[-1]
@@ -334,9 +338,11 @@ class Capped(RuntimeError):
     """Daily limit reached: the message stays approved and goes out by itself the next day."""
 
 
-def send_email(to, subject, body):
+def send_email(to, subject, body, cc=None, rush=False):
     import emailcheck
     cap, _rate = current_cap()
+    if rush:
+        cap += int(E.get("RUSH_EXTRA", "5"))  # an opportunity closing soon may go a little over the day's limit, never far
     today = date.today().isoformat()
     if STATE.get("sent_day") != today:
         STATE.update(sent_day=today, sent_count=0)
@@ -355,6 +361,8 @@ def send_email(to, subject, body):
     msg["Subject"] = subject or E.get("SENDER_NAME", "")
     msg["From"] = formataddr((E.get("SENDER_NAME", ""), E["GMAIL_USER"]))
     msg["To"] = to
+    if cc and cc.lower() != to.lower():
+        msg["Cc"] = cc
     msg["Message-ID"] = make_msgid(domain=E["GMAIL_USER"].split("@")[-1])
     with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as s:
         s.login(E["GMAIL_USER"], E["GMAIL_APP_PASSWORD"].replace(" ", ""))
@@ -364,6 +372,33 @@ def send_email(to, subject, body):
     log_[today] = log_.get(today, 0) + 1
     STATE["sent_log"] = {d: n for d, n in log_.items() if d >= (date.today() - timedelta(days=60)).isoformat()}
     save_state()
+
+
+def recipients(L):
+    """(to, cc). The decision maker's own public address goes in To and the general one (info@…) in Cc, so the message reaches
+    the person who decides while the organisation sees it too. Falls back to the general address alone."""
+    c = (L.get("profile") or {}).get("contact") or {}
+    pe, ge = (c.get("email") or "").strip().lower(), (L.get("email") or "").strip()
+    if pe and pe not in STATE.get("bounces", {}) and pe != ge.lower():
+        return pe, ge or None
+    return ge, None
+
+
+def is_rush(m, L):
+    """Sent at once, outside working hours and the spacing: ⚡ chosen by Ahmad, a tender/opportunity closing within 7 days,
+    or an answer to someone who replied (a quick answer is what a human does)."""
+    soon = (date.today() + timedelta(days=int(E.get("RUSH_DAYS", "7")))).isoformat()
+    return ((m.get("review_note") or "").startswith("⚡")
+            or bool(L.get("signal") and L.get("signal_until") and L["signal_until"] <= soon)
+            or L.get("status") in ("replied", "meeting") or bool(L.get("needs_reply")))
+
+
+def in_send_window():
+    """Working hours on working days (local PC time): mail arrives when people read it."""
+    h0, h1 = (int(x) for x in E.get("SEND_HOURS", "9-17").split("-"))
+    off = {int(x) for x in E.get("OFF_DAYS", "4,5").split(",") if x.strip()}  # Monday=0 … Friday=4, Saturday=5
+    now = datetime.now()
+    return now.weekday() not in off and h0 <= now.hour < h1
 
 
 def wa_link(phone, text):
@@ -463,6 +498,11 @@ def card(m):
     L = m["leads"]
     to = L.get("email") if m["channel"] == "email" else L.get("phone") if m["channel"] == "whatsapp" else L.get("instagram")
     head = f"{CH.get(m['channel'], m['channel'])} → {L['name']} ({KIND.get(L['kind'], L['kind'])})\nإلى: {to or '— غير متوفر'}"
+    if m["channel"] == "email":
+        pto, pcc = recipients(L)
+        if pcc:
+            c = (L.get("profile") or {}).get("contact") or {}
+            head = head.replace(f"إلى: {to}", f"إلى: {pto} ({c.get('name', '')} — {c.get('role', '')})\nنسخة: {pcc}")
     if L.get("score") is not None:
         head += f" · تقييم {L['score']}"
     if L.get("signal"):
@@ -473,6 +513,7 @@ def card(m):
 
 def buttons(mid):
     return {"inline_keyboard": [[{"text": "✅ أرسل", "callback_data": f"ok:{mid}"},
+                                 {"text": "⚡ الآن", "callback_data": f"now:{mid}"},
                                  {"text": "✏️ عدّل", "callback_data": f"ed:{mid}"},
                                  {"text": "❌ ارفض", "callback_data": f"no:{mid}"}]]}
 
@@ -534,12 +575,14 @@ def approve(mid, tg_mid):
         db.patch("lead_messages", {"id": mid}, {"review": "failed", "review_note": " · ".join(problems)[:300]})
         return "🛑 لم تُرسل — الفحص أوقفها:\n• " + "\n• ".join(problems) + "\nعدّلها (✏️ من الموقع) ثم أعد إرسالها للموافقة."
     if m["channel"] == "email":
-        if not L.get("email"):
+        to, cc = recipients(L)
+        if not to:
             return "لا يوجد إيميل لهذا العميل"
-        send_email(L["email"], m.get("subject"), m["body"])
+        send_email(to, m.get("subject"), m["body"], cc=cc, rush=is_rush(m, L))
         STATE["sent_mids"] = (STATE.get("sent_mids", []) + [mid])[-500:]  # remembered before the database is told
+        STATE["next_send_at"] = time.time() + random.randint(int(E.get("GAP_MIN", "8")), int(E.get("GAP_MAX", "20"))) * 60
         save_state()
-        done = f"✅ أُرسلت إلى {L['email']}"
+        done = f"✅ أُرسلت إلى {to}" + (f" (نسخة: {cc})" if cc else "")
     elif m["channel"] == "whatsapp":
         if not L.get("phone"):
             return "لا يوجد رقم لهذا العميل"
@@ -558,6 +601,27 @@ def mark_sent(mid, L):
     after_send(L)
 
 
+def enqueue(mid, rush=False):
+    """✅: emails are checked now and wait in the queue (one every 8–20 min in working hours); WhatsApp/Instagram and ⚡ go at once."""
+    rows = db.get("lead_messages", select="*,leads(*)", id=f"eq.{mid}")
+    if not rows or not rows[0].get("leads"):
+        return "🚫 هذه المسودة لم تعد موجودة (استُبدلت أو حُذفت)"
+    m, L = rows[0], rows[0]["leads"]
+    if rush:
+        db.patch("lead_messages", {"id": mid}, {"review_note": "⚡ عاجل"})
+        m["review_note"] = "⚡ عاجل"
+    if m["channel"] != "email" or is_rush(m, L) or m["review"] in ("sent", "rejected"):
+        return approve(mid, None)
+    problems = gate(m, L)
+    if problems:
+        db.patch("lead_messages", {"id": mid}, {"review": "failed", "review_note": " · ".join(problems)[:300]})
+        return "🛑 لم تُرسل — الفحص أوقفها:\n• " + "\n• ".join(problems) + "\nعدّلها (✏️ من الموقع) ثم أعد إرسالها للموافقة."
+    db.patch("lead_messages", {"id": mid}, {"review": "approved", "review_note": "⏳ في طابور الإرسال"})
+    n = len(db.get("lead_messages", select="id", review="eq.approved", channel="eq.email"))
+    return (f"⏳ في الطابور (رقم {n}). تُرسل وقت الدوام، رسالة كل {E.get('GAP_MIN', '8')}–{E.get('GAP_MAX', '20')} دقيقة."
+            " للإرسال فوراً اضغط ⚡ على البطاقة أو من الموقع.")
+
+
 def hold_capped(mid, e):
     db.patch("lead_messages", {"id": mid}, {"review": "approved", "review_note": str(e)[:300]})
     if STATE.get("capped_day") != date.today().isoformat():
@@ -567,15 +631,21 @@ def hold_capped(mid, e):
 
 
 def send_site_approved():
-    """Drafts approved from the site's Approvals tab are sent here too."""
-    if STATE.get("capped_day") == date.today().isoformat():
-        return  # limit already hit today: approved ones wait for tomorrow, no retry every minute
-    for m in db.get("lead_messages", select="id,tg_message_id", review="eq.approved", order="created_at", limit="10"):
+    """The sending queue (approved on Telegram or the site). Urgent ones and WhatsApp/Instagram go at once. Other emails go ONE
+    at a time, 8–20 random minutes apart, in working hours only: a burst of identical-looking mail is what spam filters catch."""
+    rows = db.get("lead_messages", select="id,tg_message_id,channel,review_note,leads(status,signal,signal_until,needs_reply)",
+                  review="eq.approved", order="created_at", limit="50")
+    capped = STATE.get("capped_day") == date.today().isoformat()
+    urgent = [m for m in rows if m["channel"] != "email" or is_rush(m, m.get("leads") or {})]
+    normal = [m for m in rows if m not in urgent]
+    paced_ok = in_send_window() and time.time() >= STATE.get("next_send_at", 0) and not capped
+    for m in urgent + (normal[:1] if paced_ok else []):
         try:
             say(approve(m["id"], m["tg_message_id"]))
         except Capped as e:
             hold_capped(m["id"], e)
-            break
+            if m in normal:
+                break
         except Exception as e:
             db.patch("lead_messages", {"id": m["id"]}, {"review": "failed", "review_note": str(e)[:300]})
             say(f"⚠️ {e}")
@@ -588,9 +658,9 @@ def on_callback(q):
     tg_mid = q["message"]["message_id"]
     tg("answerCallbackQuery", callback_query_id=q["id"], text="⏳")  # instantly, so Telegram never times out
     try:
-        if action == "ok":
+        if action in ("ok", "now"):
             try:
-                res = approve(mid, tg_mid)
+                res = enqueue(mid, rush=action == "now")
             except Capped as e:
                 hold_capped(mid, e)
                 res = f"⏸ {e}"
@@ -760,6 +830,21 @@ def write_requested():
         if not L.get("profile"):
             local_ai.analyze(db, L, _local["team"], _local["model"])
             L = db.get("leads", select="*", id=f"eq.{L['id']}")[0]
+        p = L.get("profile") or {}
+        general = (p.get("email_check") or {}).get("role") or re.match(r"(info|contact|hello|office|admin|mail|enquiries|inquiries)@", L.get("email") or "", re.I)
+        if mode == "first" and m["channel"] == "email" and general and not p.get("people") and L.get("kind") in local_ai.ORG_KINDS:
+            people = local_ai.find_people(L, _local["model"])  # who decides there (public sources only)
+            if people:
+                p = {**p, "people": people}
+                db.patch("leads", {"id": L["id"]}, {"profile": p})
+                L = {**L, "profile": p}
+        if mode == "first" and m["channel"] == "email" and p.get("people") and not (p.get("contact") or {}).get("email"):
+            who = local_ai.person_email(L, p["people"])
+            if who:
+                p = {**p, "contact": who}
+                db.patch("leads", {"id": L["id"]}, {"profile": p})
+                L = {**L, "profile": p}
+                log(f"👤 decision maker for {L['name']}: {who['name']} <{who['email']}>")
         writer = nv_model() or E.get("WRITE_MODEL", "gemma3:12b")  # better Arabic; analysis stays on the faster model
         writer = writer if local_ai.available(writer) else _local["model"]
         subject, body = local_ai.write(L, _local["team"], history, m["channel"], mode, m.get("review_note"), writer)

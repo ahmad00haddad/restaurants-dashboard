@@ -3,7 +3,7 @@ import { useAgentStatus, useLeadActions, type Approval } from "@/hooks/useLeads"
 import { useToast } from "@/hooks/useToast";
 import { KIND_LABEL } from "@/lib/leads";
 
-const STATE: Record<string, string> = { write: "💻 جهازك يكتبها الآن…", pending: "بانتظار موافقتك", approved: "موافق — سيُرسلها الوكيل خلال دقيقة", failed: "فشل الإرسال" };
+const STATE: Record<string, string> = { write: "💻 جهازك يكتبها الآن…", pending: "بانتظار موافقتك", approved: "موافق — في طابور الإرسال (رسالة كل 8–20 دقيقة وقت الدوام)", failed: "فشل الإرسال" };
 
 /** Same queue as Telegram — approve here if the phone isn't at hand. The PC agent does the actual sending. */
 export function Approvals({ items, onOpen }: { items: Approval[]; onOpen: (leadId: string) => void }) {
@@ -40,6 +40,9 @@ function Item({ m, onOpen, online }: { m: Approval; onOpen: (id: string) => void
   const to = m.channel === "email" ? L.email : m.channel === "whatsapp" ? L.phone : L.instagram;
   const go = (r: "approved" | "rejected") =>
     act.review(m.id, r, touched ? body : undefined, touched ? subject || null : undefined).then(() => toast.push(r === "approved" ? "✅ تمت الموافقة" : "❌ رُفضت"), (e) => toast.push(e.message, "error"));
+  const rushNow = () =>
+    act.rush(m.id, touched ? body : undefined, touched ? subject || null : undefined)
+      .then(() => toast.push("⚡ تُرسل خلال دقيقة"), (e) => toast.push(e.message, "error"));
   return (
     <div className="rounded border border-border p-3 space-y-2 text-sm">
       <div className="flex justify-between gap-2">
@@ -49,7 +52,12 @@ function Item({ m, onOpen, online }: { m: Approval; onOpen: (id: string) => void
       {L.signal && <div className="text-xs text-amber-600">🔔 {L.signal}</div>}
       <div className={`text-xs flex justify-between ${m.review === "failed" ? "text-red-600" : "text-muted-foreground"}`}>
         <span>{m.review === "write" && !online ? "⏸ الوكيل متوقف — سيكتبها عند تشغيله" : STATE[m.review]}{m.review_note && m.review !== "write" ? `: ${m.review_note}` : ""}</span>
-        {["write", "approved"].includes(m.review) && <button className="underline" onClick={() => go("rejected")}>إلغاء</button>}
+        <span className="flex gap-3">
+          {m.review === "approved" && m.channel === "email" && !m.review_note?.startsWith("⚡") && (
+            <button className="underline" onClick={rushNow}>⚡ أرسل الآن</button>
+          )}
+          {["write", "approved"].includes(m.review) && <button className="underline" onClick={() => go("rejected")}>إلغاء</button>}
+        </span>
       </div>
       {m.review !== "write" && !(m.review === "failed" && !m.body) && m.channel === "email" && <input className="w-full rounded border border-border bg-background px-2 py-1.5" value={subject} onChange={(e) => { setTouched(true); setSubject(e.target.value); }} />}
       {m.review !== "write" && !(m.review === "failed" && !m.body) && <textarea className="w-full rounded border border-border bg-background px-2 py-1.5" rows={7} value={body} onChange={(e) => { setTouched(true); setBody(e.target.value); }} />}
@@ -61,7 +69,8 @@ function Item({ m, onOpen, online }: { m: Approval; onOpen: (id: string) => void
       )}
       {!["approved", "write"].includes(m.review) && !(m.review === "failed" && !m.body) && (
         <div className="flex gap-2">
-          <button className="px-3 py-1.5 rounded bg-primary text-primary-foreground" onClick={() => go("approved")}>✅ وافق وأرسل</button>
+          <button className="px-3 py-1.5 rounded bg-primary text-primary-foreground" onClick={() => go("approved")}>✅ وافق</button>
+          {m.channel === "email" && <button className="px-3 py-1.5 rounded border border-border" title="بدون انتظار الطابور — لفرصة لا تحتمل التأخير" onClick={rushNow}>⚡ أرسل الآن</button>}
           <button className="px-3 py-1.5 rounded border border-border" onClick={() => go("rejected")}>❌ ارفض</button>
         </div>
       )}
