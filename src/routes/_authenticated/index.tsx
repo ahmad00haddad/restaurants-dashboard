@@ -9,7 +9,7 @@ import { LeadPanel } from "@/components/LeadPanel";
 import { Approvals } from "@/components/Approvals";
 import { AddLead } from "@/components/AddLead";
 import { Funnel } from "@/components/Funnel";
-import { KIND_LABEL, STATUS_LABEL, emailBad, tierOf, tierRank, type Lead, type LeadStatus } from "@/lib/leads";
+import { KIND_LABEL, STATUS_LABEL, emailBad, irbidFirst, tierOf, tierRank, type Lead, type LeadStatus } from "@/lib/leads";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({ meta: [{ title: "FAII — Sales" }] }),
@@ -65,7 +65,7 @@ function Home() {
     const closing = signals.filter((l) => l.status === "new" && l.signal_until && l.signal_until <= today(7));
     // "New" = never written to. Analysed first (tier A, then score), then the not-yet-analysed; a proven-bad email is not a way in.
     const fresh = leads.filter((l) => l.status === "new" && !alreadyMailed(l) && ((l.email && !emailBad(l)) || l.phone || l.instagram))
-      .sort((a, b) => Number(a.score == null) - Number(b.score == null) || tierRank(a) - tierRank(b) || (b.score ?? 0) - (a.score ?? 0));
+      .sort((a, b) => Number(a.score == null) - Number(b.score == null) || tierRank(a) - tierRank(b) || irbidFirst(a) - irbidFirst(b) || (b.score ?? 0) - (a.score ?? 0));
     const convos = leads.filter((l) => ["contacted", "replied", "meeting", "won", "lost"].includes(l.status));
     return { reply, followup, nextStep, signals, closing, fresh, convos };
   }, [leads, contactedEmails]);
@@ -111,7 +111,7 @@ function Home() {
   const analyseBatch = async (n: number) => {
     const targets = leads
       .filter((l) => !l.profile && (kind ? l.kind === kind : true) && (l.email || l.phone || l.instagram))
-      .sort((a, b) => Number(b.kind === "ngo") - Number(a.kind === "ngo") || Number(!!b.website) - Number(!!a.website))
+      .sort((a, b) => irbidFirst(a) - irbidFirst(b) || Number(b.kind === "ngo") - Number(a.kind === "ngo") || Number(!!b.website) - Number(!!a.website))
       .slice(0, n);
     for (let i = 0; i < targets.length; i++) {
       setBulk(`تحليل ${i + 1}/${targets.length}: ${targets[i].name}`);

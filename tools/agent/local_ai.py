@@ -30,7 +30,7 @@ SCHEMA = """{"summary":"who they are, one line","interests":["what they care abo
 LANG_HINT = """Language for the future message: UN agencies, international NGOs/donors, EU programmes, embassies, international brands and
 tech companies → en; Jordanian institutions, local charities and initiatives, restaurants, cafés, shops and local brands → ar.
 Their own website's main language wins. link_pick: personal for organisations/NGOs/culture/documentary; team for brands,
-restaurants, companies, campaigns; behance only for creative agencies."""
+restaurants, pharmacies, companies, campaigns; behance only for creative agencies."""
 
 
 NV_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
@@ -234,7 +234,7 @@ Return JSON only: {"people":[{"name":"...","role":"...","url":"...","index":<sni
 ROLE_OK = re.compile(r"communicat|comms|media|marketing|outreach|advocacy|public information|brand|content|social media|fundrais|partnership|resource mobili|director|head of|manager|owner|founder|ceo|chief|president|coordinator|officer", re.I)
 ROLE_TOP = re.compile(r"communicat|comms|media|marketing|outreach|advocacy|public information|brand|content|social media|fundrais|partnership", re.I)
 STALE = re.compile(r"\b(former|formerly|ex-|previously|past)\b|\bafter \d+ years\b|new job|i'?m now|officially (left|leaving)", re.I)
-ORG_KINDS = {"ngo", "org", "hotel", "brand", "event"}
+ORG_KINDS = {"ngo", "org", "hotel", "brand", "event", "pharmacy", "school"}
 
 
 def _exa(query, n=8):
@@ -382,7 +382,7 @@ def analyze(db, L, team, model):
     if p.get("lang") not in ("ar", "en"):
         p["lang"] = "ar"
     if p.get("link_pick") not in ("personal", "team", "behance"):
-        p["link_pick"] = "personal" if L.get("kind") in ("ngo", "org") else "team"
+        p["link_pick"] = "personal" if L.get("kind") in ("ngo", "org", "school") else "team"
     p["analysed_by"] = f"local:{model}"
     if L.get("email"):
         p["email_check"] = emailcheck.check(L["email"])
@@ -455,7 +455,7 @@ def lang_for(L):
     """One language per message: their profile/site decides; local Arabic-named organisations default to Arabic."""
     p = (L.get("profile") or {}).get("lang")
     arabic_name = bool(re.search(r"[؀-ۿ]", L.get("name", "")))
-    if arabic_name or L.get("kind") in ("restaurant", "brand") and not re.search(r"international|global|un |unicef|usaid", L.get("name", ""), re.I):
+    if arabic_name or L.get("kind") in ("restaurant", "brand", "pharmacy", "school") and not re.search(r"international|global|un |unicef|usaid", L.get("name", ""), re.I):
         return "ar"
     return p if p in ("ar", "en") else "en"
 
@@ -559,6 +559,10 @@ FOOD_PROOF = ["Em Sherif", "Khan Zaid", "Astrolabe", "Arafah", "Arafa", "L'Occit
 
 def sector(L):
     c = f"{L.get('category') or ''} {L.get('name') or ''}".lower()
+    if L.get("kind") == "pharmacy" or re.search(r"pharmac|drugstore|صيدلي|دواء", c):
+        return "pharmacy"
+    if L.get("kind") == "school":
+        return "education"
     if L.get("kind") in ("restaurant",) or re.search(r"restaurant|cafe|café|coffee|bakery|sweets|dessert|roaster|مطعم|كافيه|مقهى|مخبز|حلويات|محمص|فرن", c):
         return "food"
     if L.get("kind") == "brand" or re.search(r"store|shop|boutique|cosmetic|perfume|jewel|salon|متجر|عطور|مجوهرات|تجميل", c):
@@ -587,6 +591,12 @@ INTROS = {  # no client names: the site's logos speak. Rotated per lead so email
         "en": ["I'm Ahmad Haddad, a director and cinematographer in Jordan; I've made films for educational institutions about their students and teachers.",
                "I'm Ahmad Haddad, a director and cinematographer; part of my work is short films for schools and education programmes."],
     },
+    "pharmacy": {
+        "ar": ["أنا أحمد حدّاد، مخرج ومدير تصوير من إربد، صوّرت عشرات الريلز لصيدلية محلية، وأحرص أن تبدو الصيدلية بصرياً بمستوى الثقة الذي تقدمه.",
+               "أنا أحمد حدّاد، مخرج ومدير تصوير، أصنع محتوى ريلز للصيدليات يجمع بين نظافة الصورة وثقة القطاع الطبي."],
+        "en": ["I'm Ahmad Haddad, a director and cinematographer from Irbid; I've shot dozens of reels for a local pharmacy.",
+               "I'm Ahmad Haddad, a director and cinematographer; I make reels for pharmacies with clean light and colour that fit a trusted health brand."],
+    },
     "food": {
         "ar": ["أنا أحمد حدّاد، مخرج ومدير تصوير، أصنع مع فريقي أفلاماً وإعلانات للمطاعم والمقاهي في الأردن.",
                "أنا أحمد حدّاد، مخرج ومدير تصوير من إربد، أعمل مع فريقي على أفلام وإعلانات للمطاعم والمقاهي."],
@@ -602,7 +612,7 @@ INTROS = {  # no client names: the site's logos speak. Rotated per lead so email
 }
 INTROS["hotel"] = INTROS["food"]
 INTROS["event"] = INTROS["ngo"]
-ALL_CLIENT_NAMES = NGO_PROOF + FOOD_PROOF + ["Duroub", "دروب", "رانيا", "Mercy Corps", "UNICEF", "UN Women", "Jameel"]
+ALL_CLIENT_NAMES = NGO_PROOF + FOOD_PROOF + ["Sirr Al-Dawa", "Sir Al Dawa", "سر الدواء"] + ["Duroub", "دروب", "رانيا", "Mercy Corps", "UNICEF", "UN Women", "Jameel"]
 
 
 def intro_for(L, lang):
@@ -638,7 +648,9 @@ def _write_once(L, team, history, channel, mode, hint, model):
             + "\nSTRUCTURE (mandatory): 1) greeting; 2) one specific observation about their work (the hook); "
               "3) this exact introduction line: " + repr(intro_for(L, lang)) + " "
               + "Mention NO past clients or projects by name. 4) the idea for their story in one or two sentences, fitting their world "
-              + ("(a restaurant/brand: a short film or ad about their food/product/place, not a documentary about social impact)" if sector(L) in ("food", "brand", "hotel") else "")
+              + ("(a restaurant/brand: a short film or ad about their food/product/place, not a documentary about social impact)" if sector(L) in ("food", "brand", "hotel") else
+                "(a pharmacy: a short reel about the branch, its team and a service or product, clean and trustworthy; never health claims, never criticise their current content)" if sector(L) == "pharmacy" else
+                "(a school: an admission-campaign film, open day or event aftermovie about its students and teachers)" if sector(L) == "education" else "")
               + "; 5) one calm closing line. "
               "Never write 'I am available'. Do NOT write a signature or any link; they are added for you."
             + '\n\nReturn JSON: {"subject":"' + ("2-5 calm words about them" if channel == "email" else "") + '","body":"the full message"}')
@@ -748,7 +760,7 @@ def finish(body, L, team, lang="en", mode="first"):
     first = re.match(r"[A-Za-z]{3,}", c["name"]).group(0).capitalize() if c and re.match(r"[A-Za-z]{3,}", c["name"]) else None
     text = (f"السادة في {short_name(L['name'])} المحترمين،" if lang == "ar" else f"Dear {first}," if first else f"Dear {short_name(L['name'])} team,") + "\n\n" + text
     p = L.get("profile") or {}
-    site = SITES.get(p.get("link_pick"), SITES["personal" if L.get("kind") in ("ngo", "org") else "team"])
+    site = SITES.get(p.get("link_pick"), SITES["personal" if L.get("kind") in ("ngo", "org", "school") else "team"])
     if lang == "ar":
         sig = ["أحمد حدّاد", "مخرج ومدير تصوير، FAII HOUSE", f"بعض أعمالي ومن عملت معهم: {site}"]
     else:

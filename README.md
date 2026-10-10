@@ -3,7 +3,7 @@
 Marketing & sales engine for FAII HOUSE (photo/video team). Built on Lovable + Supabase.
 
 ## How it works
-1. **Collect** — on your PC: `tools/harvester/run.bat` → pick a kind (ngo / org / restaurant / hotel / brand / event) and cities.
+1. **Collect** — on your PC: `tools/harvester/run.bat` → pick a kind (pharmacy / school / ngo / org / restaurant / hotel / brand / event) and cities (Irbid is the default and is always worked first).
    A real browser goes through Google Maps, then reads each website for email, Instagram/LinkedIn/YouTube/TikTok and what they do.
    Optional **deep analysis** with [ScrapeGraphAI](https://github.com/ScrapeGraphAI/Scrapegraph-ai) on a local Ollama model (free, uses your GPU, ~15s/site; default `qwen2.5-coder:7b`, change with env `OLLAMA_MODEL`): extracts mission, programs, real project names, audiences, campaigns and comms contact, which the site's AI then uses to write.
    Output: `leads-*.json`.

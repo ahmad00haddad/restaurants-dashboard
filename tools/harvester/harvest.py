@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 import httpx
 
-CITIES = ["Amman", "Irbid", "Zarqa", "Aqaba", "Salt", "Madaba", "Jerash", "Mafraq", "Karak", "Ajloun"]
+CITIES = ["Irbid", "Ramtha", "Amman", "Zarqa", "Aqaba", "Salt", "Madaba", "Jerash", "Mafraq", "Karak", "Ajloun"]
 PRESETS = {
     "ngo": ["NGO", "non-profit organization", "charity", "foundation", "UN agency", "humanitarian organization",
             "community development organization", "women empowerment organization", "youth organization",
@@ -16,6 +16,8 @@ PRESETS = {
             "منظمة غير حكومية", "جمعية خيرية"],
     "org": ["university", "private school", "hospital", "museum", "marketing agency", "real estate developer", "bank",
             "tech company", "conference center", "clinic"],
+    "pharmacy": ["pharmacy", "صيدلية", "pharmacy chain", "صيدليات", "drugstore", "medical center pharmacy"],
+    "school": ["private school", "مدرسة خاصة", "international school", "academy school", "kindergarten", "nursery", "مدارس"],
     "restaurant": ["restaurant", "cafe", "fine dining restaurant", "bakery", "coffee roastery", "dessert shop"],
     "hotel": ["hotel", "resort", "eco lodge", "tour operator", "guest house"],
     "brand": ["clothing store", "cosmetics brand", "furniture store", "jewelry store", "car dealership", "gym"],
@@ -110,7 +112,7 @@ SOCIAL = {
     "youtube": r"https?://(?:www\.)?youtube\.com/(?:@|c/|channel/|user/)[A-Za-z0-9_\-]+",
     "tiktok": r"https?://(?:www\.)?tiktok\.com/@[A-Za-z0-9_.]+",
 }
-HINT = re.compile(r"contact|about|who-we-are|our-work|projects|programs|programmes|stories|menu|تواصل|من-نحن|اتصل|مشاريع", re.I)
+HINT = re.compile(r"contact|about|who-we-are|our-work|projects|programs|programmes|stories|menu|team|marketing|media|careers|تواصل|من-نحن|اتصل|مشاريع|فريق|التسويق", re.I)
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/128 Safari/537.36"}
 
 
@@ -148,7 +150,7 @@ def read_site(d):
         e = urllib.parse.unquote(e).lower().strip(".")
         if not BAD.search(e) and e not in emails:
             emails.append(e)
-    emails.sort(key=lambda e: (not e.endswith(dom), not re.match(r"(info|contact|hello|media|comm|pr|marketing)", e)))
+    emails.sort(key=lambda e: (not e.endswith(dom), not re.match(r"(marketing|social|media|comm|pr|brand|digital|content|info|contact|hello)", e)))
     if emails:
         d["email"] = emails[0]
         d["emails"] = emails[:15]  # all addresses on the site: the agent looks among them for a named decision maker
@@ -287,7 +289,7 @@ if __name__ == "__main__":
         json.dump(rows, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
         print(f"\n✅ {len(rows)} live opportunities → {path}\nUpload it in the site: ⬆️ استيراد من الجامع")
         sys.exit()
-    cities = [c.strip() for c in ask("Cities (comma separated, or 'all')", "Amman").split(",")]
+    cities = [c.strip() for c in ask("Cities (comma separated, or 'all'; Irbid first)", "Irbid").split(",")]
     cities = CITIES if cities == ["all"] else cities
     custom = ask("Custom search terms (comma separated, empty = presets)", "")
     terms = [t.strip() for t in custom.split(",") if t.strip()] or PRESETS[kind]

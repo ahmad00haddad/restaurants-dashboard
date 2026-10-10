@@ -1,11 +1,11 @@
 // Shared types for leads, AI profiles and team settings (used by client and server).
 
-export type LeadKind = "ngo" | "org" | "restaurant" | "brand" | "hotel" | "event" | "other";
+export type LeadKind = "ngo" | "org" | "restaurant" | "pharmacy" | "school" | "brand" | "hotel" | "event" | "other";
 export type LeadStatus = "new" | "contacted" | "replied" | "meeting" | "won" | "lost" | "skip";
 export type Channel = "email" | "whatsapp" | "instagram";
 
 export const KIND_LABEL: Record<LeadKind, string> = {
-  ngo: "منظمة / NGO", org: "مؤسسة", restaurant: "مطعم / كافيه", brand: "براند / متجر", hotel: "فندق / سياحة", event: "فعاليات", other: "أخرى",
+  ngo: "منظمة / NGO", org: "مؤسسة", restaurant: "مطعم / كافيه", pharmacy: "صيدلية", school: "مدرسة / تعليم", brand: "براند / متجر", hotel: "فندق / سياحة", event: "فعاليات", other: "أخرى",
 };
 export const STATUS_LABEL: Record<LeadStatus, string> = {
   new: "جديد", contacted: "تواصلنا", replied: "ردّ", meeting: "اجتماع", won: "صفقة", lost: "خسرناه", skip: "تجاهل",
@@ -107,6 +107,8 @@ export const DEFAULT_TEAM: TeamSettings = {
     "Documentary / impact film — منظمات، مشاريع، قصص مستفيدين، تقارير للمانحين",
     "Brand film / commercial — شركات، براندات، فنادق",
     "Food & menu photography + reels — مطاعم وكافيهات",
+    "Pharmacy reels & brand content (monthly) — صيدليات: ريلز، تعريف بالمنتجات والخدمات، هوية بصرية للفروع",
+    "School events & admission campaigns — مدارس: حفلات، أيام مفتوحة، فيلم تسجيل الطلاب",
     "Event coverage (photo + aftermovie) — مؤتمرات، إطلاقات، حفلات",
     "Social media content (monthly reels) — أي نشاط يحتاج محتوى مستمر",
     "Product photography — متاجر وبراندات",
@@ -118,6 +120,10 @@ export const DEFAULT_TEAM: TeamSettings = {
   priceGuide: "",
   focus: "الوثائقيات وأفلام الأثر للمنظمات هي الأولوية عندما تناسب العميل.",
 };
+
+/** Irbid is home turf: its leads are worked first. */
+export const irbidFirst = (l: { city: string | null; address?: string | null }) =>
+  /irbid|إربد|اربد/i.test(`${l.city ?? ""} ${l.address ?? ""}`) ? 0 : 1;
 
 export function portfolioLines(s: TeamSettings) {
   return s.portfolio.split("\n").map((l) => l.split("|").map((p) => p.trim())).filter((p) => p[1]);

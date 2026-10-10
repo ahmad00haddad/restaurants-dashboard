@@ -68,7 +68,7 @@ function us(t: TeamSettings) {
 ${t.pastClients || "(none listed — mention no client names)"}`,
     `LINKS — send exactly one, the full body of work, never a single project:
 - ${PERSONAL_SITE} — Ahmad's own site (films, documentaries, client logos). Default; best for organisations, NGOs, institutions, culture and documentaries.
-- ${TEAM_SITE} — FAII House, the production team. Best for brands, restaurants, cafés, companies, campaigns and larger productions.
+- ${TEAM_SITE} — FAII House, the production team. Best for brands, restaurants, cafés, pharmacies, companies, campaigns and larger productions.
 - ${BEHANCE} — Behance. Only for design-minded creative clients (agencies, studios) or when asked for a portfolio file.`,
     `Portfolio (for choosing which work to NAME as proof — do not paste these links) (title | url | tags). Lines starting with ★ are our FLAGSHIP works — always choose a ★ work when one is reasonably related; use others only if no ★ fits. A work whose tags say "ONLY …" may be used only in that case (e.g. only for schools, only around Ramadan):\n${t.portfolio || "(none added yet — don't invent links)"}`,
   ].join("\n");
@@ -96,7 +96,7 @@ const LANGUAGE_RULES = `Language — decide from their own website/profile first
 - UN agencies, international NGOs and donors, EU programmes, embassies, international brands, tech/corporate companies → English: polished, plain, warm.
 - Jordanian royal/national foundations and institutions (QRTA, JOHUD, Jordan River…) → formal, elegant Modern Standard Arabic (English only if their site is English-only).
 - Local charities, community and youth initiatives → refined Modern Standard Arabic, warm and human.
-- Restaurants, cafés, roasteries, sweets, pharmacies, shops, salons, local brands → Arabic in a respectful, light Jordanian register (never slang).
+- Pharmacies, restaurants, cafés, roasteries, sweets, pharmacies, shops, salons, local brands → Arabic in a respectful, light Jordanian register (never slang).
 - Private schools, publishers, local companies → their website's main language; if bilingual → Arabic.
 - One language per message. If unsure for an international organisation in Jordan, choose English.`;
 
@@ -116,6 +116,8 @@ CRAFT:
 - Right after the observation, ONE quiet line introducing the sender by the NATURE of his work, with NO client names (his website shows the logos):
   organisations → "I'm Ahmad Haddad, a director and cinematographer in Jordan; for years I've worked with organisations on films that show their impact through people." / "أنا أحمد حدّاد، مخرج ومدير تصوير من الأردن، أعمل منذ سنوات مع منظمات ومؤسسات على أفلام تروي أثر عملها من خلال الناس."
   restaurants/cafés → "أنا أحمد حدّاد، مخرج ومدير تصوير، أصنع مع فريقي أفلاماً وإعلانات للمطاعم والمقاهي في الأردن." Vary the wording; never name past clients or projects.
+  pharmacies → "أنا أحمد حدّاد، مخرج ومدير تصوير من إربد، صوّرت عشرات الريلز لصيدلية محلية، وأعمل على محتوى يجعل الصيدلية تبدو بالمستوى الذي تستحقه." (ريلز جذابة، إضاءة وألوان نظيفة تناسب الثقة الطبية؛ لا تذكر اسم أي صيدلية ولا تنتقد تصوير أحد). Address the marketing / social-media manager.
+  schools → "أنا أحمد حدّاد، مخرج ومدير تصوير، صوّرت فعاليات وحملات تسجيل لمدارس في الأردن." The idea: admission-campaign film, open day or event aftermovie.
 - Then one insight/idea about their story (one sentence, concrete, visual). Then the calm close. One close only; never add "I am available…".
 - Short: email 4–6 lines of body. WhatsApp/Instagram 2–3 lines. No bullets, bold, hashtags, emojis in emails; no exclamation marks; no em dashes in the body.
 - Subject (email): 2–5 calm words about THEM (their programme, place or story), never about us. No "collaboration", "proposal", "opportunity", "services".

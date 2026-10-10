@@ -542,7 +542,7 @@ def gate(m, L):
 
 
 # ---------------- Approval flow ----------------
-KIND = {"ngo": "منظمة", "org": "مؤسسة", "restaurant": "مطعم", "brand": "براند", "hotel": "فندق", "event": "فعاليات", "other": "أخرى"}
+KIND = {"ngo": "منظمة", "org": "مؤسسة", "restaurant": "مطعم", "pharmacy": "صيدلية", "school": "مدرسة", "brand": "براند", "hotel": "فندق", "event": "فعاليات", "other": "أخرى"}
 CH = {"email": "✉️ إيميل", "whatsapp": "💬 واتساب", "instagram": "📷 إنستغرام"}
 
 
@@ -835,8 +835,9 @@ def analyze_one():
                   **{"or": "(email.not.is.null,phone.not.is.null,instagram.not.is.null)"}, limit="40")
     if not rows:
         return
-    rank = {"ngo": 0, "org": 1, "hotel": 2, "brand": 3, "event": 4, "restaurant": 5}
-    rows.sort(key=lambda L: (not L.get("signal"), rank.get(L["kind"], 6), not L.get("website")))
+    rank = {"pharmacy": 0, "school": 0, "ngo": 1, "org": 2, "hotel": 3, "brand": 4, "event": 5, "restaurant": 6}
+    irbid = lambda L: not re.search(r"irbid|إربد|اربد", f"{L.get('city') or ''} {L.get('address') or ''}", re.I)
+    rows.sort(key=lambda L: (not L.get("signal"), irbid(L), rank.get(L["kind"], 7), not L.get("website")))
     L = rows[0]
     try:
         p = local_ai.analyze(db, L, _local["team"], _local["model"])
