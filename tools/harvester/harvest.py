@@ -16,6 +16,7 @@ PRESETS = {
             "منظمة غير حكومية", "جمعية خيرية"],
     "org": ["university", "private school", "hospital", "museum", "marketing agency", "real estate developer", "bank",
             "tech company", "conference center", "clinic"],
+    "roastery": ["coffee roastery", "specialty coffee roasters", "coffee roasters", "محمصة قهوة", "محامص قهوة مختصة", "محمص بن"],
     "pharmacy": ["pharmacy", "صيدلية", "pharmacy chain", "صيدليات", "drugstore", "medical center pharmacy"],
     "school": ["private school", "مدرسة خاصة", "international school", "academy school", "kindergarten", "nursery", "مدارس"],
     "restaurant": ["restaurant", "cafe", "fine dining restaurant", "bakery", "coffee roastery", "dessert shop"],
@@ -45,6 +46,18 @@ def is_blocked(d):
         return False
     blob = " ".join(str(d.get(k) or "") for k in ("name", "website", "instagram", "facebook", "email"))
     return bool(rx.search(blob))
+
+
+def roastery_ok(d):
+    """Coffee roasteries only: not cafes, restaurants or nut shops. Needs a coffee/roaster word, and a cafe-type category must say roaster too."""
+    c = f"{d.get('category') or ''}".lower()
+    n = f"{d.get('name') or ''}".lower()
+    coffee = re.compile(r"roast|coffee|قهوة")  # not محمص alone: that is also a nut roaster
+    cafe = re.compile(r"cafe|café|coffee shop|restaurant|dessert|bakery|مقهى|كافيه|مطعم|حلويات|مخبز")
+    says_roaster = re.search(r"roast|محمصة قهوة|محمص قهوة|محمص البن|محمص بن", c + " " + n)
+    if cafe.search(c) and not says_roaster:
+        return False
+    return bool(says_roaster or (coffee.search(c + " " + n) and re.search(r"store|supplier|wholesale|متجر|تجارة", c)))
 
 
 def human_check(pg):
@@ -129,6 +142,10 @@ def maps(queries, per_query, show, ck, kind_key):
                     continue
                 seen.add(url.split("?")[0])
                 ck["seen"] = sorted(seen)
+                if kind == "roastery" and not roastery_ok(d):
+                    print("  ✗ not a coffee roastery:", d["name"], "|", d.get("category"))
+                    ckpt_save(kind_key, ck)
+                    continue
                 if is_blocked(d):
                     print("  ✗ skipped (blocklist):", d["name"])
                     ckpt_save(kind_key, ck)

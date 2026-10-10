@@ -1,11 +1,11 @@
 // Shared types for leads, AI profiles and team settings (used by client and server).
 
-export type LeadKind = "ngo" | "org" | "restaurant" | "pharmacy" | "school" | "brand" | "hotel" | "event" | "other";
+export type LeadKind = "ngo" | "org" | "restaurant" | "roastery" | "pharmacy" | "school" | "brand" | "hotel" | "event" | "other";
 export type LeadStatus = "new" | "contacted" | "replied" | "meeting" | "won" | "lost" | "skip";
 export type Channel = "email" | "whatsapp" | "instagram";
 
 export const KIND_LABEL: Record<LeadKind, string> = {
-  ngo: "منظمة / NGO", org: "مؤسسة", restaurant: "مطعم / كافيه", pharmacy: "صيدلية", school: "مدرسة / تعليم", brand: "براند / متجر", hotel: "فندق / سياحة", event: "فعاليات", other: "أخرى",
+  ngo: "منظمة / NGO", org: "مؤسسة", restaurant: "مطعم / كافيه", roastery: "محمصة قهوة", pharmacy: "صيدلية", school: "مدرسة / تعليم", brand: "براند / متجر", hotel: "فندق / سياحة", event: "فعاليات", other: "أخرى",
 };
 export const STATUS_LABEL: Record<LeadStatus, string> = {
   new: "جديد", contacted: "تواصلنا", replied: "ردّ", meeting: "اجتماع", won: "صفقة", lost: "خسرناه", skip: "تجاهل",

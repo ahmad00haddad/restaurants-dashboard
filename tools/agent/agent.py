@@ -443,7 +443,7 @@ _allowed = {"t": 0, "urls": set()}
 def allowed_urls():
     """Only Ahmad's full bodies of work may be linked (his choice): personal site, team site, Behance profile."""
     if not _allowed["urls"]:
-        links = E.get("ALLOWED_LINKS") or "ahmadhaddad.lovable.app,behance.net/gallery/243985595/_,behance.net/gallery/242646259/duroub-with-alma,behance.net/gallery/242646259,behance.net/gallery/237148893/duroub-school,behance.net/gallery/237148893,behance.net/gallery/243985595,behance.net/ahmad00haddad,behance.com/ahmad00haddad"
+        links = E.get("ALLOWED_LINKS") or "ahmadhaddad.lovable.app,behance.net/gallery/243985595/_,behance.net/gallery/248490425/_,behance.net/gallery/248490425,behance.net/gallery/242646259/duroub-with-alma,behance.net/gallery/242646259,behance.net/gallery/237148893/duroub-school,behance.net/gallery/237148893,behance.net/gallery/243985595,behance.net/ahmad00haddad,behance.com/ahmad00haddad"
         _allowed["urls"] = {u.strip().lower().replace("https://", "").replace("http://", "").replace("www.", "").rstrip("/") for u in links.split(",") if u.strip()}
     return _allowed["urls"]
 
@@ -542,7 +542,7 @@ def gate(m, L):
 
 
 # ---------------- Approval flow ----------------
-KIND = {"ngo": "منظمة", "org": "مؤسسة", "restaurant": "مطعم", "pharmacy": "صيدلية", "school": "مدرسة", "brand": "براند", "hotel": "فندق", "event": "فعاليات", "other": "أخرى"}
+KIND = {"ngo": "منظمة", "org": "مؤسسة", "restaurant": "مطعم", "roastery": "محمصة قهوة", "pharmacy": "صيدلية", "school": "مدرسة", "brand": "براند", "hotel": "فندق", "event": "فعاليات", "other": "أخرى"}
 CH = {"email": "✉️ إيميل", "whatsapp": "💬 واتساب", "instagram": "📷 إنستغرام"}
 
 
@@ -846,7 +846,7 @@ def analyze_one():
     rows = [r for r in rows if not local_ai.is_blocked(r)]
     if not rows:
         return
-    rank = {"pharmacy": 0, "school": 0, "ngo": 1, "org": 2, "hotel": 3, "brand": 4, "event": 5, "restaurant": 6}
+    rank = {"roastery": 0, "pharmacy": 0, "school": 0, "ngo": 1, "org": 2, "hotel": 3, "brand": 4, "event": 5, "restaurant": 6}
     irbid = lambda L: not re.search(r"irbid|إربد|اربد", f"{L.get('city') or ''} {L.get('address') or ''}", re.I)
     rows.sort(key=lambda L: (not L.get("signal"), irbid(L), rank.get(L["kind"], 7), not L.get("website")))
     L = rows[0]

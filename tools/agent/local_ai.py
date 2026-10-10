@@ -232,7 +232,7 @@ Return JSON only: {"people":[{"name":"...","role":"...","url":"...","index":<sni
 ROLE_OK = re.compile(r"communicat|comms|media|marketing|outreach|advocacy|public information|brand|content|social media|fundrais|partnership|resource mobili|director|head of|manager|owner|founder|ceo|chief|president|coordinator|officer", re.I)
 ROLE_TOP = re.compile(r"communicat|comms|media|marketing|outreach|advocacy|public information|brand|content|social media|fundrais|partnership", re.I)
 STALE = re.compile(r"\b(former|formerly|ex-|previously|past)\b|\bafter \d+ years\b|new job|i'?m now|officially (left|leaving)", re.I)
-ORG_KINDS = {"ngo", "org", "hotel", "brand", "event", "pharmacy", "school"}
+ORG_KINDS = {"ngo", "org", "hotel", "brand", "event", "pharmacy", "school", "roastery"}
 
 
 class ExaLimit(Exception):
@@ -522,7 +522,9 @@ def lang_for(L):
     """One language per message: their profile/site decides; local Arabic-named organisations default to Arabic."""
     p = (L.get("profile") or {}).get("lang")
     arabic_name = bool(re.search(r"[؀-ۿ]", L.get("name", "")))
-    if arabic_name or L.get("kind") in ("restaurant", "brand", "pharmacy", "school") and not re.search(r"international|global|un |unicef|usaid", L.get("name", ""), re.I):
+    if L.get("kind") == "school" and intl_school(L):
+        return "en"
+    if arabic_name or L.get("kind") in ("restaurant", "brand", "pharmacy", "school", "roastery") and not re.search(r"international|global|un |unicef|usaid", L.get("name", ""), re.I):
         return "ar"
     return p if p in ("ar", "en") else "en"
 
@@ -561,8 +563,8 @@ PHARMACY_CLOSES = ["وإن وجدتم فيها ما يناسب صيدليتكم�
 
 def close_for(L, lang, mode=None):
     import hashlib
-    opts = (PHARMACY_CLOSES if mode == "first" and sector(L) == "pharmacy" else
-            SCHOOL_CLOSES if mode == "first" and sector(L) == "education" else CLOSES["ar" if lang == "ar" else "en"])
+    opts = (ROAST_CLOSES if mode == "first" and sector(L) == "roastery" else PHARMACY_CLOSES if mode == "first" and sector(L) == "pharmacy" else
+            (SCHOOL_CLOSES if lang == "ar" else SCHOOL_EN_CLOSES) if mode == "first" and sector(L) == "education" else CLOSES["ar" if lang == "ar" else "en"])
     return opts[int(hashlib.md5(("close" + str(L.get("id") or L.get("name"))).encode()).hexdigest(), 16) % len(opts)]
 
 
@@ -641,26 +643,62 @@ SCHOOL_REST = [
     "وأعمالي كلها في الرابط أدناه، وأترك لكم الحكم عليها بعد أن تشاهدوها.",
     "وستجدون بقية أعمالي في الرابط أدناه، شاهدوها على مهلكم.",
 ]
+ROAST_WORKS = "https://www.behance.net/gallery/248490425/_"
+ROAST_BODY = ["هذا مثال على عمل صوّرته لمحمصة قهوة:", "ومن أعمالي مع المحامص، هذا المشروع:", "مثال على ما صوّرته لمحمصة قهوة:"]
+ROAST_CLOSES = ["وإن وجدتم فيها ما يناسب محمصتكم، يسعدني أن نتحدث متى ناسبكم.",
+                "وإن أعجبكم ما رأيتم، يسرّني أن نتحدث عنه متى شئتم.",
+                "وإن رأيتم أن أسلوبي يناسبكم، يسعدني الحديث معكم في الوقت الذي يريحكم."]
 SCHOOL_CLOSES = ["وإن وجدتم فيها ما يناسبكم، يسعدني أن نتحدث متى ناسبكم.",
                  "وإن أعجبكم ما رأيتم، يسرّني أن نتحدث عنه متى شئتم.",
                  "وإن رأيتم أن أسلوبي يناسب مدرستكم، يسعدني الحديث معكم في الوقت الذي يريحكم."]
 
 
+INTL_SCHOOL = re.compile(r"international|american|british|\bIB\b|igcse|cambridge|bilingual|\bacademy\b|دولية|الأمريكية|الامريكية|البريطانية|الإنجليزية", re.I)
+SCHOOL_EN_BODY = ["Here is an example of a film I made for a school:", "One project I shot with a school:", "An example of what I filmed for a school:"]
+SCHOOL_EN_REST = ["The rest of my work is at the link below; have a look whenever you like and judge for yourselves.",
+                  "All my work is at the link below. I'll leave it to speak for itself.",
+                  "You'll find the rest of my work at the link below, to look through at your own pace."]
+SCHOOL_EN_CLOSES = ["If you find something there that suits your school, I'd be glad to talk whenever it suits you.",
+                    "If you like what you see, I'd be happy to talk about it whenever you wish.",
+                    "If you feel my style fits your school, I'd welcome a conversation at a time that suits you."]
+
+
+def intl_school(L):
+    """English-language school: Latin-only name, or the name/category says international, American, British, IB, bilingual…"""
+    c = f"{L.get('name') or ''} {L.get('category') or ''}"
+    return bool(INTL_SCHOOL.search(c)) or not re.search(r"[؀-ۿ]", L.get("name") or "")
+
+
 def school_first(L, team):
     """First email to a school: who I am, ONE strong example matched to the age group (young children / older), the portfolio link.
-    Fixed template, no model, no proposed idea."""
+    Fixed template, no model, no proposed idea. English for international / English-named schools, Arabic otherwise."""
     import hashlib
+    lang = "en" if intl_school(L) else "ar"
     h = int(hashlib.md5(("sb" + str(L.get("id") or L.get("name"))).encode()).hexdigest(), 16)
     c = f"{L.get('name') or ''} {L.get('category') or ''}"
     url = SCHOOL_WORKS["young" if YOUNG.search(c) else "older"]
+    rest = (SCHOOL_EN_REST if lang == "en" else SCHOOL_REST)[h % 3]
+    lead = (SCHOOL_EN_BODY if lang == "en" else SCHOOL_BODY)[(h >> 4) % 3]
+    body = intro_for(L, lang) + "\n\n" + rest
+    paras = finish(body, L, team, lang, "first").split("\n\n")
+    paras.insert(len(paras) - 3, f"{lead}\n{url}")
+    return (f"Visual content: {short_name(L['name'])}" if lang == "en" else f"محتوى مرئي: {short_name(L['name'])}"), "\n\n".join(paras)
+
+
+def roastery_first(L, team):
+    """First email to a coffee roastery: one line about me, ONE strong example, the portfolio link. Fixed template, no model."""
+    import hashlib
+    h = int(hashlib.md5(("rb" + str(L.get("id") or L.get("name"))).encode()).hexdigest(), 16)
     body = intro_for(L, "ar") + "\n\n" + SCHOOL_REST[h % len(SCHOOL_REST)]
     paras = finish(body, L, team, "ar", "first").split("\n\n")
-    paras.insert(len(paras) - 3, f"{SCHOOL_BODY[(h >> 4) % len(SCHOOL_BODY)]}\n{url}")
+    paras.insert(len(paras) - 3, f"{ROAST_BODY[(h >> 4) % len(ROAST_BODY)]}\n{ROAST_WORKS}")
     return f"محتوى مرئي: {short_name(L['name'])}", "\n\n".join(paras)
 
 
 def write(L, team, history, channel, mode, hint, model):
     """Write, and retry once if the model skipped the idea or cleanup left too little (never queue a hollow message)."""
+    if mode == "first" and sector(L) == "roastery":
+        return roastery_first(L, team)
     if mode == "first" and sector(L) == "pharmacy":
         return pharmacy_first(L, team)
     if mode == "first" and sector(L) == "education":
@@ -689,6 +727,8 @@ FOOD_PROOF = ["Em Sherif", "Khan Zaid", "Astrolabe", "Arafah", "Arafa", "L'Occit
 
 def sector(L):
     c = f"{L.get('category') or ''} {L.get('name') or ''}".lower()
+    if L.get("kind") == "roastery":
+        return "roastery"
     if L.get("kind") == "pharmacy" or re.search(r"pharmac|drugstore|صيدلي|دواء", c):
         return "pharmacy"
     if L.get("kind") == "school":
@@ -720,6 +760,11 @@ INTROS = {  # no client names: the site's logos speak. Rotated per lead so email
                "أنا أحمد حدّاد، مخرج ومدير تصوير، وجزء من عملي أفلام قصيرة لمدارس ومؤسسات تعليمية."],
         "en": ["I'm Ahmad Haddad, a director and cinematographer in Jordan; I've made films for educational institutions about their students and teachers.",
                "I'm Ahmad Haddad, a director and cinematographer; part of my work is short films for schools and education programmes."],
+    },
+    "roastery": {
+        "ar": ["أنا أحمد حدّاد، مخرج ومدير تصوير، أصنع أفلاماً وريلز لمحامص القهوة المختصة.",
+               "أنا أحمد حدّاد، مخرج ومدير تصوير من إربد، صوّرت لمحامص قهوة، وأعرف كيف تُصوَّر الحبّة والمحمصة والكوب."],
+        "en": ["I'm Ahmad Haddad, a director and cinematographer; I make films and reels for specialty coffee roasters."],
     },
     "pharmacy": {
         "ar": ["أنا أحمد حدّاد، مخرج ومدير تصوير من إربد، صوّرت عشرات الريلز لصيدلية محلية، وأحرص أن تبدو الصيدلية بصرياً بمستوى الثقة الذي تقدمه.",
