@@ -443,7 +443,7 @@ _allowed = {"t": 0, "urls": set()}
 def allowed_urls():
     """Only Ahmad's full bodies of work may be linked (his choice): personal site, team site, Behance profile."""
     if not _allowed["urls"]:
-        links = E.get("ALLOWED_LINKS") or "ahmadhaddad.lovable.app,faiihouse.lovable.app,behance.net/ahmad00haddad,behance.com/ahmad00haddad"
+        links = E.get("ALLOWED_LINKS") or "ahmadhaddad.lovable.app,behance.net/ahmad00haddad,behance.com/ahmad00haddad"
         _allowed["urls"] = {u.strip().lower().replace("https://", "").replace("http://", "").replace("www.", "").rstrip("/") for u in links.split(",") if u.strip()}
     return _allowed["urls"]
 

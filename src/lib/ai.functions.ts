@@ -67,8 +67,7 @@ function us(t: TeamSettings) {
     `PAST CLIENTS we really worked with (name | sector | language) — the only names you may mention:
 ${t.pastClients || "(none listed — mention no client names)"}`,
     `LINKS — send exactly one, the full body of work, never a single project:
-- ${PERSONAL_SITE} — Ahmad's own site (films, documentaries, client logos). Default; best for organisations, NGOs, institutions, culture and documentaries.
-- ${TEAM_SITE} — FAII House, the production team. Best for brands, restaurants, cafés, pharmacies, companies, campaigns and larger productions.
+- ${PERSONAL_SITE} — Ahmad's own site (films, documentaries, client logos). The ONLY work site: use it for every client.
 - ${BEHANCE} — Behance. Only for design-minded creative clients (agencies, studios) or when asked for a portfolio file.`,
     `Portfolio (for choosing which work to NAME as proof — do not paste these links) (title | url | tags). Lines starting with ★ are our FLAGSHIP works — always choose a ★ work when one is reasonably related; use others only if no ★ fits. A work whose tags say "ONLY …" may be used only in that case (e.g. only for schools, only around Ramadan):\n${t.portfolio || "(none added yet — don't invent links)"}`,
   ].join("\n");
@@ -87,7 +86,7 @@ function them(l: Lead) {
 }
 
 const PERSONAL_SITE = "https://ahmadhaddad.lovable.app";
-const TEAM_SITE = "https://faiihouse.lovable.app";
+const TEAM_SITE = "https://ahmadhaddad.lovable.app"; // same as PERSONAL_SITE: one work site for everyone
 const BEHANCE = "https://www.behance.net/ahmad00haddad";
 
 /** From the study of our 63 past clients: which language each kind of client actually works in. */

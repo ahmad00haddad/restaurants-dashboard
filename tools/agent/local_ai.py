@@ -438,8 +438,7 @@ def rules(team):
             t = t.replace("${" + k + "}", v)
         return re.sub(r"\$\{t\.(\w+)\}", lambda m: str(team.get(m.group(1), "")), t)
     links = (f"LINKS — send exactly one, the full body of work, never a single project:\n"
-             f"- {consts['PERSONAL_SITE']} — default; organisations, NGOs, institutions, culture, documentaries.\n"
-             f"- {consts['TEAM_SITE']} — brands, restaurants, cafés, companies, campaigns, larger productions.\n"
+             f"- {consts['PERSONAL_SITE']} — Ahmad's own site, the ONLY work site: use it for every client.\n"
              f"- {consts['BEHANCE']} — only for creative agencies/studios or when they ask for a portfolio.")
     return fill(voice), editor, links
 
@@ -522,10 +521,10 @@ OPT_OUT = {  # a gracious way out, never needy or apologetic; rotated per lead l
            "If it isn't something you need right now, I completely understand.",
            "If this isn't a priority for you at the moment, that's perfectly fine.",
            "And if it doesn't fit your plans, no worries at all; all the best with your work."],
-    "ar": ["وإن لم يكن التوقيت مناسباً، فلا بأس أبداً، وأتمنى لكم التوفيق في عملكم.",
-           "وإن لم يكن هذا ضمن أولوياتكم الآن، فأتفهّم ذلك تماماً.",
-           "وإن لم يكن الأمر مناسباً لكم حالياً، فلكم كل التقدير.",
-           "وإن لم يكن هذا ما تحتاجونه الآن، فلا بأس، وكل التوفيق لكم."],
+    "ar": ["وإن لم يكن التوقيت مناسباً فلا بأس أبداً، وسامحونا على الإزعاج.",
+           "وإن لم يكن هذا ضمن أولوياتكم الآن فأتفهّم ذلك تماماً، ويعطيكم العافية، وسامحونا على الإزعاج.",
+           "وإن لم يكن الأمر مناسباً لكم حالياً فيعطيكم العافية، وسامحونا على الإزعاج.",
+           "وإن لم يكن هذا ما تحتاجونه الآن فلا بأس، وكل التوفيق لكم، وسامحونا على الإزعاج."],
 }
 
 
@@ -695,7 +694,7 @@ def _write_once(L, team, history, channel, mode, hint, model):
     return subject.strip() or None, final
 
 
-SITES = {"personal": "https://ahmadhaddad.lovable.app", "team": "https://faiihouse.lovable.app", "behance": "https://www.behance.net/ahmad00haddad"}
+SITES = {"personal": "https://ahmadhaddad.lovable.app", "team": "https://ahmadhaddad.lovable.app", "behance": "https://www.behance.net/ahmad00haddad"}
 
 
 def short_name(name):
