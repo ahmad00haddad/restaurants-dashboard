@@ -131,6 +131,13 @@ ${LANGUAGE_RULES}
 const EDITOR = `You are the toughest editor of outreach messages for a respected director. You judge one draft.
 Score 1-10 on each: dignity (zero neediness, no supplier tone, no begging/thanking/apologising), specificity (could only have been written to this client),
 insight (gives them a real idea about their own story), restraint (short, calm, no adjectives about us), language (natural, elegant, correct for this audience).
+Also remove every sign of machine writing (any language), strongest first:
+- contrast that only adds weight: "not just X, but Y", "it's not X, it's Y", "ليس مجرد… بل", "لا يقتصر… بل" — state the point plainly;
+- a closing line that repeats the point, or a row of short dramatic fragments;
+- deep-sounding sayings: "at its core", "the real question", "the heart of", "في جوهره", "الحقيقة أن";
+- warm-up before the point: "Here's the thing", "Let me", "I wanted to share", "اسمحوا لي";
+- lists of three where one fact would do; inflated words: pivotal, profound, powerful, testament, journey, tapestry, resonate, محوري، عميق، رحلة، شهادة على;
+- every sentence the same length. A person writes some short sentences and some longer ones.
 If ANY score is below 9, rewrite the message to score 10 on all, keeping the same language, facts, link and signature. Never add new facts, links or client names. Keep exactly one link: the site in the signature; remove any link to a single project.
 Return JSON only: {"scores":{"dignity":n,"specificity":n,"insight":n,"restraint":n,"language":n},"subject":"...","body":"final message"}`;
 
@@ -187,7 +194,7 @@ export const draftMessage = createServerFn({ method: "POST" })
     const { lead, msgs, team } = await load(ctx, data.id);
     const history = msgs.map((m) => `[${m.direction === "in" ? "THEM" : "US"} · ${m.channel} · ${m.created_at.slice(0, 10)}]\n${m.body}`).join("\n\n");
     const task = {
-      first: "Write the FIRST message to this client.",
+      first: "Write the FIRST message to this client. Just before the signature, add to the closing line a gracious, unhurried way out, e.g. 'And if the timing isn't right, no problem at all; I wish you well with the work.' / 'وإن لم يكن التوقيت مناسباً، فلا بأس أبداً، وأتمنى لكم التوفيق في عملكم.' Never apologise and never ask them to tell you to stop.",
       followup: "They haven't answered — that's fine. Write ONE gracious, brief note (2–3 lines) that adds value: share a different piece of work relevant to them, or a thoughtful observation. No reminder of the previous message, no 'following up', no pressure. Close by leaving the door open. This is the only follow-up we ever send.",
       proposal: `They are interested. Write a short, clear proposal email they can forward internally: one line on their goal (in their words), the idea, what we deliver (bullets allowed here: e.g. film length, versions, photos, subtitles), timeline, what we need from them, and investment ${team.priceGuide ? `based on: ${team.priceGuide}` : "as 'tailored once we understand the scope' (no numbers)"}. Professional, composed tone — a studio proposal, not a sales pitch. Then the next step. Keep it under 200 words.`,
       reply: `Answer their latest message exactly like a human would. Price question → ${team.priceGuide ? `use this guide: ${team.priceGuide}` : "no fixed number; offer to understand the project first, since every piece is tailored"}. Interested → suggest meeting or a short call at their convenience, offering two possible times. Not now / no → thank them graciously in one line and wish them well; no request to check back. Asked for work → 1–2 closest portfolio links with one line of context each.`,

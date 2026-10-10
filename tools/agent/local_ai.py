@@ -498,6 +498,38 @@ CLOSE_LIKE = re.compile(r"timing|conversation|discuss|talk|time allows|convenien
 FLATTERY = re.compile(r"\b(truly|commendable|impressive|amazing|incredible|inspiring|remarkable)\b|رائع|مذهل|ملهم|مبهر|نثمّن|نقدّر جهودكم", re.I)
 
 
+# Strongest signs of machine writing (after Wikipedia's "Signs of AI writing", via the humanizer skill): structure, not vocabulary.
+AI_TELLS = [
+    (re.compile(r"\bnot (just|only|merely|simply)\b[^.!?\n]{0,80}\bbut\b|\b(it|this|that)['’]?s not [^.!?\n]{1,60}[,;] (it|this|that)['’]?s\b", re.I), "تركيب «ليس كذا بل كذا»"),
+    (re.compile(r"ليس(ت)? (مجرد|فقط)[^.؟!\n]{0,80}بل|لا يقتصر[^.؟!\n]{0,80}بل"), "تركيب «ليس مجرد… بل»"),
+    (re.compile(r"\b(at its core|the real question|the heart of|here['’]?s the thing|let['’]?s dive|in today['’]?s|testament to|tapestry|resonates?)\b|في جوهره|الحقيقة أن|شهادة على", re.I), "عبارة تبدو مولّدة"),
+    (re.compile(r"\b(pivotal|profound|transformative|seamless|unparalleled|game.?changer)\b|محوري|لا مثيل", re.I), "كلمة مبالغة"),
+]
+
+
+def ai_tells(text):
+    """Names of the machine-writing patterns found (empty = reads like a person)."""
+    return [name for rx, name in AI_TELLS if rx.search(text or "")]
+
+
+OPT_OUT = {  # a gracious way out, never needy or apologetic; rotated per lead like the closes
+    "en": ["And if the timing isn't right, no problem at all; I wish you well with the work.",
+           "If it isn't something you need right now, I completely understand.",
+           "If this isn't a priority for you at the moment, that's perfectly fine.",
+           "And if it doesn't fit your plans, no worries at all; all the best with your work."],
+    "ar": ["وإن لم يكن التوقيت مناسباً، فلا بأس أبداً، وأتمنى لكم التوفيق في عملكم.",
+           "وإن لم يكن هذا ضمن أولوياتكم الآن، فأتفهّم ذلك تماماً.",
+           "وإن لم يكن الأمر مناسباً لكم حالياً، فلكم كل التقدير.",
+           "وإن لم يكن هذا ما تحتاجونه الآن، فلا بأس، وكل التوفيق لكم."],
+}
+
+
+def opt_out_for(L, lang):
+    import hashlib
+    opts = OPT_OUT["ar" if lang == "ar" else "en"]
+    return opts[int(hashlib.md5(("out" + str(L.get("id") or L.get("name"))).encode()).hexdigest(), 16) % len(opts)]
+
+
 OFFER = re.compile(r"فيلم|أفلام|نصوّر|نصور|نوثّق بالصورة|film|shoot|video", re.I)  # not "تصوير": it is in the title "مدير تصوير"
 
 
@@ -509,9 +541,12 @@ def write(L, team, history, channel, mode, hint, model):
             subject, final = _write_once(L, team, history, channel, mode,
                                          hint if attempt == 0 else ((hint or "") + " The idea sentence is mandatory: say plainly what short film we could shoot for them."), model)
             core = " ".join(final.split("\n\n")[1:-2])
-            if mode != "first" or OFFER.search(core):
-                return subject, final
-            last = ValueError("the message has no clear film idea")
+            tells = ai_tells(final)
+            if (mode != "first" or OFFER.search(core)) and (not tells or attempt == 1):
+                return subject, final  # tells that survive a second try are caught by the send gate, never sent silently
+            last = ValueError("the message has no clear film idea" if not tells else "reads machine-written: " + ", ".join(tells))
+            if tells:
+                hint = (hint or "") + " Write it plainly, like a person: no 'not just X but Y', no dramatic closing line, no inflated words."
         except ValueError as e:
             last = e
     raise last
@@ -619,7 +654,7 @@ def _write_once(L, team, history, channel, mode, hint, model):
             body, subject = ed["body"], ed.get("subject") or subject
     except Exception:
         pass
-    final = finish(body, L, team, lang)
+    final = finish(body, L, team, lang, mode)
     core = final.split("\n\n")[1:-2]  # between greeting and close+signature
     if len(" ".join(core)) < max(80, len(body) * 0.4):
         raise ValueError("cleanup removed the message body — not queued")  # never send an empty-looking message
@@ -637,7 +672,7 @@ def short_name(name):
     return re.sub(r"\s+[-–|]\s+[^-–|]*$", "", name).strip() or name
 
 
-def finish(body, L, team, lang="en"):
+def finish(body, L, team, lang="en", mode="first"):
     """Deterministic polish: no em dashes, no stray links, no praise filler, a calm close, one signature with the one right site."""
     body = re.sub(r"\s*—\s*", "، " if re.search(r"[؀-ۿ]", body) else ", ", body.strip())
     body = re.sub(r"https?://\S+", "", body).strip()
@@ -700,7 +735,9 @@ def finish(body, L, team, lang="en"):
     # drop any sentence that still name-drops a client
     paras = [" ".join(x for x in re.split(r"(?<=[.؟?!])\s+", p_) if not any(n.lower() in x.lower() for n in ALL_CLIENT_NAMES)).strip() for p_ in paras]
     paras = [p_ for p_ in paras if p_]
-    text = "\n\n".join(paras + [close_for(L, lang)])
+    # First message only: an easy, polite way out. Someone who can simply say "no" does not press "spam", the strongest bad signal.
+    close = close_for(L, lang) + (" " + opt_out_for(L, lang) if mode == "first" else "")  # one closing paragraph, not two
+    text = "\n\n".join(paras + [close])
     # Always one clean greeting: drop whatever greeting-ish lines the model wrote, then add ours.
     ls = text.splitlines()
     while ls and (not ls[0].strip() or len(ls[0]) < 70 and (re.match(r"\s*(dear|hello|hi|good (morning|evening|afternoon)|السادة|الأخوة|الإخوة|مرحب|تحية|السلام|إلى|مساء الخير|صباح الخير)", ls[0], re.I)

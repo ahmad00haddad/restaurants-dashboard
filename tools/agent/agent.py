@@ -314,6 +314,17 @@ def check_inbox():
         save_state()
 
 
+REFUSAL = re.compile(r"\b(unsubscribe|remove (me|us|our)|take (me|us) off|stop (e-?mailing|contacting|writing)|do not (contact|email|write)|don['’]?t (contact|email|write)|"
+                     r"not interested|no,? thank(s| you)|we (are|['’]re) not looking|please stop)\b|"
+                     r"إلغاء الاشتراك|أزيلو|احذفو|لا (نرغب|نحتاج|حاجة)|غير مهتم|لا تراسل|توقفوا عن|نعتذر عن عدم|شكرا[ًا]?،? لا", re.I)
+
+
+def is_refusal(body):
+    """A clear "no" or "remove me". Code decides, no model: a refusal must always be honoured, an unclear reply gets a human answer."""
+    first = (body or "")[:600]  # their words, not the quoted thread
+    return bool(REFUSAL.search(first))
+
+
 def process_reply(L, addr, subject, body, when, auto):
     if not body:
         body = "(رسالة بلا نص — افتحها في Gmail)"
@@ -321,6 +332,16 @@ def process_reply(L, addr, subject, body, when, auto):
                                           "body": body, "created_at": when})
     if auto:  # out-of-office: keep it in the history, but it is not a conversation
         log(f"auto-reply from {L['name']}")
+        return
+    if is_refusal(body):
+        STATE.setdefault("do_not_contact", {})[addr] = date.today().isoformat()
+        save_state()
+        db.patch("leads", {"id": L["id"]}, {"status": "lost", "needs_reply": False, "next_action_at": None})
+        db.req("PATCH", "lead_messages", {"lead_id": f"eq.{L['id']}", "draft": "eq.true", "review": "in.(pending,approved,write,failed)"},
+               {"review": "rejected", "review_note": "أُلغيت: طلبوا عدم المراسلة"})
+        log(f"🚫 {L['name']} declined — closed, never contacted again")
+        say(f"🚫 {L['name']} ({addr}) ردّوا بالرفض أو طلبوا عدم المراسلة:\n────────\n{body[:800]}\n────────\n"
+            "صنّفتهم «لم تنجح» ولن يكتب لهم النظام مرة أخرى. إن رأيت أن الرد يستحق جواباً شخصياً، اكتبه بنفسك.")
         return
     db.patch("leads", {"id": L["id"]}, {"status": "meeting" if L["status"] in ("meeting", "won") else "replied",
                                         "needs_reply": True, "next_action_at": date.today().isoformat()})
@@ -480,6 +501,15 @@ def gate(m, L):
         why.append("أطول من اللازم لرسالة أولى")
     if L.get("status") in ("lost", "skip"):
         why.append("العميل مغلق (رفض أو تجاهل)")
+    try:
+        import local_ai
+        for t in local_ai.ai_tells(body):
+            why.append(f"تبدو مكتوبة بالذكاء الاصطناعي: {t}")
+    except Exception:
+        pass
+    dnc = STATE.get("do_not_contact", {})
+    if m["channel"] == "email" and any((a or "").strip().lower() in dnc for a in recipients(L)):
+        why.append("طلبوا عدم مراسلتهم — لن نراسلهم أبداً")
     if m["channel"] == "email" and L.get("status") in ("new", "skip", None) and L.get("email"):
         addr = L["email"].strip().lower()
         other = db.get("leads", select="name,status", email=f"ilike.{addr}", id=f"neq.{L['id']}", status="in.(contacted,replied,meeting,won,lost)", limit="1")
