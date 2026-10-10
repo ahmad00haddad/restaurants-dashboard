@@ -552,8 +552,8 @@ def pharmacy_first(L, team):
     h = int(hashlib.md5(("pb" + str(L.get("id") or L.get("name"))).encode()).hexdigest(), 16)
     body = intro_for(L, "ar") + "\n\n" + PHARMACY_BODY[h % len(PHARMACY_BODY)]
     paras = finish(body, L, team, "ar", "first").split("\n\n")
-    # the example sits before the close paragraph (finish strips links from the body, so it is added here)
-    paras.insert(len(paras) - 2, f"{EXAMPLE_LINES[(h >> 4) % len(EXAMPLE_LINES)]}\n{PHARMACY_EXAMPLE}")
+    # the example sits before the "rest of my work" paragraph (finish strips links from the body, so it is added here)
+    paras.insert(len(paras) - 3, f"{EXAMPLE_LINES[(h >> 4) % len(EXAMPLE_LINES)]}\n{PHARMACY_EXAMPLE}")
     return f"محتوى مرئي: {short_name(L['name'])}", "\n\n".join(paras)
 
 
