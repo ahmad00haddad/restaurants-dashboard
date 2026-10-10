@@ -177,7 +177,7 @@ export function useLeadActions() {
       qc.invalidateQueries({ queryKey: ["approvals"] });
     },
     async review(id: string, review: "approved" | "rejected", body?: string, subject?: string | null) {
-      const { error } = await db.from("lead_messages").update({ review, ...(body != null ? { body, subject } : {}) }).eq("id", id);
+      const { error } = await db.from("lead_messages").update({ review, review_note: null, ...(body != null ? { body, subject } : {}) }).eq("id", id);
       if (error) throw error;
       qc.invalidateQueries({ queryKey: ["approvals"] });
     },

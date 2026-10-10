@@ -52,6 +52,9 @@ function Home() {
       .sort((a, b) => (a.signal_until ?? "9").localeCompare(b.signal_until ?? "9"));
     return { reply, followup, meeting, best, signals };
   }, [leads]);
+  /** Emails we already wrote to (on any lead record) — a duplicate record with the same address must not get a first message. */
+  const contactedEmails = useMemo(() => new Set(leads.filter((l) => l.email && l.status !== "new").map((l) => l.email!.trim().toLowerCase())), [leads]);
+  const alreadyMailed = (l: Lead) => !!l.email && contactedEmails.has(l.email.trim().toLowerCase());
 
   const list = useMemo(() => {
     let L: Lead[] =
@@ -79,7 +82,7 @@ function Home() {
   const draftBatch = async (n: number) => {
     const queued = new Set(approvals.map((a) => a.lead_id));
     const targets = [...groups.signals.filter((l) => l.status === "new"), ...groups.best]
-      .filter((l, i, a) => a.indexOf(l) === i && !queued.has(l.id) && reachable(l)).slice(0, n);
+      .filter((l, i, a) => a.indexOf(l) === i && !queued.has(l.id) && !alreadyMailed(l) && reachable(l)).slice(0, n);
     for (let i = 0; i < targets.length; i++) {
       const l = targets[i];
       setBulk(`كتابة ${i + 1}/${targets.length}: ${l.name}`);
@@ -104,7 +107,7 @@ function Home() {
     const fresh = leads.filter((l) => l.status === "new" && !l.profile && (!kind || l.kind === kind))
       .sort((x, y) => Number(y.kind === "ngo") - Number(x.kind === "ngo") || Number(!!y.website) - Number(!!x.website));
     const targets = [...groups.signals.filter((l) => l.status === "new"), ...groups.best, ...fresh]
-      .filter((l, i, a) => a.indexOf(l) === i && !queued.has(l.id) && reachable(l) && (!kind || l.kind === kind)).slice(0, n);
+      .filter((l, i, a) => a.indexOf(l) === i && !queued.has(l.id) && !alreadyMailed(l) && reachable(l) && (!kind || l.kind === kind)).slice(0, n);
     for (const l of targets) await act.requestLocalWrite(l.id, channelFor(l));
     toast.push(`💻 ${targets.length} رسائل في طابور جهازك — تصلك على Telegram تباعاً`);
   };

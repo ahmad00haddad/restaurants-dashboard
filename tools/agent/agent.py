@@ -189,6 +189,111 @@ def check_bounces():
     save_state()
 
 
+FREE_MAIL = {"gmail.com", "googlemail.com", "hotmail.com", "outlook.com", "live.com", "yahoo.com", "icloud.com", "me.com", "aol.com", "proton.me", "protonmail.com"}
+AUTO_SUBJ = re.compile(r"automatic reply|auto.?reply|out of (the )?office|autoreply|away from|on leave|رد تلقائي|ردّ تلقائي|إجابة تلقائية|خارج المكتب", re.I)
+QUOTE_START = re.compile(r"^(on .{5,200} wrote:|في .{5,200} كتب.{0,20}:|-{2,}\s*original message|from:\s|sent from my|من:\s)", re.I | re.M)
+
+
+def _plain_body(msg):
+    """The reply text only: first text/plain part (HTML stripped as a fallback), quoted thread and '>' lines removed."""
+    import html as _html
+    text = ""
+    for ctype in ("text/plain", "text/html"):
+        for part in msg.walk():
+            if part.get_content_type() == ctype and not part.get_filename():
+                raw = part.get_payload(decode=True) or b""
+                text = raw.decode(part.get_content_charset() or "utf-8", "ignore")
+                if ctype == "text/html":
+                    text = _html.unescape(re.sub(r"<[^>]+>", " ", re.sub(r"(?i)<br\s*/?>|</p>|</div>", "\n", text)))
+                break
+        if text.strip():
+            break
+    m = QUOTE_START.search(text)
+    if m:
+        text = text[:m.start()]
+    text = "\n".join(l for l in text.splitlines() if not l.lstrip().startswith(">"))
+    return re.sub(r"\n{3,}", "\n\n", text).strip()[:4000]
+
+
+def _lead_for(addr):
+    """The lead this sender belongs to: exact email first, else same company domain (never for gmail/hotmail…) among leads we wrote to."""
+    rows = db.get("leads", select="id,name,status,email,followups", email=f"ilike.{addr}", deleted_at="is.null", limit="2")
+    if rows:
+        return rows[0]
+    dom = addr.split("@")[-1]
+    if dom in FREE_MAIL:
+        return None
+    rows = db.get("leads", select="id,name,status,email,followups", email=f"ilike.*@{dom}", deleted_at="is.null",
+                  status="in.(contacted,replied,meeting,won)", limit="2")
+    return rows[0] if len(rows) == 1 else None  # two contacted leads on one domain → ambiguous, skip
+
+
+def check_inbox():
+    """Every few minutes: read new mail over IMAP (read-only, nothing is marked read). Bounces → bad email.
+    A reply from a lead → logged in the site, follow-ups stopped, queued drafts cancelled, Telegram alert + a reply draft written."""
+    import imaplib, email as _email
+    from email.header import decode_header, make_header
+    from email.utils import parseaddr, parsedate_to_datetime
+    seen = STATE.setdefault("inbox_seen", [])
+    since = (date.today() - timedelta(days=3)).strftime("%d-%b-%Y")
+    me = E["GMAIL_USER"].lower()
+    box = imaplib.IMAP4_SSL("imap.gmail.com", timeout=30)
+    replies = []
+    try:
+        box.login(E["GMAIL_USER"], E["GMAIL_APP_PASSWORD"].replace(" ", ""))
+        box.select("INBOX", readonly=True)
+        _, ids = box.search(None, f'(SINCE {since} NOT FROM "{me}" NOT FROM "mailer-daemon")')
+        for i in ids[0].split()[-200:]:
+            _, data = box.fetch(i, "(BODY.PEEK[HEADER.FIELDS (FROM MESSAGE-ID)])")
+            head = _email.message_from_bytes(data[0][1])
+            mid = (head.get("Message-ID") or f"{i.decode()}-{head.get('From')}").strip()
+            if mid in seen:
+                continue
+            seen.append(mid)
+            addr = parseaddr(head.get("From") or "")[1].lower()
+            L = _lead_for(addr) if "@" in addr else None
+            if not L:
+                continue
+            _, data = box.fetch(i, "(BODY.PEEK[])")
+            msg = _email.message_from_bytes(data[0][1])
+            subject = str(make_header(decode_header(msg.get("Subject") or "")))
+            auto = bool(msg.get("Auto-Submitted", "no").lower() != "no" or msg.get("X-Autoreply") or AUTO_SUBJ.search(subject))
+            try:
+                when = parsedate_to_datetime(msg.get("Date")).astimezone().isoformat()
+            except Exception:
+                when = datetime.now().astimezone().isoformat()
+            replies.append((L, addr, subject, _plain_body(msg), when, auto))
+    finally:
+        try:
+            box.logout()
+        except Exception:
+            pass
+    STATE["inbox_seen"] = seen[-3000:]
+    save_state()
+    for L, addr, subject, body, when, auto in replies:
+        if not body:
+            body = "(رسالة بلا نص — افتحها في Gmail)"
+        db.req("POST", "lead_messages", body={"lead_id": L["id"], "channel": "email", "direction": "in", "subject": subject or None,
+                                              "body": body, "created_at": when})
+        if auto:  # out-of-office: keep it in the history, but it is not a conversation
+            log(f"auto-reply from {L['name']}")
+            continue
+        db.patch("leads", {"id": L["id"]}, {"status": "meeting" if L["status"] in ("meeting", "won") else "replied",
+                                            "needs_reply": True, "next_action_at": date.today().isoformat()})
+        # A follow-up written before they answered must never go out now.
+        db.req("PATCH", "lead_messages", {"lead_id": f"eq.{L['id']}", "draft": "eq.true", "review": "in.(pending,approved,write,failed)"},
+               {"review": "rejected", "review_note": "أُلغيت تلقائياً: العميل ردّ"})
+        db.req("POST", "lead_messages", body={"lead_id": L["id"], "channel": "email", "direction": "out", "draft": True,
+                                              "review": "write", "body": ""})
+        log(f"📩 reply from {L['name']} <{addr}>")
+        say(f"📩 ردّ من {L['name']} ({addr})\nالموضوع: {subject or '—'}\n────────\n{body[:1500]}\n────────\n"
+            "أوقفت المتابعات لهذا العميل، وأكتب لك مسودة ردّ تصلك هنا للموافقة.")
+
+
+class Capped(RuntimeError):
+    """Daily limit reached: the message stays approved and goes out by itself the next day."""
+
+
 def send_email(to, subject, body):
     import emailcheck
     cap, _rate = current_cap()
@@ -196,7 +301,7 @@ def send_email(to, subject, body):
     if STATE.get("sent_day") != today:
         STATE.update(sent_day=today, sent_count=0)
     if STATE["sent_count"] >= cap:
-        raise RuntimeError(f"وصلت للحد اليومي ({cap}) — سيُرسل غداً")
+        raise Capped(f"مؤجلة: وصلت للحد اليومي ({cap}) — تُرسل تلقائياً غداً")
     chk = emailcheck.check(to)
     if chk["ok"] is False:
         raise RuntimeError(f"الإيميل لن يصل ({chk['reason']}): {to} — صحّحه أو استخدم واتساب")
@@ -214,6 +319,9 @@ def send_email(to, subject, body):
         s.login(E["GMAIL_USER"], E["GMAIL_APP_PASSWORD"].replace(" ", ""))
         s.send_message(msg)
     STATE["sent_count"] += 1
+    log_ = STATE.setdefault("sent_log", {})  # per-day counts drive the gradual cap and the bounce rate
+    log_[today] = log_.get(today, 0) + 1
+    STATE["sent_log"] = {d: n for d, n in log_.items() if d >= (date.today() - timedelta(days=60)).isoformat()}
     save_state()
 
 
@@ -296,6 +404,12 @@ def gate(m, L):
         why.append("أطول من اللازم لرسالة أولى")
     if L.get("status") in ("lost", "skip"):
         why.append("العميل مغلق (رفض أو تجاهل)")
+    if m["channel"] == "email" and L.get("status") in ("new", "skip", None) and L.get("email"):
+        addr = L["email"].strip().lower()
+        other = db.get("leads", select="name,status", email=f"ilike.{addr}", id=f"neq.{L['id']}", status="neq.new", limit="1")
+        sent = db.get("lead_messages", select="id", lead_id=f"eq.{L['id']}", direction="eq.out", draft="eq.false", limit="1")
+        if other or sent:
+            why.append(f"راسلنا هذا الإيميل سابقاً ({other[0]['name'] if other else 'نفس العميل'}) — لا رسالة أولى ثانية")
     return why
 
 
@@ -359,6 +473,8 @@ def approve(mid, tg_mid):
     L = m["leads"]
     if m["review"] == "sent":
         return "أُرسلت مسبقاً"
+    if m["review"] == "rejected":
+        return f"🚫 لم تُرسل — {m.get('review_note') or 'المسودة مرفوضة'}"
     problems = gate(m, L)
     if problems:
         db.patch("lead_messages", {"id": mid}, {"review": "failed", "review_note": " · ".join(problems)[:300]})
@@ -377,16 +493,29 @@ def approve(mid, tg_mid):
         say(m["body"])
         done = f"✅ انسخ الرسالة أعلاه وأرسلها في الدايركت: {L.get('instagram') or ''}"
     now = datetime.utcnow().isoformat()
-    db.patch("lead_messages", {"id": mid}, {"review": "sent", "draft": False, "sent_at": now, "created_at": now})
+    db.patch("lead_messages", {"id": mid}, {"review": "sent", "review_note": None, "draft": False, "sent_at": now, "created_at": now})
     after_send(L)
     return done
 
 
+def hold_capped(mid, e):
+    db.patch("lead_messages", {"id": mid}, {"review": "approved", "review_note": str(e)[:300]})
+    if STATE.get("capped_day") != date.today().isoformat():
+        STATE["capped_day"] = date.today().isoformat()
+        save_state()
+        say(f"⏸ {e}")
+
+
 def send_site_approved():
     """Drafts approved from the site's Approvals tab are sent here too."""
-    for m in db.get("lead_messages", select="id,tg_message_id", review="eq.approved", limit="10"):
+    if STATE.get("capped_day") == date.today().isoformat():
+        return  # limit already hit today: approved ones wait for tomorrow, no retry every minute
+    for m in db.get("lead_messages", select="id,tg_message_id", review="eq.approved", order="created_at", limit="10"):
         try:
             say(approve(m["id"], m["tg_message_id"]))
+        except Capped as e:
+            hold_capped(m["id"], e)
+            break
         except Exception as e:
             db.patch("lead_messages", {"id": m["id"]}, {"review": "failed", "review_note": str(e)[:300]})
             say(f"⚠️ {e}")
@@ -400,7 +529,11 @@ def on_callback(q):
     tg("answerCallbackQuery", callback_query_id=q["id"], text="⏳")  # instantly, so Telegram never times out
     try:
         if action == "ok":
-            res = approve(mid, tg_mid)
+            try:
+                res = approve(mid, tg_mid)
+            except Capped as e:
+                hold_capped(mid, e)
+                res = f"⏸ {e}"
         elif action == "no":
             db.patch("lead_messages", {"id": mid}, {"review": "rejected"})
             res = "❌ رُفضت"
@@ -638,6 +771,13 @@ def main():
                 push_pending()
                 send_site_approved()
                 last_push = time.time()
+            if time.time() - last_bounce > 300:  # inbox: replies + bounces, every 5 min
+                last_bounce = time.time()
+                for fn in (check_inbox, check_bounces):
+                    try:
+                        fn()
+                    except Exception as e:
+                        log(f"{fn.__name__} failed:", str(e)[:200])
             today = date.today().isoformat()
             if STATE.get("chat") and datetime.now().hour >= report_hour and STATE.get("report_day") != today:
                 report()

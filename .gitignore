@@ -31,3 +31,7 @@ dist-ssr
 *.sln
 *.sw?
 tools/harvester/leads-*.json
+
+# Python
+__pycache__/
+*.pyc
