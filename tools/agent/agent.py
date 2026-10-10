@@ -464,6 +464,28 @@ def past_client_names():
     return _clients["names"]
 
 
+def email_site_mismatch(L):
+    """True when the email clearly belongs to another organisation: its domain and the website's share no name
+    (mercycorps.org vs prosperglobal.org). Free mail (gmail…) and leads without a website are not judged."""
+    em, site = (L.get("email") or "").lower(), (L.get("website") or "").lower()
+    if "@" not in em or not site:
+        return False
+    ed = em.split("@")[-1]
+    if ed in FREE_MAIL:
+        return False
+    host = re.sub(r"^https?://", "", site.split("%20")[0].split()[0]).split("/")[0].removeprefix("www.")
+    if not host or "." not in host:
+        return False
+    stop = {"com", "org", "net", "jo", "gov", "edu", "int", "co", "ac", "info", "www"}
+    names = lambda d: {w for w in re.split(r"[.\-]", d) if len(w) > 2 and w not in stop}
+    a, b = names(ed), names(host)
+    words = re.findall(r"[a-z]+", (L.get("name") or "").lower())
+    inits = ("".join(w[0] for w in words), "".join(w[0] for w in words if w not in {"of", "for", "the", "and", "to"}))
+    if any(len(x) >= 2 and x in i for x in a for i in inits):
+        return False  # gfp.ngo = Generations For Peace
+    return bool(a and b) and not any(x in y or y in x for x in a for y in b)
+
+
 def gate(m, L):
     """Returns a list of reasons to block. Empty list = safe to send. Any doubt → block."""
     body, subj = m.get("body") or "", m.get("subject") or ""
@@ -537,6 +559,8 @@ def card(m):
         head += f" · تقييم {L['score']}"
     if L.get("signal"):
         head += f"\n🔔 {L['signal']}"
+    if m["channel"] == "email" and email_site_mismatch(L):
+        head += f"\n⚠️ انتبه: الإيميل لا يشبه موقعهم ({L.get('website')}) — قد يكون لجهة أخرى. تأكد قبل الموافقة."
     subj = f"\nالموضوع: {m['subject']}" if m.get("subject") else ""
     return f"{head}{subj}\n────────\n{m['body']}"
 
