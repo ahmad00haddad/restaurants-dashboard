@@ -136,7 +136,7 @@ def _date_in_text(d, text):
     if d.isoformat() in t:
         return True
     month = d.strftime("%B").lower()
-    return (month in t or month[:3] in t) and re.search(r"0?%d" % d.day, t) is not None and str(d.year) in t
+    return (month in t or month[:3] in t) and re.search(r"\b0?%d\b" % d.day, t) is not None and str(d.year) in t
 
 
 def _valid(it, batch, today, kinds):

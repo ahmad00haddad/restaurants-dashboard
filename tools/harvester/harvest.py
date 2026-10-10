@@ -384,7 +384,7 @@ def signals(country="Jordan"):
             from datetime import datetime
             until = datetime.strptime(close.group(1).strip(), "%d %b %Y").date().isoformat() if close else None
             body = text(desc)
-            tender = re.search(r"(RFQ|RFP|tender|quotation|EOI|expression of interest|consultan)", title, re.I)
+            tender = re.search(r"\b(RFQ|RFP|tender|quotation|EOI|expression of interest|consultan)", title, re.I)
             kind = "Tender" if tender else "Hiring"
             hot = bool(VIDEO_WORDS.search(title + " " + body[:3000]))
             if tender and not VIDEO_WORDS.search(title + " " + body[:6000]):
