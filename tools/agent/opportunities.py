@@ -11,9 +11,8 @@ Sources: Exa web search (no key) and ReliefWeb's public RSS. Nothing is invented
 Results go into `leads` with signal / signal_url / signal_until (the site's "🔔 فرص الآن" tab) via the ingest_leads RPC.
 """
 import html
-import json
 import re
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 
 import httpx
 
@@ -195,7 +194,8 @@ def _find_deadline(model, url, today):
 def scan(db, model, seen, log=print, max_new=25):
     """Find new opportunities, save them as leads with a live signal. Returns the list saved (for the Telegram note)."""
     today = date.today()
-    found, urls = [], set(seen)
+    found, urls = [], list(seen)  # ordered: the newest stay when the memory is trimmed
+    known = set(seen)
 
     from concurrent.futures import ThreadPoolExecutor
     jobs = [(q.format(y=today.year), 8, True) for q in JORDAN_QUERIES] + [(q.format(y=today.year), 8, False) for q in TENDER_QUERIES] +            [(q.format(y=today.year, r=r), 5, False) for r in REGIONS for q in PROSPECT_QUERIES[:2]]
@@ -203,8 +203,9 @@ def scan(db, model, seen, log=print, max_new=25):
         results = list(ex.map(lambda j: _snippets(j[0], j[1]), jobs))
     batches = []  # (is_jordan, snippets)
     for (q, n, jo), res in zip(jobs, results):
-        res = [x for x in res if x[0] not in urls]
-        urls.update(x[0] for x in res)
+        res = [x for x in res if x[0] not in known]
+        known.update(x[0] for x in res)
+        urls += [x[0] for x in res]
         batches.append((jo, res))
     for jo, s_ in batches:
         for k in range(0, len(s_), 8):
@@ -221,7 +222,9 @@ def scan(db, model, seen, log=print, max_new=25):
 
     # --- ReliefWeb (structured)
     for rw in _reliefweb():
-        if rw["until"] >= today and rw["url"] not in seen:
+        if rw["until"] >= today and rw["url"] not in known:
+            known.add(rw["url"])
+            urls.append(rw["url"])  # remembered, so the same notice is not announced again tomorrow
             found.append({"jo": "jordan" in (rw["country"] or "").lower(), "kind": "tender", "org": rw["org"], "what": rw["title"], "deadline": rw["until"], "country": rw["country"],
                           "eligibility": "", "apply": "", "url": rw["url"], "text": rw["text"]})
 
@@ -244,5 +247,5 @@ def scan(db, model, seen, log=print, max_new=25):
         saved.append(o)
     if rows:
         db.req("POST", "rpc/ingest_leads", body={"rows": rows})
-    seen_new = list(urls)[-800:]
+    seen_new = urls[-1500:]
     return saved, seen_new

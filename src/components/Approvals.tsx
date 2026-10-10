@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAgentStatus, useLeadActions, type Approval } from "@/hooks/useLeads";
 import { useToast } from "@/hooks/useToast";
 import { KIND_LABEL } from "@/lib/leads";
@@ -33,10 +33,13 @@ function Item({ m, onOpen, online }: { m: Approval; onOpen: (id: string) => void
   const toast = useToast();
   const [body, setBody] = useState(m.body);
   const [subject, setSubject] = useState(m.subject ?? "");
+  // The agent may (re)write this draft while the page is open, or Ahmad edits it on Telegram: follow it unless he is typing here.
+  const [touched, setTouched] = useState(false);
+  useEffect(() => { if (!touched) { setBody(m.body); setSubject(m.subject ?? ""); } }, [m.body, m.subject]);
   const L = m.leads;
   const to = m.channel === "email" ? L.email : m.channel === "whatsapp" ? L.phone : L.instagram;
   const go = (r: "approved" | "rejected") =>
-    act.review(m.id, r, body, subject || null).then(() => toast.push(r === "approved" ? "✅ تمت الموافقة" : "❌ رُفضت"), (e) => toast.push(e.message, "error"));
+    act.review(m.id, r, touched ? body : undefined, touched ? subject || null : undefined).then(() => toast.push(r === "approved" ? "✅ تمت الموافقة" : "❌ رُفضت"), (e) => toast.push(e.message, "error"));
   return (
     <div className="rounded border border-border p-3 space-y-2 text-sm">
       <div className="flex justify-between gap-2">
@@ -48,8 +51,8 @@ function Item({ m, onOpen, online }: { m: Approval; onOpen: (id: string) => void
         <span>{m.review === "write" && !online ? "⏸ الوكيل متوقف — سيكتبها عند تشغيله" : STATE[m.review]}{m.review_note && m.review !== "write" ? `: ${m.review_note}` : ""}</span>
         {["write", "approved"].includes(m.review) && <button className="underline" onClick={() => go("rejected")}>إلغاء</button>}
       </div>
-      {m.review !== "write" && !(m.review === "failed" && !m.body) && m.channel === "email" && <input className="w-full rounded border border-border bg-background px-2 py-1.5" value={subject} onChange={(e) => setSubject(e.target.value)} />}
-      {m.review !== "write" && !(m.review === "failed" && !m.body) && <textarea className="w-full rounded border border-border bg-background px-2 py-1.5" rows={7} value={body} onChange={(e) => setBody(e.target.value)} />}
+      {m.review !== "write" && !(m.review === "failed" && !m.body) && m.channel === "email" && <input className="w-full rounded border border-border bg-background px-2 py-1.5" value={subject} onChange={(e) => { setTouched(true); setSubject(e.target.value); }} />}
+      {m.review !== "write" && !(m.review === "failed" && !m.body) && <textarea className="w-full rounded border border-border bg-background px-2 py-1.5" rows={7} value={body} onChange={(e) => { setTouched(true); setBody(e.target.value); }} />}
       {m.review === "failed" && !m.body && (
         <div className="flex gap-2">
           <button className="px-3 py-1.5 rounded bg-primary text-primary-foreground" onClick={() => act.retry(m.id).then(() => toast.push("🔁 أُعيدت إلى جهازك"), (e) => toast.push(e.message, "error"))}>🔁 أعد المحاولة</button>

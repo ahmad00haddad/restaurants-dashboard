@@ -53,7 +53,7 @@ function Home() {
     return { reply, followup, meeting, best, signals };
   }, [leads]);
   /** Emails we already wrote to (on any lead record) — a duplicate record with the same address must not get a first message. */
-  const contactedEmails = useMemo(() => new Set(leads.filter((l) => l.email && l.status !== "new").map((l) => l.email!.trim().toLowerCase())), [leads]);
+  const contactedEmails = useMemo(() => new Set(leads.filter((l) => l.email && ["contacted", "replied", "meeting", "won", "lost"].includes(l.status)).map((l) => l.email!.trim().toLowerCase())), [leads]);
   const alreadyMailed = (l: Lead) => !!l.email && contactedEmails.has(l.email.trim().toLowerCase());
 
   const list = useMemo(() => {

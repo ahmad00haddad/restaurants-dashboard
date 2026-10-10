@@ -233,7 +233,8 @@ ${out.body}`);
       lead_id: data.id, channel: data.channel, direction: "out", draft: true,
       subject: (out.subject as string) || null, body: out.body,
     });
-    if (data.mode === "reply" && out.status) {
+    // "lost" is Ahmad's call, never the model's: a polite "not now" must not close the client.
+    if (data.mode === "reply" && (out.status === "replied" || out.status === "meeting")) {
       const note = `${new Date().toISOString().slice(0, 10)}: ${out.summary ?? ""}`;
       await ctx.supabase.from("leads").update({
         status: out.status, notes: lead.notes ? `${lead.notes}\n${note}` : note,

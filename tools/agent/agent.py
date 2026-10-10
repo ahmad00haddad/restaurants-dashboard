@@ -6,7 +6,7 @@
 - Morning report every day + /report /queue /pause /resume commands.
 Config: agent.env (see agent.env.example).
 """
-import json, os, re, smtplib, sys, time, traceback
+import json, os, re, smtplib, sys, threading, time, traceback
 from datetime import date, datetime, timedelta
 from email.mime.text import MIMEText
 from email.utils import formataddr, make_msgid
@@ -32,11 +32,30 @@ E = load_env()
 for _k in ("NVIDIA_API_KEY", "OLLAMA_MODEL"):  # local_ai reads these from the environment
     if E.get(_k):
         os.environ[_k] = E[_k]
-STATE = json.loads(STATE_FILE.read_text()) if STATE_FILE.exists() else {}
+_state_lock = threading.RLock()
+
+
+def _load_state():
+    """A half-written state.json (power cut) must not stop the agent: fall back to the backup, then to empty."""
+    for f in (STATE_FILE, STATE_FILE.with_suffix(".bak")):
+        try:
+            return json.loads(f.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+    return {}
+
+
+STATE = _load_state()
 
 
 def save_state():
-    STATE_FILE.write_text(json.dumps(STATE))
+    """Write a temp file and swap it in, so a crash mid-write never leaves a broken state.json. Several threads save."""
+    with _state_lock:
+        tmp = STATE_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(STATE), encoding="utf-8")
+        if STATE_FILE.exists():
+            os.replace(STATE_FILE, STATE_FILE.with_suffix(".bak"))
+        os.replace(tmp, STATE_FILE)
 
 
 def log(*a):
@@ -160,15 +179,18 @@ def check_bounces():
     try:
         box.login(E["GMAIL_USER"], E["GMAIL_APP_PASSWORD"].replace(" ", ""))
         box.select("INBOX", readonly=True)
-        _, ids = box.search(None, f'(FROM "mailer-daemon" SINCE {since})')
+        _, ids = box.search(None, f'(SINCE {since} OR OR FROM "mailer-daemon" FROM "postmaster" SUBJECT "Undeliverable")')
         for i in ids[0].split()[-100:]:
             _, data = box.fetch(i, "(RFC822)")
             msg = _email.message_from_bytes(data[0][1])
             text = ""
             for part in msg.walk():
-                if part.get_content_type() in ("text/plain", "message/delivery-status"):
-                    text += (part.get_payload(decode=True) or b"").decode("utf-8", "ignore") if part.get_content_type() == "text/plain" else str(part.get_payload())
-            for addr in set(re.findall(r"(?:Final-Recipient: rfc822;|wasn't delivered to|to the following address[^\n]*\n+)\s*<?([\w.+-]+@[\w.-]+\.\w+)", text, re.I)):
+                if part.get_content_type() == "text/plain":
+                    text += (part.get_payload(decode=True) or b"").decode("utf-8", "ignore") + "\n"
+                elif part.get_content_type() == "message/delivery-status":  # payload = list of header blocks, not text
+                    pl = part.get_payload()
+                    text += "\n".join(str(x) for x in (pl if isinstance(pl, list) else [pl])) + "\n"
+            for addr in set(re.findall(r"(?:Final-Recipient:\s*rfc822;|wasn['’]t delivered to|to the following address[^\n]*\n+)\s*<?([\w.+-]+@[\w.-]+\.\w+)", text, re.I)):
                 found[addr.lower()] = date.today().isoformat()
     finally:
         try:
@@ -191,6 +213,8 @@ def check_bounces():
 
 FREE_MAIL = {"gmail.com", "googlemail.com", "hotmail.com", "outlook.com", "live.com", "yahoo.com", "icloud.com", "me.com", "aol.com", "proton.me", "protonmail.com"}
 AUTO_SUBJ = re.compile(r"automatic reply|auto.?reply|out of (the )?office|autoreply|away from|on leave|رد تلقائي|ردّ تلقائي|إجابة تلقائية|خارج المكتب", re.I)
+SYSTEM_SENDER = re.compile(r"^(postmaster|mailer-daemon|no-?reply|do-?not-?reply|notifications?|newsletters?|bounces?)@", re.I)
+BOUNCE_SUBJ = re.compile(r"undeliverable|delivery (status|has failed|failure)|mail delivery failed|returned mail|not delivered", re.I)
 QUOTE_START = re.compile(r"^(on .{5,200} wrote:|في .{5,200} كتب.{0,20}:|-{2,}\s*original message|from:\s|sent from my|من:\s)", re.I | re.M)
 
 
@@ -215,13 +239,14 @@ def _plain_body(msg):
     return re.sub(r"\n{3,}", "\n\n", text).strip()[:4000]
 
 
-def _lead_for(addr):
-    """The lead this sender belongs to: exact email first, else same company domain (never for gmail/hotmail…) among leads we wrote to."""
+def _lead_for(addr, is_reply):
+    """The lead this sender belongs to: exact email first, else same company domain (never for gmail/hotmail…) among leads we
+    wrote to, and only when the mail really answers something (Re: / In-Reply-To) — a newsletter from their domain is not a reply."""
     rows = db.get("leads", select="id,name,status,email,followups", email=f"ilike.{addr}", deleted_at="is.null", limit="2")
     if rows:
         return rows[0]
     dom = addr.split("@")[-1]
-    if dom in FREE_MAIL:
+    if dom in FREE_MAIL or not is_reply:
         return None
     rows = db.get("leads", select="id,name,status,email,followups", email=f"ilike.*@{dom}", deleted_at="is.null",
                   status="in.(contacted,replied,meeting,won)", limit="2")
@@ -243,16 +268,25 @@ def check_inbox():
         box.login(E["GMAIL_USER"], E["GMAIL_APP_PASSWORD"].replace(" ", ""))
         box.select("INBOX", readonly=True)
         _, ids = box.search(None, f'(SINCE {since} NOT FROM "{me}" NOT FROM "mailer-daemon")')
-        for i in ids[0].split()[-200:]:
-            _, data = box.fetch(i, "(BODY.PEEK[HEADER.FIELDS (FROM MESSAGE-ID)])")
-            head = _email.message_from_bytes(data[0][1])
+        ids = ids[0].split()[-200:]
+        heads = []
+        if ids:  # all headers in ONE round trip (the Telegram buttons wait while this runs)
+            _, data = box.fetch(b",".join(ids), "(BODY.PEEK[HEADER.FIELDS (FROM MESSAGE-ID SUBJECT IN-REPLY-TO REFERENCES LIST-UNSUBSCRIBE PRECEDENCE)])")
+            heads = [(re.match(rb"(\d+)", d[0]).group(1), _email.message_from_bytes(d[1])) for d in data if isinstance(d, tuple)]
+        for i, head in heads:
             mid = (head.get("Message-ID") or f"{i.decode()}-{head.get('From')}").strip()
             if mid in seen:
                 continue
-            seen.append(mid)
             addr = parseaddr(head.get("From") or "")[1].lower()
-            L = _lead_for(addr) if "@" in addr else None
+            subj0 = str(make_header(decode_header(head.get("Subject") or "")))
+            bulk = bool(head.get("List-Unsubscribe")) or (head.get("Precedence") or "").lower() in ("bulk", "list", "junk")
+            if "@" not in addr or bulk or SYSTEM_SENDER.match(addr) or BOUNCE_SUBJ.search(subj0):
+                seen.append(mid)  # newsletters, bounces, system mail: never a conversation
+                continue
+            is_reply = bool(head.get("In-Reply-To") or head.get("References") or re.match(r"\s*(re|aw|sv|رد)\s*:", subj0, re.I))
+            L = _lead_for(addr, is_reply)
             if not L:
+                seen.append(mid)
                 continue
             _, data = box.fetch(i, "(BODY.PEEK[])")
             msg = _email.message_from_bytes(data[0][1])
@@ -262,7 +296,7 @@ def check_inbox():
                 when = parsedate_to_datetime(msg.get("Date")).astimezone().isoformat()
             except Exception:
                 when = datetime.now().astimezone().isoformat()
-            replies.append((L, addr, subject, _plain_body(msg), when, auto))
+            replies.append((mid, L, addr, subject, _plain_body(msg), when, auto))
     finally:
         try:
             box.logout()
@@ -270,24 +304,30 @@ def check_inbox():
             pass
     STATE["inbox_seen"] = seen[-3000:]
     save_state()
-    for L, addr, subject, body, when, auto in replies:
-        if not body:
-            body = "(رسالة بلا نص — افتحها في Gmail)"
-        db.req("POST", "lead_messages", body={"lead_id": L["id"], "channel": "email", "direction": "in", "subject": subject or None,
-                                              "body": body, "created_at": when})
-        if auto:  # out-of-office: keep it in the history, but it is not a conversation
-            log(f"auto-reply from {L['name']}")
-            continue
-        db.patch("leads", {"id": L["id"]}, {"status": "meeting" if L["status"] in ("meeting", "won") else "replied",
-                                            "needs_reply": True, "next_action_at": date.today().isoformat()})
-        # A follow-up written before they answered must never go out now.
-        db.req("PATCH", "lead_messages", {"lead_id": f"eq.{L['id']}", "draft": "eq.true", "review": "in.(pending,approved,write,failed)"},
-               {"review": "rejected", "review_note": "أُلغيت تلقائياً: العميل ردّ"})
-        db.req("POST", "lead_messages", body={"lead_id": L["id"], "channel": "email", "direction": "out", "draft": True,
-                                              "review": "write", "body": ""})
-        log(f"📩 reply from {L['name']} <{addr}>")
-        say(f"📩 ردّ من {L['name']} ({addr})\nالموضوع: {subject or '—'}\n────────\n{body[:1500]}\n────────\n"
-            "أوقفت المتابعات لهذا العميل، وأكتب لك مسودة ردّ تصلك هنا للموافقة.")
+    for mid, L, addr, subject, body, when, auto in replies:
+        process_reply(L, addr, subject, body, when, auto)
+        STATE["inbox_seen"].append(mid)  # only once it is saved: a database hiccup means we try again next round
+        save_state()
+
+
+def process_reply(L, addr, subject, body, when, auto):
+    if not body:
+        body = "(رسالة بلا نص — افتحها في Gmail)"
+    db.req("POST", "lead_messages", body={"lead_id": L["id"], "channel": "email", "direction": "in", "subject": subject or None,
+                                          "body": body, "created_at": when})
+    if auto:  # out-of-office: keep it in the history, but it is not a conversation
+        log(f"auto-reply from {L['name']}")
+        return
+    db.patch("leads", {"id": L["id"]}, {"status": "meeting" if L["status"] in ("meeting", "won") else "replied",
+                                        "needs_reply": True, "next_action_at": date.today().isoformat()})
+    # A follow-up written before they answered must never go out now.
+    db.req("PATCH", "lead_messages", {"lead_id": f"eq.{L['id']}", "draft": "eq.true", "review": "in.(pending,approved,write,failed)"},
+           {"review": "rejected", "review_note": "أُلغيت تلقائياً: العميل ردّ"})
+    db.req("POST", "lead_messages", body={"lead_id": L["id"], "channel": "email", "direction": "out", "draft": True,
+                                          "review": "write", "body": ""})
+    log(f"📩 reply from {L['name']} <{addr}>")
+    say(f"📩 ردّ من {L['name']} ({addr})\nالموضوع: {subject or '—'}\n────────\n{body[:1500]}\n────────\n"
+        "أوقفت المتابعات لهذا العميل، وأكتب لك مسودة ردّ تصلك هنا للموافقة.")
 
 
 class Capped(RuntimeError):
@@ -302,18 +342,19 @@ def send_email(to, subject, body):
         STATE.update(sent_day=today, sent_count=0)
     if STATE["sent_count"] >= cap:
         raise Capped(f"مؤجلة: وصلت للحد اليومي ({cap}) — تُرسل تلقائياً غداً")
+    m = re.fullmatch(r"\s*([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})[\s\\/.,;]*", to or "")
+    if not m:
+        raise RuntimeError(f"عنوان الإيميل غير صالح: {to!r} — صحّحه في صفحة العميل")
+    to = m.group(1)
     chk = emailcheck.check(to)
     if chk["ok"] is False:
         raise RuntimeError(f"الإيميل لن يصل ({chk['reason']}): {to} — صحّحه أو استخدم واتساب")
-    if (to or "").strip().lower() in STATE.get("bounces", {}):
+    if to.lower() in STATE.get("bounces", {}):
         raise RuntimeError(f"هذا الإيميل ارتدّ سابقاً: {to}")
     msg = build_mime(body)
     msg["Subject"] = subject or E.get("SENDER_NAME", "")
     msg["From"] = formataddr((E.get("SENDER_NAME", ""), E["GMAIL_USER"]))
-    m = re.fullmatch(r"\s*([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})[\s\\/.,;]*", to or "")
-    if not m:
-        raise RuntimeError(f"عنوان الإيميل غير صالح: {to!r} — صحّحه في صفحة العميل")
-    msg["To"] = m.group(1)
+    msg["To"] = to
     msg["Message-ID"] = make_msgid(domain=E["GMAIL_USER"].split("@")[-1])
     with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as s:
         s.login(E["GMAIL_USER"], E["GMAIL_APP_PASSWORD"].replace(" ", ""))
@@ -406,7 +447,7 @@ def gate(m, L):
         why.append("العميل مغلق (رفض أو تجاهل)")
     if m["channel"] == "email" and L.get("status") in ("new", "skip", None) and L.get("email"):
         addr = L["email"].strip().lower()
-        other = db.get("leads", select="name,status", email=f"ilike.{addr}", id=f"neq.{L['id']}", status="neq.new", limit="1")
+        other = db.get("leads", select="name,status", email=f"ilike.{addr}", id=f"neq.{L['id']}", status="in.(contacted,replied,meeting,won,lost)", limit="1")
         sent = db.get("lead_messages", select="id", lead_id=f"eq.{L['id']}", direction="eq.out", draft="eq.false", limit="1")
         if other or sent:
             why.append(f"راسلنا هذا الإيميل سابقاً ({other[0]['name'] if other else 'نفس العميل'}) — لا رسالة أولى ثانية")
@@ -436,9 +477,17 @@ def buttons(mid):
                                  {"text": "❌ ارفض", "callback_data": f"no:{mid}"}]]}
 
 
+_push_lock = threading.Lock()
+
+
 def push_pending():
     if STATE.get("paused"):
         return
+    with _push_lock:
+        _push_pending()
+
+
+def _push_pending():
     rows = db.get("lead_messages", select="*,leads(*)", review="eq.pending", tg_message_id="is.null", order="created_at", limit="10")
     for m in rows:
         text = card(m)
@@ -469,8 +518,13 @@ def after_send(L):
 
 
 def approve(mid, tg_mid):
-    m = db.get("lead_messages", select="*,leads(*)", id=f"eq.{mid}")[0]
-    L = m["leads"]
+    rows = db.get("lead_messages", select="*,leads(*)", id=f"eq.{mid}")
+    if not rows or not rows[0].get("leads"):
+        return "🚫 هذه المسودة لم تعد موجودة (استُبدلت أو حُذفت)"
+    m, L = rows[0], rows[0]["leads"]
+    if mid in STATE.get("sent_mids", []) and m["review"] != "sent":
+        mark_sent(mid, L)  # it went out earlier but the database never heard: record it, never send again
+        return "أُرسلت مسبقاً"
     if m["review"] == "sent":
         return "أُرسلت مسبقاً"
     if m["review"] == "rejected":
@@ -483,6 +537,8 @@ def approve(mid, tg_mid):
         if not L.get("email"):
             return "لا يوجد إيميل لهذا العميل"
         send_email(L["email"], m.get("subject"), m["body"])
+        STATE["sent_mids"] = (STATE.get("sent_mids", []) + [mid])[-500:]  # remembered before the database is told
+        save_state()
         done = f"✅ أُرسلت إلى {L['email']}"
     elif m["channel"] == "whatsapp":
         if not L.get("phone"):
@@ -492,10 +548,14 @@ def approve(mid, tg_mid):
     else:
         say(m["body"])
         done = f"✅ انسخ الرسالة أعلاه وأرسلها في الدايركت: {L.get('instagram') or ''}"
+    mark_sent(mid, L)
+    return done
+
+
+def mark_sent(mid, L):
     now = datetime.utcnow().isoformat()
     db.patch("lead_messages", {"id": mid}, {"review": "sent", "review_note": None, "draft": False, "sent_at": now, "created_at": now})
     after_send(L)
-    return done
 
 
 def hold_capped(mid, e):
@@ -714,8 +774,26 @@ def write_requested():
 
 
 # ---------------- Global opportunities (tenders + prospects abroad) ----------------
+_opp_busy = threading.Lock()
+
+
 def run_opportunities(manual=False):
     """Daily scan (or /opps). New finds are saved as leads with a live signal and announced on Telegram right away."""
+    if not _opp_busy.acquire(blocking=False):
+        if manual:
+            say("🌍 البحث عن الفرص يعمل الآن — انتظر نتيجته.")
+        return
+    try:
+        _run_opportunities(manual)
+    except Exception as e:
+        log("opportunities failed:", e)
+        if manual:
+            say(f"⚠️ فشل البحث عن الفرص: {str(e)[:200]}")
+    finally:
+        _opp_busy.release()
+
+
+def _run_opportunities(manual):
     import opportunities
     model = _local.get("model") or local_model()
     if not model:
@@ -724,7 +802,7 @@ def run_opportunities(manual=False):
         return
     say("🌍 أبحث عن عطاءات وفرص جديدة (الأردن أولاً ثم العالم)…") if manual else None
     saved, seen = opportunities.scan(db, model, STATE.get("opp_seen", []), log=log)
-    STATE["opp_seen"], STATE["opp_day"] = seen, date.today().isoformat()
+    STATE["opp_seen"] = seen
     save_state()
     if not saved:
         say("🌍 لا فرص جديدة الآن.") if manual else None
@@ -751,7 +829,6 @@ def worker():
 
 
 def main():
-    import threading
     threading.Thread(target=worker, daemon=True).start()
     log("FAII Agent started. Open Telegram and send /start to your bot." if not STATE.get("chat") else "FAII Agent started.")
     offset, last_push, last_bounce, report_hour = STATE.get("offset", 0), 0, 0, int(E.get("REPORT_HOUR", "8"))
@@ -783,6 +860,10 @@ def main():
                 report()
                 STATE["report_day"] = today
                 save_state()
+            if STATE.get("chat") and datetime.now().hour >= report_hour and STATE.get("opp_day") != today and not _opp_busy.locked():
+                STATE["opp_day"] = today  # once a day, even if the scan fails half-way
+                save_state()
+                threading.Thread(target=run_opportunities, daemon=True).start()
         except Exception as e:
             log("error:", e)
             traceback.print_exc()

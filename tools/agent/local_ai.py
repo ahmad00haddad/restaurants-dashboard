@@ -77,16 +77,23 @@ def _ollama_chat(model, messages, temperature, as_json):
     return r.json()["message"]["content"]
 
 
+_down = {}  # model -> time until which it is skipped (hung or failing)
+
+
 def complete(model, system, user, temperature=0.2, as_json=True):
     """One call to the chosen model. 'nv:<id>' = NVIDIA; if it fails, the local Ollama model (OLLAMA_MODEL) takes over."""
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     if is_nv(model):
-        err = None
+        err = RuntimeError("NVIDIA models are resting after failures")
         for m in dict.fromkeys([model, NV_SMALL]):  # big model first, then the faster NVIDIA one, then local
+            if _down.get(m, 0) > time.time():
+                continue  # failed recently: don't wait another 2 minutes on it
             try:
                 return _nv_chat(m, messages, temperature)
             except Exception as e:
                 err = e
+                _down[m] = time.time() + 1800
+                print(f"{m} failed ({type(e).__name__}) — skipping it for 30 min", flush=True)
         model = os.environ.get("OLLAMA_MODEL", "qwen2.5:14b")
         if not available(model):
             raise err
