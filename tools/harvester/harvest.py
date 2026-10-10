@@ -48,10 +48,11 @@ def is_blocked(d):
     return bool(rx.search(blob))
 
 
-PRIVATE_WORDS = re.compile(r"private|international|american|british|IB|igcse|cambridge|bilingual|academy|kindergarten|nursery|montessori|preschool|"
+PRIVATE_WORDS = re.compile(r"private|international|american|british|\bIB\b|igcse|cambridge|bilingual|academy|kindergarten|nursery|montessori|preschool|"
                            r"خاصة|الخاصة|دولية|الدولية|أكاديمية|الأكاديمية|الأمريكية|البريطانية|حضانة|روضة|رياض الأطفال|مدارس ال", re.I)
-PUBLIC_WORDS = re.compile(r"public school|government|governmental|ministry of education|directorate|unrwa|حكومية|الحكومية|وزارة التربية|مديرية|الأونروا|الاونروا|"
-                          r"الثانوية (للبنين|للبنات|الشاملة)|الأساسية|الاساسية|الإعدادية|للبنين|للبنات", re.I)
+# Only the unmistakable government markers reject a school here; names like "الأساسية" / "للبنات" are left to the AI judges (school_type in local_ai.py).
+PUBLIC_WORDS = re.compile(r"public school|government|governmental|ministry of education|directorate|unrwa|حكومية|الحكومية|وزارة التربية|مديرية|الأونروا|الاونروا", re.I)
+SOFT_PUBLIC = re.compile(r"الثانوية (للبنين|للبنات|الشاملة)|الأساسية|الاساسية|الإعدادية|للبنين|للبنات", re.I)
 
 
 def school_ok(d):

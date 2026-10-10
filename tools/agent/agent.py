@@ -821,6 +821,26 @@ def local_model():
     return None
 
 
+_school_cache = {}
+
+
+def school_gate(L, cached_only=False):
+    """Private-or-public check by all available AI models (local_ai.school_type). Returns the verdict dict, or None when the school is
+    public (the lead is then marked skip). Unknown stays in the list, flagged for a human look. Cached per lead for this run."""
+    import local_ai
+    st = ((L.get("profile") or {}).get("school_type")) or _school_cache.get(L["id"])
+    if st is None and not cached_only:
+        st = local_ai.school_type(L)
+        _school_cache[L["id"]] = st
+        names = ", ".join(v["model"] for v in st["votes"]) or "-"
+        log(f"🏫 {L['name']}: {st['verdict']} ({st['confidence']}) by {names} — {st['evidence'][:80]}")
+    if st and st["verdict"] == "public":
+        db.patch("leads", {"id": L["id"]}, {"status": "skip", "notes": "مدرسة حكومية (تأكّدت منها النماذج): " + st["evidence"][:150],
+                                            "profile": {"summary": "مدرسة حكومية", "analysed_by": "school_type", "school_type": st}, "score": 0})
+        return None
+    return st
+
+
 def analyze_one():
     """Profile the next un-analysed lead on the local GPU. Organisations first, those with a website first."""
     if E.get("LOCAL_ANALYSIS", "1") != "1" or STATE.get("paused"):
@@ -855,7 +875,14 @@ def analyze_one():
     rows.sort(key=lambda L: (not L.get("signal"), irbid(L), rank.get(L["kind"], 7), not L.get("website")))
     L = rows[0]
     try:
+        if L.get("kind") == "school" and school_gate(L) is None:
+            return  # a government school: marked skip, nothing else to do
         p = local_ai.analyze(db, L, _local["team"], _local["model"])
+        if L.get("kind") == "school":
+            st = school_gate(L, cached_only=True)
+            if st:
+                p["profile"]["school_type"] = st
+                db.patch("leads", {"id": L["id"]}, {"profile": p["profile"]})
         _local["done"] += 1
         log(f"🧠 {L['name']}: {p['score']} — {p['profile'].get('angle', '')[:80]}")
     except Exception as e:
@@ -920,6 +947,9 @@ def write_requested():
     m, L = rows[0], rows[0]["leads"]
     if local_ai.is_blocked(L):
         db.patch("lead_messages", {"id": m["id"]}, {"review": "failed", "review_note": "على قائمة الاستبعاد: لا نراسله"})
+        return
+    if L.get("kind") == "school" and _local["model"] and school_gate(L) is None:
+        db.patch("lead_messages", {"id": m["id"]}, {"review": "failed", "review_note": "مدرسة حكومية: لا ميزانية للتصوير السينمائي"})
         return
     if not _local["model"]:
         db.patch("lead_messages", {"id": m["id"]}, {"review": "failed", "review_note": "Ollama غير شغّال على الجهاز"})

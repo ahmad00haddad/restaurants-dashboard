@@ -685,6 +685,73 @@ def school_first(L, team):
     return (f"Visual content: {short_name(L['name'])}" if lang == "en" else f"محتوى مرئي: {short_name(L['name'])}"), "\n\n".join(paras)
 
 
+SCHOOL_JUDGE = """You decide whether a school in Jordan is PRIVATE (fee-paying: private schools, international/American/British/IB schools, private
+nurseries and kindergartens) or PUBLIC (Ministry of Education government school, UNRWA school, or other state-run school).
+Use ONLY the evidence given. Private needs real evidence: tuition/fees, 'private', an international curriculum, a private owner or company,
+admissions marketing, several branches run by a company. Public needs real evidence: Ministry of Education / UNRWA / 'government', or a
+state-style name (e.g. 'الأساسية للبنين', 'الثانوية للبنات') AND nothing pointing to fees or private ownership.
+A name alone that merely sounds like a government school is weak evidence. If the evidence does not settle it, answer unknown. Never guess.
+Return JSON only: {"type":"private|public|unknown","confidence":0-100,"evidence":"the exact fact or quote you relied on, in one short line"}"""
+
+
+def judges():
+    """Every distinct AI model that is available: NVIDIA hosted (big, small) and the local Ollama models."""
+    out = []
+    if _nv_key():
+        out += ["nv:" + os.environ.get("NVIDIA_MODEL", "nvidia/nemotron-3-ultra-550b-a55b"), NV_SMALL]
+    for m in ("qwen2.5:14b", "gemma3:12b", os.environ.get("OLLAMA_MODEL", "")):
+        if m and m not in out and available(m):
+            out.append(m)
+    return out
+
+
+def school_evidence(L):
+    """What we can read about the school: Google category, its own site (fees / admissions words), and a web search."""
+    parts = [f"Name: {L.get('name')}", f"Google category: {L.get('category')}", f"City/address: {L.get('city')} {L.get('address') or ''}",
+             f"Website: {L.get('website')}", f"Instagram: {L.get('instagram')}", f"Facebook: {L.get('facebook')}"]
+    about = (L.get("about") or "")[:2500]
+    if about:
+        parts.append("Text from its website:\n" + about)
+    try:
+        web = _exa(f"{L.get('name')} {L.get('city') or ''} Jordan school private OR government tuition fees admission مدرسة خاصة رسوم", n=5)
+        if web:
+            parts.append("Web search results:\n" + web[:2500])
+    except Exception:
+        pass
+    return "\n".join(parts)
+
+
+def school_type(L, models=None):
+    """Private-or-public verdict by several AI models working independently on the same evidence.
+    Two models agreeing decide it; a split goes to the next model; no majority or low confidence = unknown (a person decides).
+    Returns {verdict: private|public|unknown, confidence, evidence, votes:[{model,type,confidence,evidence}]}."""
+    models = models or judges()
+    evidence = school_evidence(L)
+    votes = []
+    for m in models:
+        try:
+            out = chat(m, SCHOOL_JUDGE, evidence)
+        except Exception:
+            continue
+        t = str(out.get("type") or "unknown").lower()
+        try:
+            conf = int(out.get("confidence") or 0)
+        except (TypeError, ValueError):
+            conf = 0
+        votes.append({"model": str(m).replace("nv:nvidia/", ""), "type": t if t in ("private", "public") else "unknown",
+                      "confidence": conf, "evidence": str(out.get("evidence") or "")[:200]})
+        firm = [v for v in votes if v["type"] != "unknown" and v["confidence"] >= 55]
+        for kind in ("private", "public"):
+            agree = [v for v in firm if v["type"] == kind]
+            if len(agree) >= 2 and len(agree) > len(firm) - len(agree):
+                return {"verdict": kind, "confidence": round(sum(v["confidence"] for v in agree) / len(agree)),
+                        "evidence": agree[0]["evidence"], "votes": votes}
+    firm = [v for v in votes if v["type"] != "unknown" and v["confidence"] >= 55]
+    if len(votes) == 1 and firm and firm[0]["confidence"] >= 80:  # only one judge available: it must be very sure
+        return {"verdict": firm[0]["type"], "confidence": firm[0]["confidence"], "evidence": firm[0]["evidence"], "votes": votes}
+    return {"verdict": "unknown", "confidence": 0, "evidence": "لا إجماع بين النماذج" if votes else "لا يوجد نموذج متاح", "votes": votes}
+
+
 def roastery_first(L, team):
     """First email to a coffee roastery: one line about me, ONE strong example, the portfolio link. Fixed template, no model."""
     import hashlib
