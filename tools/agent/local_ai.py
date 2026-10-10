@@ -487,9 +487,14 @@ CLOSES = {  # calm closes, rotated per lead so messages do not share one fingerp
 }
 
 
-def close_for(L, lang):
+PHARMACY_CLOSES = ["وإن وجدتم فيها ما يناسب صيدليتكم، يسعدني أن نتحدث متى ناسبكم.",
+                   "وإن أعجبكم ما رأيتم، يسرّني أن نتحدث عنه متى شئتم.",
+                   "وإن رأيتم أن أسلوبي يناسبكم، يسعدني الحديث معكم في الوقت الذي يريحكم."]
+
+
+def close_for(L, lang, mode=None):
     import hashlib
-    opts = CLOSES["ar" if lang == "ar" else "en"]
+    opts = PHARMACY_CLOSES if mode == "first" and sector(L) == "pharmacy" else CLOSES["ar" if lang == "ar" else "en"]
     return opts[int(hashlib.md5(("close" + str(L.get("id") or L.get("name"))).encode()).hexdigest(), 16) % len(opts)]
 
 
@@ -533,8 +538,25 @@ def opt_out_for(L, lang):
 OFFER = re.compile(r"فيلم|أفلام|نصوّر|نصور|نوثّق بالصورة|film|shoot|video", re.I)  # not "تصوير": it is in the title "مدير تصوير"
 
 
+PHARMACY_BODY = [  # no film idea on purpose: the portfolio itself is the argument, they look and decide for themselves
+    "جمعت أعمالي في الرابط أدناه وتركتها تتحدث عن نفسها. تصفحوها متى شئتم وقرّروا بأنفسكم.",
+    "أعمالي مع الصيدليات في الرابط أدناه، وأترك لكم الحكم عليها بعد أن تشاهدوها.",
+    "ستجدون أعمالي في الرابط أدناه. شاهدوها على مهلكم، فهي تعرّف بي أفضل من أي كلام.",
+]
+
+
+def pharmacy_first(L, team):
+    """First email to a pharmacy: who I am in one line + the portfolio link. Fixed template, no model, no proposed idea."""
+    import hashlib
+    h = int(hashlib.md5(("pb" + str(L.get("id") or L.get("name"))).encode()).hexdigest(), 16)
+    body = intro_for(L, "ar") + "\n\n" + PHARMACY_BODY[h % len(PHARMACY_BODY)]
+    return f"محتوى مرئي: {short_name(L['name'])}", finish(body, L, team, "ar", "first")
+
+
 def write(L, team, history, channel, mode, hint, model):
     """Write, and retry once if the model skipped the idea or cleanup left too little (never queue a hollow message)."""
+    if mode == "first" and sector(L) == "pharmacy":
+        return pharmacy_first(L, team)
     last = None
     for attempt in range(2):
         try:
@@ -748,7 +770,7 @@ def finish(body, L, team, lang="en", mode="first"):
     paras = [" ".join(x for x in re.split(r"(?<=[.؟?!])\s+", p_) if not any(n.lower() in x.lower() for n in ALL_CLIENT_NAMES)).strip() for p_ in paras]
     paras = [p_ for p_ in paras if p_]
     # First message only: an easy, polite way out. Someone who can simply say "no" does not press "spam", the strongest bad signal.
-    close = close_for(L, lang) + (" " + opt_out_for(L, lang) if mode == "first" else "")  # one closing paragraph, not two
+    close = close_for(L, lang, mode) + (" " + opt_out_for(L, lang) if mode == "first" else "")  # one closing paragraph, not two
     text = "\n\n".join(paras + [close])
     # Always one clean greeting: drop whatever greeting-ish lines the model wrote, then add ours.
     ls = text.splitlines()
