@@ -538,10 +538,12 @@ OFFER = re.compile(r"فيلم|أفلام|نصوّر|نصور|نوثّق بالص
 
 
 PHARMACY_BODY = [  # no film idea on purpose: the portfolio itself is the argument, they look and decide for themselves
-    "جمعت أعمالي في الرابط أدناه وتركتها تتحدث عن نفسها. تصفحوها متى شئتم وقرّروا بأنفسكم.",
-    "أعمالي مع الصيدليات في الرابط أدناه، وأترك لكم الحكم عليها بعد أن تشاهدوها.",
-    "ستجدون أعمالي في الرابط أدناه. شاهدوها على مهلكم، فهي تعرّف بي أفضل من أي كلام.",
+    "وبقية أعمالي في الرابط أدناه، تركتها تتحدث عن نفسها. تصفحوها متى شئتم وقرّروا بأنفسكم.",
+    "وأعمالي كلها في الرابط أدناه، وأترك لكم الحكم عليها بعد أن تشاهدوها.",
+    "وستجدون بقية أعمالي في الرابط أدناه. شاهدوها على مهلكم، فهي تعرّف بي أفضل من أي كلام.",
 ]
+PHARMACY_EXAMPLE = "https://www.behance.net/gallery/243985595/_"  # Ahmad's strongest example, shot in Ramadan; one example, not the portfolio
+EXAMPLE_LINES = ["هذا مثال على عمل صوّرته في رمضان:", "ومن أعمالي، مشروع صوّرته في رمضان:"]
 
 
 def pharmacy_first(L, team):
@@ -549,7 +551,10 @@ def pharmacy_first(L, team):
     import hashlib
     h = int(hashlib.md5(("pb" + str(L.get("id") or L.get("name"))).encode()).hexdigest(), 16)
     body = intro_for(L, "ar") + "\n\n" + PHARMACY_BODY[h % len(PHARMACY_BODY)]
-    return f"محتوى مرئي: {short_name(L['name'])}", finish(body, L, team, "ar", "first")
+    paras = finish(body, L, team, "ar", "first").split("\n\n")
+    # the example sits before the close paragraph (finish strips links from the body, so it is added here)
+    paras.insert(len(paras) - 2, f"{EXAMPLE_LINES[(h >> 4) % len(EXAMPLE_LINES)]}\n{PHARMACY_EXAMPLE}")
+    return f"محتوى مرئي: {short_name(L['name'])}", "\n\n".join(paras)
 
 
 def write(L, team, history, channel, mode, hint, model):
