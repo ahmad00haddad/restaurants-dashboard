@@ -11,7 +11,7 @@ import httpx
 import emailcheck
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "harvester"))
-from harvest import read_site  # same website reader the collector uses (email, socials, text)
+from harvest import read_site, is_blocked  # same website reader the collector uses (email, socials, text)
 
 OLLAMA = "http://127.0.0.1:11434"
 

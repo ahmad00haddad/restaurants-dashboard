@@ -26,17 +26,64 @@ PRESETS = {
 
 
 # ---------------- Google Maps ----------------
+# ---------------- Blocklist: existing clients and chains we never contact ----------------
+BLOCKLIST_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "blocklist.txt")
+
+
+def _blocklist():
+    try:
+        words = [l.strip() for l in open(BLOCKLIST_FILE, encoding="utf-8") if l.strip() and not l.startswith("#")]
+    except OSError:
+        words = []
+    return re.compile("|".join(re.escape(w) for w in words), re.I) if words else None
+
+
+def is_blocked(d):
+    """True for a lead whose name, website or social account matches a line of blocklist.txt (old clients, chains with many branches)."""
+    rx = _blocklist()
+    if not rx:
+        return False
+    blob = " ".join(str(d.get(k) or "") for k in ("name", "website", "instagram", "facebook", "email"))
+    return bool(rx.search(blob))
+
+
+def human_check(pg):
+    return "/sorry/" in pg.url or pg.locator("iframe[src*='recaptcha']").count() > 0
+
+
+def wait_if_blocked(pg, show):
+    """Google's 'I'm not a robot' page: stop touching the page so the person can solve it, then go on. False = give up."""
+    if not human_check(pg):
+        return True
+    if not show:
+        print("  ⛔ Google asked for a human check. Run again and answer y to 'Show browser'.")
+        return False
+    print("  ⏸ Google human check: solve it in the browser window. I wait here (up to 10 minutes) and don't touch the page.")
+    for _ in range(300):
+        pg.wait_for_timeout(2000)
+        if not human_check(pg):
+            pg.wait_for_timeout(2000)
+            print("  ▶ continuing")
+            return True
+    return False
+
+
 def maps(queries, per_query, show):
+    import random
     from playwright.sync_api import sync_playwright
     out = []
     with sync_playwright() as p:
-        b = p.chromium.launch(headless=not show)
-        pg = b.new_page(locale="en-US")
+        # persistent profile: once a check is solved, Google remembers it for the next runs
+        b = p.chromium.launch_persistent_context(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".gprofile"),
+                                                 headless=not show, locale="en-US")
+        pg = b.pages[0] if b.pages else b.new_page()
         for kind, text, city in queries:
             print(f"\n🔎 {text}")
             try:
                 pg.goto("https://www.google.com/maps/search/" + urllib.parse.quote(text) + "?hl=en", timeout=60000)
                 pg.wait_for_timeout(3500)
+                if not wait_if_blocked(pg, show):
+                    break
                 for t in ("Reject all", "Accept all"):
                     if pg.locator(f"button:has-text('{t}')").count():
                         pg.locator(f"button:has-text('{t}')").first.click(); pg.wait_for_timeout(2000); break
@@ -44,16 +91,27 @@ def maps(queries, per_query, show):
             except Exception as e:
                 print("  ✗", str(e)[:100]); continue
             print(f"   {len(links)} places")
+            stop = False
             for url in links:
                 try:
                     pg.goto(url, timeout=45000)
+                    pg.wait_for_timeout(random.randint(1200, 3200))  # a human pace: fewer checks from Google
+                    if not wait_if_blocked(pg, show):
+                        stop = True
+                        break
                     pg.wait_for_selector("h1.DUwDvf", timeout=12000)
                     d = place(pg)
                 except Exception:
                     continue
+                if is_blocked(d):
+                    print("  ✗ skipped (blocklist):", d["name"])
+                    continue
                 d.update(kind=kind, city=d.get("city") or city, maps_url=url.split("?")[0], source="maps: " + text)
                 out.append(d)
                 print("  +", d["name"], d.get("phone") or "", d.get("website") or "")
+            if stop:
+                print("  (stopping the search here; everything found so far is still saved)")
+                break
         b.close()
     return out
 

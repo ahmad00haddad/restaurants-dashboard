@@ -1,0 +1,14 @@
+# Clients and chains we never contact. One word or phrase per line (matched against name, website, Instagram, Facebook, email).
+# Lines starting with # are ignored. Used by the collector and by the agent.
+سر الدواء
+سر دواء
+Sirr Al Dawa
+Sir Al Dawa
+Sirr Aldawa
+سعدون
+Saadoun
+Saadon
+# Their Amman branches use another name; unconfirmed, check Google Maps and fix the spelling:
+لين فارم
+Leen Pharm
+Lin Pharm
