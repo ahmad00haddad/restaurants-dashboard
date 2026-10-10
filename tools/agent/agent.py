@@ -617,6 +617,9 @@ def approve(mid, tg_mid):
     if not rows or not rows[0].get("leads"):
         return "🚫 هذه المسودة لم تعد موجودة (استُبدلت أو حُذفت)"
     m, L = rows[0], rows[0]["leads"]
+    import local_ai
+    if local_ai.is_blocked(L):  # last gate before anything is sent
+        return "⛔ هذا العميل على قائمة الاستبعاد (tools/harvester/blocklist.txt): لم يُرسل شيء"
     if mid in STATE.get("sent_mids", []) and m["review"] != "sent":
         mark_sent(mid, L)  # it went out earlier but the database never heard: record it, never send again
         return "أُرسلت مسبقاً"
@@ -836,6 +839,13 @@ def analyze_one():
     if not rows:
         refresh_one()
         return
+    for L in [r for r in rows if local_ai.is_blocked(r)]:  # an old client / big chain from tools/harvester/blocklist.txt
+        db.patch("leads", {"id": L["id"]}, {"status": "skip", "notes": "قائمة الاستبعاد (عميل قديم أو سلسلة كبيرة)",
+                                             "profile": {"summary": "مستبعد", "analysed_by": "blocklist"}, "score": 0})
+        log(f"⛔ {L['name']} is on the blocklist, skipped")
+    rows = [r for r in rows if not local_ai.is_blocked(r)]
+    if not rows:
+        return
     rank = {"pharmacy": 0, "school": 0, "ngo": 1, "org": 2, "hotel": 3, "brand": 4, "event": 5, "restaurant": 6}
     irbid = lambda L: not re.search(r"irbid|إربد|اربد", f"{L.get('city') or ''} {L.get('address') or ''}", re.I)
     rows.sort(key=lambda L: (not L.get("signal"), irbid(L), rank.get(L["kind"], 7), not L.get("website")))
@@ -904,6 +914,9 @@ def write_requested():
         _local.update(t=time.time(), model=local_model(),
                       team=((db.get("app_settings", select="data", id="eq.1") or [{}])[0].get("data") or {}))
     m, L = rows[0], rows[0]["leads"]
+    if local_ai.is_blocked(L):
+        db.patch("lead_messages", {"id": m["id"]}, {"review": "failed", "review_note": "على قائمة الاستبعاد: لا نراسله"})
+        return
     if not _local["model"]:
         db.patch("lead_messages", {"id": m["id"]}, {"review": "failed", "review_note": "Ollama غير شغّال على الجهاز"})
         return
