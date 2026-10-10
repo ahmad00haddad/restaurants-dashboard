@@ -80,8 +80,8 @@ export function LeadPanel({ id }: { id: string }) {
   };
 
   return (
-    <div className="p-4 space-y-4 text-sm">
-      <div>
+    <div className="p-4 flex flex-col gap-4 text-sm">
+      <div className="order-first">
         <div className="flex items-center gap-2">
           <h2 className="text-lg font-semibold">{lead.name}</h2>
           {lead.score != null && <span className="rounded bg-muted px-2 text-xs font-bold">{lead.score}</span>}
@@ -102,7 +102,7 @@ export function LeadPanel({ id }: { id: string }) {
         if (!last && !theirs) return null;
         const waiting = data?.msgs.find((m) => m.draft && (m as any).review === "pending");
         return (
-          <div className="rounded border border-green-600/40 bg-green-500/10 p-2 text-xs space-y-0.5">
+          <div className="-order-1 rounded border border-green-600/40 bg-green-500/10 p-2 text-xs space-y-0.5">
             {last && <div>✅ أُرسلت آخر رسالة عبر {last.channel} في {last.created_at.slice(0, 16).replace("T", " ")}</div>}
             {theirs ? <div>💬 ردّوا في {theirs.created_at.slice(0, 10)}</div> : last && <div>⏳ بانتظار ردّهم{lead.next_action_at ? ` — المتابعة الهادئة يوم ${lead.next_action_at}` : ""}</div>}
             {waiting && <div>📤 هناك رسالة بانتظار موافقتك على Telegram</div>}
@@ -188,7 +188,8 @@ export function LeadPanel({ id }: { id: string }) {
         )}
       </section>
 
-      <section className="rounded border border-border p-3 space-y-2">
+      {/* Once we have written to them, the conversation is what matters: it moves to the top. */}
+      <section className={`rounded border border-border p-3 space-y-2 ${msgs.length ? "-order-1" : ""}`}>
         <b>المحادثة</b>
         {msgs.length === 0 && <p className="text-muted-foreground">لا يوجد تواصل بعد.</p>}
         {msgs.map((m) => (

@@ -35,3 +35,5 @@ tools/harvester/leads-*.json
 # Python
 __pycache__/
 *.pyc
+tools/agent/state.bak
+tools/agent/state.tmp

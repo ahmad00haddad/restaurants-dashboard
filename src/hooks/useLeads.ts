@@ -38,6 +38,27 @@ export function useLead(id: string | null) {
   });
 }
 
+export type LastMessage = Pick<LeadMessage, "lead_id" | "direction" | "channel" | "created_at">;
+
+/** The newest real (non-draft) message of every conversation, for the Conversations board. */
+export function useLastMessages() {
+  return useQuery({
+    queryKey: ["last-messages"],
+    refetchInterval: 30_000,
+    queryFn: async (): Promise<Record<string, LastMessage>> => {
+      const out: Record<string, LastMessage> = {};
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await db.from("lead_messages").select("lead_id,direction,channel,created_at")
+          .eq("draft", false).order("created_at", { ascending: false }).range(from, from + 999);
+        if (error) throw error;
+        for (const m of data as LastMessage[]) out[m.lead_id] ??= m;
+        if (!data || data.length < 1000) break;
+      }
+      return out;
+    },
+  });
+}
+
 export interface Approval extends LeadMessage {
   review: string;
   review_note: string | null;
