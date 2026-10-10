@@ -561,7 +561,8 @@ PHARMACY_CLOSES = ["وإن وجدتم فيها ما يناسب صيدليتكم�
 
 def close_for(L, lang, mode=None):
     import hashlib
-    opts = PHARMACY_CLOSES if mode == "first" and sector(L) == "pharmacy" else CLOSES["ar" if lang == "ar" else "en"]
+    opts = (PHARMACY_CLOSES if mode == "first" and sector(L) == "pharmacy" else
+            SCHOOL_CLOSES if mode == "first" and sector(L) == "education" else CLOSES["ar" if lang == "ar" else "en"])
     return opts[int(hashlib.md5(("close" + str(L.get("id") or L.get("name"))).encode()).hexdigest(), 16) % len(opts)]
 
 
@@ -625,10 +626,45 @@ def pharmacy_first(L, team):
     return f"محتوى مرئي: {short_name(L['name'])}", "\n\n".join(paras)
 
 
+SCHOOL_WORKS = {  # one strong example per age group, chosen in code
+    "older": "https://www.behance.net/gallery/242646259/Duroub-With-Alma",
+    "young": "https://www.behance.net/gallery/237148893/Duroub-School",
+}
+YOUNG = re.compile(r"kinder|nursery|preschool|pre-school|early (years|childhood)|montessori|حضان|روضة|رياض الأطفال|طفول|تمهيدي|أطفال|اطفال", re.I)
+SCHOOL_BODY = [
+    "هذا مثال على عمل صوّرته لمدرسة:",
+    "ومن أعمالي مع المدارس، هذا المشروع:",
+    "مثال على ما صوّرته لمدرسة:",
+]
+SCHOOL_REST = [
+    "وبقية أعمالي في الرابط أدناه، تصفحوها متى شئتم وقرّروا بأنفسكم.",
+    "وأعمالي كلها في الرابط أدناه، وأترك لكم الحكم عليها بعد أن تشاهدوها.",
+    "وستجدون بقية أعمالي في الرابط أدناه، شاهدوها على مهلكم.",
+]
+SCHOOL_CLOSES = ["وإن وجدتم فيها ما يناسبكم، يسعدني أن نتحدث متى ناسبكم.",
+                 "وإن أعجبكم ما رأيتم، يسرّني أن نتحدث عنه متى شئتم.",
+                 "وإن رأيتم أن أسلوبي يناسب مدرستكم، يسعدني الحديث معكم في الوقت الذي يريحكم."]
+
+
+def school_first(L, team):
+    """First email to a school: who I am, ONE strong example matched to the age group (young children / older), the portfolio link.
+    Fixed template, no model, no proposed idea."""
+    import hashlib
+    h = int(hashlib.md5(("sb" + str(L.get("id") or L.get("name"))).encode()).hexdigest(), 16)
+    c = f"{L.get('name') or ''} {L.get('category') or ''}"
+    url = SCHOOL_WORKS["young" if YOUNG.search(c) else "older"]
+    body = intro_for(L, "ar") + "\n\n" + SCHOOL_REST[h % len(SCHOOL_REST)]
+    paras = finish(body, L, team, "ar", "first").split("\n\n")
+    paras.insert(len(paras) - 3, f"{SCHOOL_BODY[(h >> 4) % len(SCHOOL_BODY)]}\n{url}")
+    return f"محتوى مرئي: {short_name(L['name'])}", "\n\n".join(paras)
+
+
 def write(L, team, history, channel, mode, hint, model):
     """Write, and retry once if the model skipped the idea or cleanup left too little (never queue a hollow message)."""
     if mode == "first" and sector(L) == "pharmacy":
         return pharmacy_first(L, team)
+    if mode == "first" and sector(L) == "education":
+        return school_first(L, team)
     last = None
     for attempt in range(2):
         try:
@@ -717,6 +753,7 @@ def intro_for(L, lang):
 
 def wrong_proof(L, body):
     """Ahmad's rule: no client names in outreach — the website shows who he worked with."""
+    body = re.sub(r"https?://\S+", " ", body)  # the allowed portfolio links may carry a project name; only prose counts
     return [n for n in ALL_CLIENT_NAMES if n.lower() in body.lower()]
 
 

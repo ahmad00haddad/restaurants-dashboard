@@ -443,7 +443,7 @@ _allowed = {"t": 0, "urls": set()}
 def allowed_urls():
     """Only Ahmad's full bodies of work may be linked (his choice): personal site, team site, Behance profile."""
     if not _allowed["urls"]:
-        links = E.get("ALLOWED_LINKS") or "ahmadhaddad.lovable.app,behance.net/gallery/243985595/_,behance.net/gallery/243985595,behance.net/ahmad00haddad,behance.com/ahmad00haddad"
+        links = E.get("ALLOWED_LINKS") or "ahmadhaddad.lovable.app,behance.net/gallery/243985595/_,behance.net/gallery/242646259/duroub-with-alma,behance.net/gallery/242646259,behance.net/gallery/237148893/duroub-school,behance.net/gallery/237148893,behance.net/gallery/243985595,behance.net/ahmad00haddad,behance.com/ahmad00haddad"
         _allowed["urls"] = {u.strip().lower().replace("https://", "").replace("http://", "").replace("www.", "").rstrip("/") for u in links.split(",") if u.strip()}
     return _allowed["urls"]
 
@@ -512,7 +512,7 @@ def gate(m, L):
         wrong = []
     if wrong:
         why.append(f"يذكر أسماء عملاء سابقين (قاعدتك: لا أسماء، الموقع يعرضهم): {', '.join(wrong)}")
-    if L.get("status") in ("new", None) and not re.search(r"فيلم|أفلام|نصوّر|نصور|film|shoot|video|documentary", body, re.I):
+    if L.get("status") in ("new", None) and not re.search(r"فيلم|أفلام|نصوّر|نصور|صوّرت|صورت|ريل|film|shoot|video|reel|documentary", body, re.I):
         why.append("لا توضح أنها عرض تصوير/فيلم — قد تُفهم كتعليق أو شكوى")
     if re.search(r"(بعنوان|تحت عنوان|titled|entitled|called)\s*[«\"“'‘]", body, re.I):
         why.append("يقترح اسماً/عنواناً لفيلم — ممنوع")
