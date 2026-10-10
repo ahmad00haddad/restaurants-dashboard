@@ -31,6 +31,17 @@ JORDAN_QUERIES = [  # tender aggregators mirror JONEPS / UNGM / donor notices, s
     "Jordan call for consultants impact documentary film {y}",
     "Amman tender provision of video production services ministry",
 ]
+JORDAN_SIGNAL_QUERIES = [  # signal-first discovery of NEW organisations: something happened now that creates a need for film/photo
+    "Jordan NGO launches new project {y}",
+    "Jordan organisation announces grant funding awarded programme {y}",
+    "Amman new branch opening {y}",
+    "Jordan brand launches new campaign {y}",
+    "Amman conference forum summit {y} organised by",
+    "Jordan company launches new product {y}",
+    "Jordan annual report launch {y} organisation",
+    "Jordan rebrand new visual identity {y}",
+    "Jordan new programme launched youth women refugees {y}",
+]
 TENDER_QUERIES = [
     "request for quotation video production services {y}",
     "call for proposals documentary film production consultancy {y}",
@@ -44,6 +55,8 @@ PROSPECT_QUERIES = ["new hotel opening {y} {r}", "new restaurant opening soon {y
 EXTRACT_SYSTEM = """You extract paid-work opportunities for a freelance film director / cinematographer from web search snippets.
 For each snippet that really is such an opportunity, return an item. Rules:
 - kind: "tender" (RFQ/RFP/call for proposals/ToR/LTA to hire a company or individual for video/film/photo work), "commission" (a named organisation clearly looking to hire a video/film/photo producer), "opening" (a named business that has NOT opened yet and will open on a date written in the snippet), "event" (a named event that has NOT happened yet, with its date written in the snippet).
+- kind "news_signal": a named organisation in Jordan or the region that, per the snippet, JUST (recently) launched/announced a project, programme, grant, campaign, new branch, product, rebrand, report or conference, so it likely needs film/photo content now. Use it only when the snippet is dated news about that organisation itself.
+- org_type: one of ngo, org, hotel, restaurant, brand, event (what kind of organisation the org is).
 - Past events do not count: "launched", "opened", "was held" = skip. A closed or expired tender = skip.
 - Skip: full-time staff jobs, courses, stock footage, software, news about other topics, or anything not clearly about video/film/photo work or a business/event that will need it.
 - org = the organisation issuing the tender or opening/hosting (exact name as written). org_quote = a short EXACT quote from the snippet that contains the org name.
@@ -52,18 +65,25 @@ For each snippet that really is such an opportunity, return an item. Rules:
 - country = country if stated, else null.
 - eligibility = a short quote if the snippet restricts who can apply (registered company, local firm only, nationals only), else "".
 - apply = an email address or URL to apply/contact if written in the snippet, else "".
-Return JSON only: {"items":[{"index":<snippet number>,"kind":"...","org":"...","org_quote":"...","what":"...","deadline":"YYYY-MM-DD or null","country":"...","eligibility":"...","apply":"..."}]}. Empty list when none."""
+Return JSON only: {"items":[{"index":<snippet number>,"kind":"...","org":"...","org_quote":"...","what":"...","deadline":"YYYY-MM-DD or null","org_type":"...","country":"...","eligibility":"...","apply":"..."}]}. Empty list when none."""
 
 AGGREGATORS = re.compile(r"bidding ?source|biddetail|globaltenders|global tenders|bidsfactory|bids factory|developmentaid|development aid|tenderimpulse|tender impulse|"
                          r"ungm|reliefweb|linkedin|tendersontime|tenders on time|biddingsource|devex|dgmarket|joneps", re.I)
-LABEL = {"tender": "مناقصة/طلب عروض", "commission": "جهة تبحث عن مصوّر", "opening": "افتتاح/إطلاق قريب", "event": "فعالية قادمة"}
+LABEL = {"news_signal": "إشارة جديدة", "tender": "مناقصة/طلب عروض", "commission": "جهة تبحث عن مصوّر", "opening": "افتتاح/إطلاق قريب", "event": "فعالية قادمة"}
 KIND_OF = {"tender": "ngo", "commission": "org", "opening": "brand", "event": "event"}
+
+
+limited = False  # True when Exa refused (rate limit) during the last scan
 
 
 def _snippets(query, n=8):
     """[(url, published 'YYYY-MM-DD' or '', text)] from Exa."""
+    global limited
     try:
         text = local_ai._exa(query, n)
+    except local_ai.ExaLimit:
+        limited = True
+        return []
     except Exception:
         return []
     out = []
@@ -131,7 +151,7 @@ def _valid(it, batch, today, kinds):
     org, quote = str(it.get("org") or "").strip(), str(it.get("org_quote") or "").strip()
     if len(org) < 3 or org.lower() not in text.lower() or (quote and quote not in text) or AGGREGATORS.search(org):
         return None  # the organisation is the issuer, never the website that republishes the notice
-    if not VIDEO.search(text):
+    if it["kind"] in ("tender", "commission") and not VIDEO.search(text):
         return None
     deadline = None
     if it.get("deadline"):
@@ -143,7 +163,10 @@ def _valid(it, batch, today, kinds):
             deadline = None  # a date the text does not contain is a guess: ignore it
     if re.search(r"closed tender|tender closed|expired|deadline (has )?passed", text, re.I) and not (deadline and deadline >= today):
         return None
-    if it["kind"] != "tender":
+    if it["kind"] == "news_signal":
+        if not (pub and date.fromisoformat(pub) >= today - timedelta(days=45)):
+            return None  # a signal must be news from the last 45 days
+    elif it["kind"] != "tender":
         if not deadline or deadline < today:
             return None  # an opening / event / commission must carry a written FUTURE date
     elif deadline and deadline < today:
@@ -154,7 +177,7 @@ def _valid(it, batch, today, kinds):
     if len(what) < 15:
         return None
     return {"needs_deadline": it["kind"] == "tender" and not deadline, "kind": it["kind"], "org": org, "what": what, "deadline": deadline, "country": it.get("country"),
-            "eligibility": str(it.get("eligibility") or "")[:160], "apply": str(it.get("apply") or "")[:200], "url": url, "text": text}
+            "eligibility": str(it.get("eligibility") or "")[:160], "pub": pub, "org_type": it.get("org_type"), "apply": str(it.get("apply") or "")[:200], "url": url, "text": text}
 
 
 JUNK_MAIL = re.compile(r"example|@mail\.com|@email\.com|@domain|sentry|wixpress|@test\.|your-?name|name@|user@|\.(png|jpg|gif|svg)$|noreply|no-reply", re.I)
@@ -191,14 +214,14 @@ def _find_deadline(model, url, today):
     return d if d and d >= today and _date_in_text(d, page) else None
 
 
-def scan(db, model, seen, log=print, max_new=25):
+def scan(db, model, seen, log=print, max_new=40):
     """Find new opportunities, save them as leads with a live signal. Returns the list saved (for the Telegram note)."""
     today = date.today()
     found, urls = [], list(seen)  # ordered: the newest stay when the memory is trimmed
     known = set(seen)
 
     from concurrent.futures import ThreadPoolExecutor
-    jobs = [(q.format(y=today.year), 8, True) for q in JORDAN_QUERIES] + [(q.format(y=today.year), 8, False) for q in TENDER_QUERIES] +            [(q.format(y=today.year, r=r), 5, False) for r in REGIONS for q in PROSPECT_QUERIES[:2]]
+    jobs = [(q.format(y=today.year), 8, True) for q in JORDAN_QUERIES + JORDAN_SIGNAL_QUERIES] + [(q.format(y=today.year), 8, False) for q in TENDER_QUERIES] +            [(q.format(y=today.year, r=r), 5, False) for r in REGIONS for q in PROSPECT_QUERIES[:2]]
     with ThreadPoolExecutor(4) as ex:
         results = list(ex.map(lambda j: _snippets(j[0], j[1]), jobs))
     batches = []  # (is_jordan, snippets)
@@ -211,7 +234,7 @@ def scan(db, model, seen, log=print, max_new=25):
         for k in range(0, len(s_), 8):
             batch = s_[k:k + 8]
             for it in _extract(model, batch):
-                ok = _valid(it, batch, today, {"tender", "commission", "opening", "event"})
+                ok = _valid(it, batch, today, {"tender", "commission", "opening", "event", "news_signal"})
                 if ok and ok.pop("needs_deadline"):
                     ok["deadline"] = _find_deadline(model, ok["url"], today)
                     if not ok["deadline"]:
@@ -239,10 +262,12 @@ def scan(db, model, seen, log=print, max_new=25):
     rows, saved = [], []
     for o in list(by_org.values())[:max_new]:
         c = _contact(o["org"], o["country"])
-        sig = ("🇯🇴 " if o.get("jo") else "") + f"{LABEL[o['kind']]}: {o['what']}" + (f" — ⚠ {o['eligibility']}" if o["eligibility"] else "") + ("" if o["deadline"] else " — الموعد النهائي غير مذكور، راجع الرابط") + (f" — للتقديم: {o['apply']}" if o["apply"] else "")
-        rows.append({"name": o["org"], "kind": KIND_OF[o["kind"]], "city": o["country"], "source": "opportunities",
+        sig = ("🇯🇴 " if o.get("jo") else "") + f"{LABEL[o['kind']]}: {o['what']}" + (f" — ⚠ {o['eligibility']}" if o["eligibility"] else "") + ("" if o["deadline"] or o["kind"] == "news_signal" else " — الموعد النهائي غير مذكور، راجع الرابط") + (f" — للتقديم: {o['apply']}" if o["apply"] else "")
+        kind = o["org_type"] if o["kind"] == "news_signal" and o.get("org_type") in ("ngo", "org", "hotel", "restaurant", "brand", "event") else KIND_OF[o["kind"]]
+        until = o["deadline"] or (date.fromisoformat(o["pub"]) + timedelta(days=45) if o["kind"] == "news_signal" and o.get("pub") else today + timedelta(days=14))
+        rows.append({"name": o["org"], "kind": kind, "city": o["country"], "source": "opportunities",
                      "signal": sig[:500], "signal_url": o["url"],
-                     "signal_until": o["deadline"].isoformat() if o["deadline"] else (today + timedelta(days=14)).isoformat(),
+                     "signal_until": until.isoformat(),
                      "about": o["text"][:3000], **c})
         saved.append(o)
     if rows:

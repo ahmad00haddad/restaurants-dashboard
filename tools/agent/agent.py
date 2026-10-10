@@ -29,7 +29,7 @@ def load_env():
 
 
 E = load_env()
-for _k in ("NVIDIA_API_KEY", "OLLAMA_MODEL"):  # local_ai reads these from the environment
+for _k in ("NVIDIA_API_KEY", "OLLAMA_MODEL", "EXA_API_KEY"):  # local_ai reads these from the environment
     if E.get(_k):
         os.environ[_k] = E[_k]
 _state_lock = threading.RLock()
@@ -834,6 +834,7 @@ def analyze_one():
     rows = db.get("leads", select="*", profile="is.null", deleted_at="is.null",
                   **{"or": "(email.not.is.null,phone.not.is.null,instagram.not.is.null)"}, limit="40")
     if not rows:
+        refresh_one()
         return
     rank = {"pharmacy": 0, "school": 0, "ngo": 1, "org": 2, "hotel": 3, "brand": 4, "event": 5, "restaurant": 6}
     irbid = lambda L: not re.search(r"irbid|إربد|اربد", f"{L.get('city') or ''} {L.get('address') or ''}", re.I)
@@ -846,6 +847,34 @@ def analyze_one():
     except Exception as e:
         log(f"analysis failed for {L['name']}: {e}")
         db.patch("leads", {"id": L["id"]}, {"profile": {"summary": "تعذّر التحليل المحلي", "why": str(e)[:200], "analysed_by": "failed"}, "score": 0})
+
+
+def refresh_one():
+    """Nothing new to analyse: re-check an already analysed lead (fresh news, buying signal, decision makers, tier).
+    Highest score first, Irbid first; each lead is re-checked at most every REFRESH_DAYS (default 14)."""
+    import local_ai
+    if local_ai.exa_limited():
+        return  # Exa is cooling down; the same leads stay due
+    cutoff = (date.today() - timedelta(days=int(E.get("REFRESH_DAYS", "14")))).isoformat()
+    rows = db.get("leads", select="*", status="eq.new", deleted_at="is.null", profile="not.is.null",
+                  **{"or": f"(profile->>signal_checked.is.null,profile->>signal_checked.lt.{cutoff})"}, order="score.desc.nullslast", limit="40")
+    rows = [L for L in rows if (L.get("profile") or {}).get("analysed_by") != "failed" and (L.get("email") or L.get("phone") or L.get("instagram"))]
+    if not rows:
+        return
+    irbid = lambda L: not re.search(r"irbid|إربد|اربد", f"{L.get('city') or ''} {L.get('address') or ''}", re.I)
+    rows.sort(key=lambda L: (irbid(L), -(L.get("score") or 0)))
+    L = rows[0]
+    try:
+        p = local_ai.refresh(db, L, _local["model"])
+        _local["done"] += 1
+        sig = p.get("signal")
+        log(f"🔄 {L['name']}: {p['score']} tier {p['profile'].get('tier')}" + (f" 🔔 {sig[:70]}" if sig else ""))
+    except local_ai.ExaLimit:
+        log("Exa rate limit: pausing news refresh for 30 min (set EXA_API_KEY in agent.env for a real quota)")
+    except Exception as e:
+        log(f"refresh failed for {L['name']}: {e}")
+        pr = {**(L.get("profile") or {}), "signal_checked": date.today().isoformat()}  # do not retry the same lead in a loop
+        db.patch("leads", {"id": L["id"]}, {"profile": pr})
 
 
 _hb = {"t": 0, "warned": False}
@@ -942,6 +971,11 @@ def _run_opportunities(manual):
         return
     say("🌍 أبحث عن عطاءات وفرص جديدة (الأردن أولاً ثم العالم)…") if manual else None
     saved, seen = opportunities.scan(db, model, STATE.get("opp_seen", []), log=log)
+    if opportunities.limited and not saved:
+        STATE["opp_day"], STATE["opp_after"] = None, time.time() + 3600  # Exa refused: retry in an hour instead of losing the day
+        save_state()
+        say("🌍 البحث متوقف مؤقتاً: Exa المجاني وصل حده. سأعيد المحاولة بعد ساعة. (حل دائم: مفتاح Exa مجاني من dashboard.exa.ai ثم EXA_API_KEY في agent.env)")
+        return
     STATE["opp_seen"] = seen
     save_state()
     if not saved:
@@ -1000,7 +1034,7 @@ def main():
                 report()
                 STATE["report_day"] = today
                 save_state()
-            if STATE.get("chat") and datetime.now().hour >= report_hour and STATE.get("opp_day") != today and not _opp_busy.locked():
+            if STATE.get("chat") and datetime.now().hour >= report_hour and STATE.get("opp_day") != today and time.time() > STATE.get("opp_after", 0) and not _opp_busy.locked():
                 STATE["opp_day"] = today  # once a day, even if the scan fails half-way
                 save_state()
                 threading.Thread(target=run_opportunities, daemon=True).start()

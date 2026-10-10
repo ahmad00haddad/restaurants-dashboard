@@ -122,11 +122,9 @@ def fresh(L, months=12, limit=3):
         return []
     q = f"{name} {L.get('city') or ''} news projects announcement".strip()
     try:
-        r = httpx.post(EXA, timeout=40, headers={"Accept": "application/json, text/event-stream", "Content-Type": "application/json"},
-                       json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
-                             "params": {"name": "web_search_exa", "arguments": {"query": q, "numResults": 8}}})
-        data = next((json.loads(l[5:]) for l in r.text.splitlines() if l.startswith("data:")), {})
-        text = "".join(c.get("text", "") for c in data.get("result", {}).get("content", []))
+        text = _exa(q, 8)
+    except ExaLimit:
+        return None  # None = could not ask (rate limit), unlike [] = asked and found nothing; callers must not mark the lead as checked
     except Exception:
         return []
     place = {"jordan", "amman", "irbid", "zarqa", "aqaba", "الأردن", "عمان", "عمّان", "إربد", "الزرقاء", "العقبة", "the", "of", "and"}
@@ -237,9 +235,28 @@ STALE = re.compile(r"\b(former|formerly|ex-|previously|past)\b|\bafter \d+ years
 ORG_KINDS = {"ngo", "org", "hotel", "brand", "event", "pharmacy", "school"}
 
 
+class ExaLimit(Exception):
+    """Exa's rate limit (the keyless MCP is limited). Set EXA_API_KEY in agent.env for a real quota."""
+
+
+_exa_block = {"until": 0.0}
+
+
+def exa_limited():
+    return time.time() < _exa_block["until"]
+
+
 def _exa(query, n=8):
-    r = httpx.post(EXA, timeout=40, headers={"Accept": "application/json, text/event-stream", "Content-Type": "application/json"},
+    if exa_limited():
+        raise ExaLimit("cooling down")
+    headers = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json"}
+    if os.environ.get("EXA_API_KEY"):
+        headers["Authorization"] = "Bearer " + os.environ["EXA_API_KEY"]
+    r = httpx.post(EXA, timeout=40, headers=headers,
                    json={"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "web_search_exa", "arguments": {"query": query, "numResults": n}}})
+    if r.status_code == 429 or "rate limit" in r.text[:300].lower():
+        _exa_block["until"] = time.time() + 1800  # stop hammering for 30 minutes
+        raise ExaLimit("Exa rate limit")
     data = next((json.loads(l[5:]) for l in r.text.splitlines() if l.startswith("data:")), {})
     return "".join(c.get("text", "") for c in data.get("result", {}).get("content", []))
 
@@ -252,7 +269,7 @@ def find_people(L, model, limit=3):
         return []
     try:
         text = _exa(f"{name} {city} communications marketing director head linkedin.com/in") + "\n" + _exa(f"{name} team staff communications director")
-    except Exception:
+    except Exception:  # includes ExaLimit: no names is safe, the next refresh retries (people stays empty)
         return []
     chunks = []
     for ch in re.split(r"(?m)^Title: ", text)[1:]:
@@ -367,6 +384,8 @@ def analyze(db, L, team, model):
                 patch[k] = site[k]
         L = {**L, **patch}
     recent = fresh(L)
+    news_failed = recent is None  # rate limited: analyse without news and leave signal_checked empty so refresh retries later
+    recent = recent or []
     if recent:
         L = {**L, "recent": recent}
     p = chat(model, SYSTEM, f"{us(team)}\n\n{LANG_HINT}\n\nCLIENT:\n{them(L)}\n\nReturn JSON exactly in this shape:\n{SCHEMA}")
@@ -399,7 +418,11 @@ def analyze(db, L, team, model):
             patch.update(signal=f"{sig['type']}: {sig['text']}", signal_url=sig["url"], signal_until=sig["until"])
             L = {**L, "signal": patch["signal"]}
             p["signal_type"] = sig["type"]
+            p["score_base"] = score
             score = min(100, score + 10)  # something is happening now
+    p.setdefault("score_base", score)
+    if not news_failed:
+        p["signal_checked"] = date.today().isoformat()
     if L.get("kind") in ORG_KINDS and score >= 60:
         people = find_people(L, model)
         if people:
@@ -409,6 +432,51 @@ def analyze(db, L, team, model):
             if who:
                 p["contact"] = who
     p["tier"] = tier_of(score, L, p)
+    patch.update(profile=p, score=score)
+    db.patch("leads", {"id": L["id"]}, patch)
+    return patch
+
+
+def _signal_active(L):
+    return bool(L.get("signal")) and (not L.get("signal_until") or L["signal_until"] >= date.today().isoformat())
+
+
+def refresh(db, L, model):
+    """Light re-check of an already analysed lead: fresh news, hook, buying signal, email check, decision makers, tier.
+    Keeps the rest of the profile (who they are, angle, services) untouched — 2 to 4 model calls instead of a full analysis."""
+    p = dict(L.get("profile") or {})
+    patch = {}
+    base = p.get("score_base", L.get("score") or 0)
+    recent = fresh(L)
+    if recent is None:
+        raise ExaLimit("Exa rate limit")  # nothing is written: the lead stays due for the next refresh
+    p.pop("recent", None)
+    if recent:
+        p["recent"] = recent
+        h = recent_hook(L, recent, p.get("lang") or "ar", model)
+        if h:
+            p["hook"], p["hook_source"] = h, "news"
+        if not _signal_active(L):
+            sig = buying_signal(L, recent, model)
+            if sig:
+                patch.update(signal=f"{sig['type']}: {sig['text']}", signal_url=sig["url"], signal_until=sig["until"])
+                p["signal_type"] = sig["type"]
+    active = _signal_active({**L, **patch})
+    if not active:
+        p.pop("signal_type", None)
+    score = min(100, base + 10) if active else base
+    if L.get("email"):
+        p["email_check"] = emailcheck.check(L["email"])
+    if L.get("kind") in ORG_KINDS and score >= 60 and not p.get("people"):
+        people = find_people(L, model)
+        if people:
+            p["people"] = people
+            p["decision_maker"] = f"{people[0]['name']} — {people[0]['role']} (مرشّح غير مؤكد، المصدر {people[0]['as_of']})"
+            who = addressable(L, people)
+            if who:
+                p["contact"] = who
+    p["score_base"], p["signal_checked"] = base, date.today().isoformat()
+    p["tier"] = tier_of(score, {**L, **patch}, p)
     patch.update(profile=p, score=score)
     db.patch("leads", {"id": L["id"]}, patch)
     return patch
