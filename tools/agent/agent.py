@@ -777,7 +777,7 @@ def on_text(msg):
     if text == "/start" and not STATE.get("chat"):
         STATE["chat"] = chat
         save_state()
-        say("أهلاً أحمد 👋 ربطت هذا الحساب بالوكيل. ستصلك هنا الرسائل للموافقة والتقرير الصباحي.\nالأوامر: /report /queue /analyze /opps /pause /resume")
+        say("أهلاً أحمد 👋 ربطت هذا الحساب بالوكيل. ستصلك هنا الرسائل للموافقة والتقرير الصباحي.\nالأوامر: /report /queue /analyze /opps /radar /pause /resume")
         return
     if str(chat) != str(STATE.get("chat")):
         return  # only the owner can control the agent
@@ -805,6 +805,9 @@ def on_text(msg):
     elif text == "/opps":
         import threading
         threading.Thread(target=lambda: (run_opportunities(manual=True)), daemon=True).start()
+    elif text == "/radar":
+        import threading
+        threading.Thread(target=lambda: run_radar(manual=True), daemon=True).start()
     elif text == "/pause":
         STATE["paused"] = True; save_state(); say("⏸ أوقفت إرسال المسودات. /resume للاستئناف")
     elif text == "/resume":
@@ -1046,6 +1049,39 @@ def run_opportunities(manual=False):
         _opp_busy.release()
 
 
+_radar_busy = threading.Lock()
+
+
+def run_radar(manual=False):
+    """Daily (or /radar): competitions, festivals, grants, open calls and jobs for a photographer / cinematographer. New finds go to the
+    site's 🏆 tab and a short digest to Telegram; the official pages of the seeded programmes get their current deadline filled in."""
+    if not _radar_busy.acquire(blocking=False):
+        if manual:
+            say("🏆 الرادار يعمل الآن — انتظر نتيجته.")
+        return
+    try:
+        import radar
+        model = local_model()
+        if not model:
+            if manual:
+                say("🏆 الرادار يحتاج نموذجاً: شغّل Ollama أو أضف مفتاح NVIDIA.")
+            return
+        done = radar.refresh(db, model, log=log)
+        new = radar.scan(db, model, log=log)
+        log(f"🏆 radar: {len(new)} new, {done} official pages refreshed")
+        msg = radar.digest(new)
+        if msg:
+            say(msg)
+        elif manual:
+            say(f"🏆 لا فرص جديدة الآن ({done} صفحة رسمية حُدّثت). الفرص المحفوظة في تبويب 🏆 بالموقع.")
+    except Exception as e:
+        log("radar failed:", e)
+        if manual:
+            say(f"⚠️ فشل الرادار: {str(e)[:200]}")
+    finally:
+        _radar_busy.release()
+
+
 def _run_opportunities(manual):
     import opportunities
     model = _local.get("model") or local_model()
@@ -1122,6 +1158,10 @@ def main():
                 STATE["opp_day"] = today  # once a day, even if the scan fails half-way
                 save_state()
                 threading.Thread(target=run_opportunities, daemon=True).start()
+            if STATE.get("chat") and datetime.now().hour >= report_hour and STATE.get("radar_day") != today and not _radar_busy.locked():
+                STATE["radar_day"] = today  # once a day
+                save_state()
+                threading.Thread(target=run_radar, daemon=True).start()
         except Exception as e:
             log("error:", e)
             traceback.print_exc()

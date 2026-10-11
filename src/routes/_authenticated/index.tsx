@@ -9,6 +9,9 @@ import { LeadPanel } from "@/components/LeadPanel";
 import { Approvals } from "@/components/Approvals";
 import { AddLead } from "@/components/AddLead";
 import { Funnel } from "@/components/Funnel";
+import { Radar } from "@/components/Radar";
+import { useOpportunities } from "@/hooks/useOpportunities";
+import { daysLeft, isActiveOpp } from "@/lib/opportunities";
 import { KIND_LABEL, STATUS_LABEL, emailBad, irbidFirst, tierOf, tierRank, type Lead, type LeadStatus } from "@/lib/leads";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -17,7 +20,7 @@ export const Route = createFileRoute("/_authenticated/")({
 });
 
 /** Four places, one question each: what do I do now / who did we write to / who is next / which tenders are open. */
-type View = "today" | "convos" | "new" | "opps" | "approvals" | "stats";
+type View = "today" | "convos" | "new" | "opps" | "radar" | "approvals" | "stats";
 const today = (plus = 0) => new Date(Date.now() + plus * 864e5).toLocaleDateString("en-CA"); // local date, not UTC
 const daysAgo = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / 864e5);
 const STAGES: { status: LeadStatus; label: string }[] = [
@@ -39,6 +42,9 @@ function Home() {
   const draft = useServerFn(draftMessage);
   const { data: approvals = [] } = useApprovals();
   const { data: agent } = useAgentStatus();
+  const { data: radarOpps = [] } = useOpportunities();
+  const radarOpen = radarOpps.filter(isActiveOpp).length;
+  const radarClosing = radarOpps.filter((o) => isActiveOpp(o) && (daysLeft(o.deadline) ?? 99) <= 14);
   const fileRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<View>("today");
   const [kind, setKind] = useState("");
@@ -186,8 +192,15 @@ function Home() {
   const main = (() => {
     if (found) return (<><h3 className="px-3 pt-3 text-sm text-muted-foreground">نتائج البحث عن «{q}» في كل البيانات ({found.length})</h3>{table(found, lastLine)}</>);
     if (view === "today") {
-      return todayCount === 0 ? <p className="p-6 text-muted-foreground">✨ لا شيء ينتظرك اليوم. اذهب إلى «🎯 الجدد» لتكتب لأفضل 10.</p> : (
+      const radarNote = radarClosing.length > 0 && (
+        <div className="m-3 rounded border border-amber-500/50 bg-amber-500/10 p-3 flex items-center justify-between gap-2 text-sm">
+          <span>🏆 {radarClosing.length} مسابقة أو منحة تُغلق خلال 14 يوماً، أقربها: {radarClosing.sort((a, b) => (daysLeft(a.deadline) ?? 99) - (daysLeft(b.deadline) ?? 99))[0].title}</span>
+          <button className={btn} onClick={() => go("radar")}>افتح الرادار</button>
+        </div>
+      );
+      return todayCount === 0 ? <>{radarNote}<p className="p-6 text-muted-foreground">✨ لا شيء ينتظرك اليوم. اذهب إلى «🎯 الجدد» لتكتب لأفضل 10.</p></> : (
         <>
+          {radarNote}
           {section("🔥 ردود تنتظر جوابك", groups.reply, lastLine)}
           {approvals.length > 0 && (
             <div className="m-3 rounded border border-amber-500/50 bg-amber-500/10 p-3 flex items-center justify-between gap-2 text-sm">
@@ -261,7 +274,8 @@ function Home() {
         {tab("today", "✅ اليوم", todayCount)}
         {tab("convos", "💬 المحادثات", groups.convos.length)}
         {tab("new", "🎯 الجدد", groups.fresh.length)}
-        {tab("opps", "🔔 الفرص", groups.signals.length)}
+        {tab("opps", "🔔 فرص عملاء", groups.signals.length)}
+        {tab("radar", "🏆 مسابقات ومنح", radarOpen)}
         <div className="flex-1" />
         <input className="rounded border border-border bg-background px-2 py-1.5 text-sm w-48" placeholder="🔍 بحث في كل البيانات" value={q} onChange={(e) => setQ(e.target.value)} />
         {tab("stats", "📊 القياس")}
@@ -279,6 +293,7 @@ function Home() {
       {bulk && <div className="px-4 py-1 text-xs text-muted-foreground border-b border-border">{bulk}</div>}
 
       {view === "stats" && !found ? <Funnel leads={leads} />
+      : view === "radar" && !found ? <Radar />
       : view === "approvals" && !found ? (
         <>
           <button className="m-3 underline text-sm" onClick={() => go("today")}>→ رجوع إلى اليوم</button>
