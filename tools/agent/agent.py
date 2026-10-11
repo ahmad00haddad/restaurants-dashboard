@@ -836,7 +836,7 @@ def on_text(msg):
     if text == "/start" and not STATE.get("chat"):
         STATE["chat"] = chat
         save_state()
-        say("أهلاً أحمد 👋 ربطت هذا الحساب بالوكيل. ستصلك هنا الرسائل للموافقة والتقرير الصباحي.\nالأوامر: /report /queue /analyze /opps /radar /pause /resume")
+        say("أهلاً أحمد 👋 ربطت هذا الحساب بالوكيل. ستصلك هنا الرسائل للموافقة والتقرير الصباحي.\nالأوامر: /report /today /queue /analyze /opps /radar /pause /resume")
         return
     if str(chat) != str(STATE.get("chat")):
         return  # only the owner can control the agent
@@ -851,7 +851,9 @@ def on_text(msg):
         db.patch("lead_messages", {"id": mid}, patch)
         push_pending()
         return
-    if text == "/report":
+    if text == "/today":
+        daily_report()
+    elif text == "/report":
         report()
     elif text == "/queue":
         n = len(db.get("lead_messages", select="id", review="eq.pending"))
@@ -875,6 +877,8 @@ def on_text(msg):
 
 # ---------------- Morning report ----------------
 def report():
+    """Full morning report (also /report): sending today / yesterday / week, queue, replies, sectors, opportunities, health, pipeline."""
+    import reports
     leads = []
     for off in range(0, 20000, 1000):
         page = db.req("GET", "leads", {"select": "id,name,kind,status,score,email,phone,signal,signal_until,next_action_at,needs_reply,followups,deal_value",
@@ -882,23 +886,13 @@ def report():
         leads += page
         if len(page) < 1000:
             break
-    t = date.today().isoformat()
-    replies = [l for l in leads if l["needs_reply"]]
-    follow = [l for l in leads if l["status"] == "contacted" and l["next_action_at"] and l["next_action_at"] <= t and l["followups"] < 1]
-    signals = sorted([l for l in leads if l["signal"] and (not l["signal_until"] or l["signal_until"] >= t) and l["status"] not in ("won", "lost", "skip")],
-                     key=lambda l: l["signal_until"] or "9")
-    best = sorted([l for l in leads if l["status"] == "new" and l["score"] is not None and (l["email"] or l["phone"])], key=lambda l: -l["score"])
-    pending = db.get("lead_messages", select="id", review="eq.pending")
-    pipe = sum(float(l["deal_value"] or 0) for l in leads if l["status"] in ("replied", "meeting"))
-    won = sum(float(l["deal_value"] or 0) for l in leads if l["status"] == "won")
-    lines = [f"☀️ صباح الخير — تقرير {t}",
-             f"🔥 ردود تنتظرك: {len(replies)}" + "".join(f"\n   • {l['name']}" for l in replies[:5]),
-             f"🔔 فرص مفتوحة الآن: {len(signals)}" + "".join(f"\n   • {l['name']} — {l['signal'][:60]} ({l['signal_until'] or ''})" for l in signals[:5]),
-             f"↩️ متابعات مستحقة: {len(follow)}",
-             f"🎯 أفضل جدد: " + "، ".join(f"{l['name']} ({l['score']})" for l in best[:5]),
-             f"📤 مسودات بانتظار موافقتك: {len(pending)}",
-             f"📊 {len(leads)} عميل · تواصلنا مع {sum(1 for l in leads if l['status'] not in ('new', 'skip'))} · قيد التفاوض {pipe:.0f} د.أ · صفقات {won:.0f} د.أ"]
-    say("\n\n".join(lines))
+    say(reports.full(sys.modules[__name__], leads))
+
+
+def daily_report():
+    """Short end-of-day summary (also /today): how many were sent today, replies, what waits for tomorrow."""
+    import reports
+    say(reports.daily(sys.modules[__name__]))
 
 
 # ---------------- Local analysis (Ollama on this PC, no credit) ----------------
@@ -1213,6 +1207,13 @@ def main():
                     except Exception as e:
                         log(f"{fn.__name__} failed:", str(e)[:200])
             today = date.today().isoformat()
+            if STATE.get("chat") and datetime.now().hour >= int(E.get("EVENING_HOUR", "21")) and STATE.get("evening_day") != today:
+                STATE["evening_day"] = today
+                save_state()
+                try:
+                    daily_report()
+                except Exception as e:
+                    log("daily report failed:", str(e)[:150])
             if STATE.get("chat") and datetime.now().hour >= report_hour and STATE.get("report_day") != today:
                 report()
                 STATE["report_day"] = today
