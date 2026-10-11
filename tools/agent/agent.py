@@ -659,7 +659,7 @@ def mark_sent(mid, L):
 
 
 def enqueue(mid, rush=False):
-    """✅: emails are checked now and wait in the queue (one every 8–20 min in working hours); WhatsApp/Instagram and ⚡ go at once."""
+    """✅: sent at once after the safety check (daily limit still applies). With PACED=1 emails wait in the queue instead, one every 8–20 min in working hours."""
     rows = db.get("lead_messages", select="*,leads(*)", id=f"eq.{mid}")
     if not rows or not rows[0].get("leads"):
         return "🚫 هذه المسودة لم تعد موجودة (استُبدلت أو حُذفت)"
@@ -667,8 +667,8 @@ def enqueue(mid, rush=False):
     if rush:
         db.patch("lead_messages", {"id": mid}, {"review_note": "⚡ عاجل"})
         m["review_note"] = "⚡ عاجل"
-    if m["channel"] != "email" or is_rush(m, L) or m["review"] in ("sent", "rejected"):
-        return approve(mid, None)
+    if E.get("PACED", "0") != "1" or m["channel"] != "email" or is_rush(m, L) or m["review"] in ("sent", "rejected"):
+        return approve(mid, None)  # default: send as soon as it is approved (the daily limit still applies); PACED=1 brings the queue back
     problems = gate(m, L)
     if problems:
         db.patch("lead_messages", {"id": mid}, {"review": "failed", "review_note": " · ".join(problems)[:300]})
