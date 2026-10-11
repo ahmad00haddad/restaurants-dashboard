@@ -10,6 +10,7 @@ import { Approvals } from "@/components/Approvals";
 import { AddLead } from "@/components/AddLead";
 import { Funnel } from "@/components/Funnel";
 import { Radar } from "@/components/Radar";
+import { ReplyLessons } from "@/components/ReplyLessons";
 import { useOpportunities } from "@/hooks/useOpportunities";
 import { daysLeft, isActiveOpp } from "@/lib/opportunities";
 import { KIND_LABEL, STATUS_LABEL, emailBad, irbidFirst, tierOf, tierRank, type Lead, type LeadStatus } from "@/lib/leads";
@@ -292,7 +293,7 @@ function Home() {
       </div>
       {bulk && <div className="px-4 py-1 text-xs text-muted-foreground border-b border-border">{bulk}</div>}
 
-      {view === "stats" && !found ? <Funnel leads={leads} />
+      {view === "stats" && !found ? <><Funnel leads={leads} /><ReplyLessons /></>
       : view === "radar" && !found ? <Radar />
       : view === "approvals" && !found ? (
         <>

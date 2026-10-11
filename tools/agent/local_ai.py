@@ -752,6 +752,35 @@ def school_type(L, models=None):
     return {"verdict": "unknown", "confidence": 0, "evidence": "لا إجماع بين النماذج" if votes else "لا يوجد نموذج متاح", "votes": votes}
 
 
+REPLY_CATEGORIES = ("interested", "question", "meeting_request", "not_now", "no_internal_capacity", "no_budget", "not_relevant", "stop_contact",
+                    "wrong_person", "auto_reply_support_desk", "auto_reply_generic", "out_of_office", "other")
+REPLY_SYSTEM = """You study replies to cold outreach sent by Ahmad Haddad, a director / cinematographer in Jordan, so the sending system can improve.
+You get OUR last message to this organisation and THEIR reply. Return JSON only:
+{"category":"interested|question|meeting_request|not_now|no_internal_capacity|no_budget|not_relevant|stop_contact|wrong_person|auto_reply_support_desk|auto_reply_generic|out_of_office|other",
+"objection":"what stands in the way, using their words, one short line in Arabic (empty if none)",
+"lesson":"what this reply teaches about WHO we target, WHAT we wrote, or WHICH ADDRESS we used, one line in Arabic",
+"suggestion":"ONE concrete change to make in the system (a targeting rule, a template change, how an address is chosen, timing), in Arabic; empty if nothing follows",
+"confidence":0-100}
+Definitions: auto_reply_support_desk = automatic answer from a donor / supporter / customer-service desk or ticket system (the address reaches the wrong team);
+auto_reply_generic = other automatic acknowledgement; out_of_office = away notice; no_internal_capacity = they do this work in-house;
+wrong_person = they say to write to someone else; stop_contact = asks not to be contacted again.
+Only what the text says. Never invent facts about them."""
+
+
+def review_reply(model, L, ours, theirs, auto=False):
+    """Classify one reply and say what the system should learn. Returns a dict (category always valid) or raises."""
+    user = (f"ORGANISATION: {L.get('name')} (type {L.get('kind')}, {L.get('city') or ''})\nAUTOMATIC REPLY FLAG: {auto}\n\n"
+            f"OUR LAST MESSAGE:\n{(ours or '(none found)')[:1500]}\n\nTHEIR REPLY:\n{(theirs or '')[:2500]}")
+    out = chat(model, REPLY_SYSTEM, user)
+    cat = str(out.get("category") or "other").lower()
+    try:
+        conf = int(out.get("confidence") or 0)
+    except (TypeError, ValueError):
+        conf = 0
+    return {"category": cat if cat in REPLY_CATEGORIES else "other", "objection": str(out.get("objection") or "")[:300] or None,
+            "lesson": str(out.get("lesson") or "")[:400] or None, "suggestion": str(out.get("suggestion") or "")[:400] or None, "confidence": conf}
+
+
 def roastery_first(L, team):
     """First email to a coffee roastery: one line about me, ONE strong example, the portfolio link. Fixed template, no model."""
     import hashlib

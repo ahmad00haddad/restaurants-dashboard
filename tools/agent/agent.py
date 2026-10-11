@@ -331,11 +331,60 @@ def is_refusal(body):
     return bool(REFUSAL.search(first))
 
 
+_insight_off = {"warned": False}
+
+
+def learn_from_reply(L, msg_id, subject, body, auto):
+    """Every reply teaches something: classify it with the local model, store the lesson (site: 📊 القياس), tell Telegram, and apply the
+    safe automatic fixes (an address that only reaches a support desk is marked bad so no lead is picked by it again)."""
+    import local_ai
+    model = local_model()
+    if not model:
+        return None
+    try:
+        ours = db.get("lead_messages", select="body", lead_id=f"eq.{L['id']}", direction="eq.out", draft="eq.false", order="created_at.desc", limit="1")
+        ins = local_ai.review_reply(model, L, ours[0]["body"] if ours else "", f"{subject or ''}\n{body}", auto)
+    except Exception as e:
+        log("reply study failed:", str(e)[:120])
+        return None
+    row = {"lead_id": L["id"], "message_id": msg_id, "lead_kind": L.get("kind"), **ins}
+    try:
+        db.req("POST", "reply_insights", {"on_conflict": "message_id"}, row, prefer="resolution=ignore-duplicates")
+    except Exception as e:
+        if not _insight_off["warned"]:
+            log("reply lessons not saved (apply migration 20261011150000_reply_insights.sql):", str(e)[:120])
+            _insight_off["warned"] = True
+    if ins["category"] in ("auto_reply_support_desk", "wrong_person") and L.get("email"):
+        prof = {**(L.get("profile") or {}), "email_check": {"ok": False, "role": True, "reason": "الردّ يدلّ أن هذا العنوان لا يصل للفريق المعني: " + (ins.get("objection") or ins["category"])[:120]}}
+        db.patch("leads", {"id": L["id"]}, {"profile": prof})
+    log(f"🧠 reply study {L['name']}: {ins['category']} — {ins.get('lesson') or ''}"[:200])
+    if not auto or ins["category"] == "auto_reply_support_desk":
+        say(f"🧠 درس من ردّ {L['name']}: {ins['category']}\n"
+            + (f"المشكلة: {ins['objection']}\n" if ins.get("objection") else "") + (f"الدرس: {ins['lesson']}\n" if ins.get("lesson") else "")
+            + (f"اقتراح للنظام: {ins['suggestion']}" if ins.get("suggestion") else ""))
+    return ins
+
+
+def learn_backlog():
+    """Once at start: study replies that arrived before this feature existed (or while the table was missing)."""
+    try:
+        done = {r["message_id"] for r in db.get("reply_insights", select="message_id", limit="2000") if r.get("message_id")}
+    except Exception:
+        return  # table not there yet
+    rows = db.get("lead_messages", select="id,subject,body,leads(*)", direction="eq.in", order="created_at.desc", limit="60")
+    for r in rows:
+        if r["id"] in done or not r.get("leads"):
+            continue
+        auto = bool(AUTO_SUBJ.search(r.get("subject") or "")) or bool(re.search(r"thank you for contacting|automated|auto-?reply|do not reply|ticket|higher-than-usual volume", r.get("body") or "", re.I))
+        learn_from_reply(r["leads"], r["id"], r.get("subject"), r.get("body") or "", auto)
+
+
 def process_reply(L, addr, subject, body, when, auto):
     if not body:
         body = "(رسالة بلا نص — افتحها في Gmail)"
-    db.req("POST", "lead_messages", body={"lead_id": L["id"], "channel": "email", "direction": "in", "subject": subject or None,
-                                          "body": body, "created_at": when})
+    saved = db.req("POST", "lead_messages", body={"lead_id": L["id"], "channel": "email", "direction": "in", "subject": subject or None,
+                                                  "body": body, "created_at": when}, prefer="return=representation")
+    threading.Thread(target=learn_from_reply, args=(L, (saved or [{}])[0].get("id"), subject, body, auto), daemon=True).start()
     if auto:  # out-of-office: keep it in the history, but it is not a conversation
         log(f"auto-reply from {L['name']}")
         return
@@ -1137,6 +1186,7 @@ def worker():
 
 def main():
     threading.Thread(target=worker, daemon=True).start()
+    threading.Thread(target=learn_backlog, daemon=True).start()
     log("FAII Agent started. Open Telegram and send /start to your bot." if not STATE.get("chat") else "FAII Agent started.")
     offset, last_push, last_bounce, report_hour = STATE.get("offset", 0), 0, 0, int(E.get("REPORT_HOUR", "8"))
     while True:
