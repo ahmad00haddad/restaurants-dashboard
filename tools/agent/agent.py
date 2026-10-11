@@ -19,9 +19,15 @@ HERE = Path(__file__).parent
 STATE_FILE = HERE / "state.json"
 
 
+ENV_KEYS = ("SUPABASE_URL", "SUPABASE_KEY", "AGENT_EMAIL", "AGENT_PASSWORD", "GMAIL_USER", "GMAIL_APP_PASSWORD", "SENDER_NAME",
+            "DAILY_CAP", "DAILY_MAX", "RAMP_STEP", "RAMP_DAYS", "RUSH_DAYS", "RUSH_EXTRA", "SEND_HOURS", "OFF_DAYS", "ALLOWED_LINKS", "PACED")
+
+
 def load_env():
-    env = {}
-    for line in (HERE / "agent.env").read_text(encoding="utf-8").splitlines():
+    """agent.env on the PC; in the cloud sender (GitHub Actions) there is no file, the same keys come from the environment."""
+    env = {k: os.environ[k] for k in ENV_KEYS if os.environ.get(k)}
+    f = HERE / "agent.env"
+    for line in (f.read_text(encoding="utf-8").splitlines() if f.exists() else []):
         if "=" in line and not line.strip().startswith("#"):
             k, v = line.split("=", 1)
             env[k.strip()] = v.strip()
@@ -117,7 +123,7 @@ db = DB()
 
 
 # ---------------- Telegram ----------------
-TG = f"https://api.telegram.org/bot{E['TELEGRAM_TOKEN']}/"
+TG = f"https://api.telegram.org/bot{E.get('TELEGRAM_TOKEN', '')}/"
 
 
 def tg(method, **p):
@@ -612,7 +618,15 @@ def after_send(L):
     db.patch("leads", {"id": L["id"]}, patch)
 
 
-def approve(mid, tg_mid):
+def claim(mid):
+    """Atomically take an approved draft for sending (approved → sending). Only one sender (this PC or the cloud one) can win it,
+    so an email is never sent twice."""
+    r = db.req("PATCH", "lead_messages", {"id": f"eq.{mid}", "review": "eq.approved"},
+               {"review": "sending", "review_note": "⏳ تُرسل الآن"}, prefer="return=representation")
+    return bool(r)
+
+
+def approve(mid, tg_mid, own_claim=False):
     rows = db.get("lead_messages", select="*,leads(*)", id=f"eq.{mid}")
     if not rows or not rows[0].get("leads"):
         return "🚫 هذه المسودة لم تعد موجودة (استُبدلت أو حُذفت)"
@@ -625,6 +639,8 @@ def approve(mid, tg_mid):
         return "أُرسلت مسبقاً"
     if m["review"] == "sent":
         return "أُرسلت مسبقاً"
+    if m["review"] == "sending" and not own_claim:
+        return "⏳ قيد الإرسال الآن من مُرسِل آخر"
     if m["review"] == "rejected":
         return f"🚫 لم تُرسل — {m.get('review_note') or 'المسودة مرفوضة'}"
     problems = gate(m, L)
@@ -701,8 +717,10 @@ def send_site_approved():
         paced_ok = in_send_window() and time.time() >= STATE.get("next_send_at", 0) and not capped
         batch = urgent + (normal[:1] if paced_ok else [])
     for m in batch:
+        if m["channel"] == "email" and not claim(m["id"]):
+            continue  # the cloud sender took it first
         try:
-            say(approve(m["id"], m["tg_message_id"]))
+            say(approve(m["id"], m["tg_message_id"], own_claim=m["channel"] == "email"))
         except Capped as e:
             hold_capped(m["id"], e)
             if m in normal:

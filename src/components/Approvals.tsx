@@ -3,7 +3,7 @@ import { useAgentStatus, useLeadActions, type Approval } from "@/hooks/useLeads"
 import { useToast } from "@/hooks/useToast";
 import { KIND_LABEL } from "@/lib/leads";
 
-const STATE: Record<string, string> = { write: "💻 جهازك يكتبها الآن…", pending: "بانتظار موافقتك", approved: "موافق — تُرسل عندما يعمل الوكيل على جهازك", failed: "فشل الإرسال" };
+const STATE: Record<string, string> = { write: "💻 جهازك يكتبها الآن…", pending: "بانتظار موافقتك", approved: "موافق — بانتظار الإرسال (رسالة كل ~5 دقائق)", failed: "فشل الإرسال" };
 
 /** Same queue as Telegram — approve here if the phone isn't at hand. The PC agent does the actual sending. */
 export function Approvals({ items, onOpen }: { items: Approval[]; onOpen: (leadId: string) => void }) {

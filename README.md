@@ -18,3 +18,9 @@ Marketing & sales engine for FAII HOUSE (photo/video team). Built on Lovable + S
 8. **Today** — replies waiting, follow-ups due (day 4, then day 10), meetings, best new leads.
 
 Settings (who you are, services, portfolio, prices) are what the AI uses for every message, so keep them accurate.
+
+## Sending while the PC agent is off (GitHub Actions)
+`.github/workflows/send.yml` runs `tools/agent/cloud_sender.py` every 5 minutes: it sends ONE approved email (same safety gate and daily limit as the agent;
+urgent ones first and at any hour, normal ones 09:00–18:00 Amman time except Fridays). Add these repository secrets
+(Settings → Secrets and variables → Actions): `SUPABASE_URL`, `SUPABASE_KEY`, `AGENT_EMAIL`, `AGENT_PASSWORD`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `SENDER_NAME`.
+An email is claimed in the database (approved → sending) before it is sent, so the PC agent and the cloud sender can never send the same one twice.

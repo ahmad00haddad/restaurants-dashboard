@@ -1,0 +1,37 @@
+# Sends the emails you approved on the site even when the agent on your PC is off (one email about every 5 minutes).
+# Setup: repo → Settings → Secrets and variables → Actions → add the secrets listed under `env:` below.
+name: send-approved-emails
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: send-approved-emails
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install httpx
+      - run: python tools/agent/cloud_sender.py
+        env:
+          TZ: Asia/Amman
+          PYTHONUNBUFFERED: "1"
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          AGENT_EMAIL: ${{ secrets.AGENT_EMAIL }}
+          AGENT_PASSWORD: ${{ secrets.AGENT_PASSWORD }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          SENDER_NAME: ${{ secrets.SENDER_NAME }}
+          # working hours for normal emails (urgent ones go any time); Monday=0 … Friday=4, Saturday=5
+          SEND_HOURS: "9-18"
+          OFF_DAYS: "4"
