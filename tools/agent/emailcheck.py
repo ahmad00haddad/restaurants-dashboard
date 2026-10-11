@@ -9,6 +9,12 @@ ROLE = {"info", "contact", "contactus", "hello", "admin", "office", "support", "
         "hr", "jobs", "careers", "press", "media", "booking", "bookings", "reservations", "service", "customerservice", "webmaster", "noreply", "no-reply"}
 DISPOSABLE = {"mailinator.com", "10minutemail.com", "guerrillamail.com", "tempmail.com", "yopmail.com", "trashmail.com"}
 SYNTAX = re.compile(r"[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,})")
+# Big international organisations: their generic mailbox (info@, contact@…) reaches a global donor / supporter desk, not the country office
+# (learned from the Mercy Corps and IRC auto-replies). A named person's address at the same domain is still fine.
+BIG_ORG_DOMAINS = {"rescue.org", "mercycorps.org", "unicef.org", "undp.org", "unhcr.org", "wfp.org", "savethechildren.org", "savethechildren.net",
+                   "wvi.org", "worldvision.org", "oxfam.org", "care.org", "nrc.no", "icrc.org", "ifrc.org", "who.int", "unwomen.org", "unfpa.org",
+                   "ilo.org", "iom.int", "redcross.org", "caritas.org", "drc.ngo", "plan-international.org", "actionagainsthunger.org", "msf.org",
+                   "handicap-international.org", "hi.org", "internationalmedicalcorps.org", "irc.org", "intersos.org", "cesvi.org", "cordaid.org"}
 _mx = {}
 
 
@@ -41,5 +47,7 @@ def check(email):
     local, domain = email.strip().lower().rsplit("@", 1)
     if domain in DISPOSABLE:
         return {"ok": False, "role": False, "reason": "إيميل مؤقت"}
+    if local.replace(".", "") in ROLE and any(domain == d or domain.endswith("." + d) for d in BIG_ORG_DOMAINS):
+        return {"ok": False, "role": True, "reason": "عنوان عام لمنظمة دولية كبيرة: يصل غالباً لخدمة الداعمين وليس لفريق الأردن، ابحث عن شخص بالاسم"}
     ok = has_mx(domain)
     return {"ok": ok, "role": local.replace(".", "") in ROLE, "reason": "" if ok is not False else "النطاق لا يستقبل بريداً (لا MX)"}
