@@ -626,6 +626,13 @@ def after_send(L):
     db.patch("leads", {"id": L["id"]}, patch)
 
 
+def next_gap():
+    """Seconds to wait before the next email. Default: fast, 45-120 s (anytime, any day). PACED=1: GAP_MIN-GAP_MAX minutes, working hours only."""
+    if E.get("PACED", "0") == "1":
+        return random.randint(int(E.get("GAP_MIN", "4")), int(E.get("GAP_MAX", "6"))) * 60
+    return random.randint(int(E.get("FAST_GAP_MIN", "45")), int(E.get("FAST_GAP_MAX", "120")))
+
+
 def claim(mid):
     """Atomically take an approved draft for sending (approved → sending). Only one sender (this PC or the cloud one) can win it,
     so an email is never sent twice."""
@@ -661,7 +668,7 @@ def approve(mid, tg_mid, own_claim=False):
             return "لا يوجد إيميل لهذا العميل"
         send_email(to, m.get("subject"), m["body"], cc=cc, rush=is_rush(m, L))
         STATE["sent_mids"] = (STATE.get("sent_mids", []) + [mid])[-500:]  # remembered before the database is told
-        STATE["next_send_at"] = time.time() + random.randint(int(E.get("GAP_MIN", "8")), int(E.get("GAP_MAX", "20"))) * 60
+        STATE["next_send_at"] = time.time() + next_gap()
         save_state()
         done = f"✅ أُرسلت إلى {to}" + (f" (نسخة: {cc})" if cc else "")
     elif m["channel"] == "whatsapp":
@@ -719,8 +726,8 @@ def send_site_approved():
     capped = STATE.get("capped_day") == date.today().isoformat()
     urgent = [m for m in rows if m["channel"] != "email" or is_rush(m, m.get("leads") or {})]
     normal = [m for m in rows if m not in urgent]
-    if E.get("PACED", "0") != "1":  # default: everything approved goes out now (the daily limit still applies)
-        batch = urgent + ([] if capped else normal)
+    if E.get("PACED", "0") != "1":  # default: fast, one every 45-120 s, any hour; the daily limit still applies
+        batch = urgent + (normal[:1] if time.time() >= STATE.get("next_send_at", 0) and not capped else [])
     else:
         paced_ok = in_send_window() and time.time() >= STATE.get("next_send_at", 0) and not capped
         batch = urgent + (normal[:1] if paced_ok else [])

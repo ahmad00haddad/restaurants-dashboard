@@ -3,8 +3,9 @@
 name: send-approved-emails
 
 on:
-  schedule:
-    - cron: "*/5 * * * *"
+  # Scheduling is OFF (the PC agent does the sending). To turn the cloud sender on, add the secrets and restore:
+  #   schedule:
+  #     - cron: "*/5 * * * *"
   workflow_dispatch: {}
 
 concurrency:
