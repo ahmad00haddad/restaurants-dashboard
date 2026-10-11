@@ -500,11 +500,18 @@ def email_site_mismatch(L):
     return bool(a and b) and not any(x in y or y in x for x in a for y in b)
 
 
+PLATFORM_MAIL = re.compile(r"@([a-z0-9-]+\.)*(google|googlemail|facebook|instagram|youtube|linkedin|tiktok|whatsapp|wix|wixpress|godaddy|cloudflare|squarespace|shopify|microsoft|apple|twitter|sentry)\.[a-z.]+$", re.I)
+
+
 def gate(m, L):
     """Returns a list of reasons to block. Empty list = safe to send. Any doubt → block."""
     body, subj = m.get("body") or "", m.get("subject") or ""
     text = (subj + "\n" + body).lower()
     why = []
+    if m.get("channel") == "email":
+        to_, _cc = recipients(L)
+        if to_ and PLATFORM_MAIL.search(to_):
+            why.append(f"عنوان بريد يخص منصة كبرى وليس العميل ({to_}) — غالباً التقطه الجامع من صفحة خارجية. صحّحه في صفحة العميل")
     if len(body.strip()) < 40:
         why.append("الرسالة قصيرة جداً أو فارغة")
     if re.search(r"\{\{?[^}]*\}\}?|\[(name|اسم|company|link)[^\]]*\]|<[A-Z_]+>|xxx", body, re.I):
