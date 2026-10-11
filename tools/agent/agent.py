@@ -695,8 +695,12 @@ def send_site_approved():
     capped = STATE.get("capped_day") == date.today().isoformat()
     urgent = [m for m in rows if m["channel"] != "email" or is_rush(m, m.get("leads") or {})]
     normal = [m for m in rows if m not in urgent]
-    paced_ok = in_send_window() and time.time() >= STATE.get("next_send_at", 0) and not capped
-    for m in urgent + (normal[:1] if paced_ok else []):
+    if E.get("PACED", "0") != "1":  # default: everything approved goes out now (the daily limit still applies)
+        batch = urgent + ([] if capped else normal)
+    else:
+        paced_ok = in_send_window() and time.time() >= STATE.get("next_send_at", 0) and not capped
+        batch = urgent + (normal[:1] if paced_ok else [])
+    for m in batch:
         try:
             say(approve(m["id"], m["tg_message_id"]))
         except Capped as e:
