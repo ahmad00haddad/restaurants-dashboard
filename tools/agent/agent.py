@@ -654,6 +654,9 @@ def approve(mid, tg_mid, own_claim=False):
         return "🚫 هذه المسودة لم تعد موجودة (استُبدلت أو حُذفت)"
     m, L = rows[0], rows[0]["leads"]
     import local_ai
+    if L.get("deleted_at"):  # deleted on the site: nothing is ever sent to it
+        db.patch("lead_messages", {"id": mid}, {"review": "failed", "review_note": "العميل محذوف"})
+        return "🗑 العميل محذوف: لم يُرسل شيء"
     if local_ai.is_blocked(L):  # last gate before anything is sent
         return "⛔ هذا العميل على قائمة الاستبعاد (tools/harvester/blocklist.txt): لم يُرسل شيء"
     if mid in STATE.get("sent_mids", []) and m["review"] != "sent":
@@ -992,6 +995,9 @@ def write_requested():
         _local.update(t=time.time(), model=local_model(),
                       team=((db.get("app_settings", select="data", id="eq.1") or [{}])[0].get("data") or {}))
     m, L = rows[0], rows[0]["leads"]
+    if L.get("deleted_at"):
+        db.patch("lead_messages", {"id": m["id"]}, {"review": "failed", "review_note": "العميل محذوف"})
+        return
     if local_ai.is_blocked(L):
         db.patch("lead_messages", {"id": m["id"]}, {"review": "failed", "review_note": "على قائمة الاستبعاد: لا نراسله"})
         return

@@ -126,10 +126,22 @@ export function useLeadActions() {
       return { inserted, merged };
     };
 
+  /** Delete a client for good: its queued / approved drafts are removed first (nothing more can be sent), then the lead is marked deleted.
+   *  The row is kept hidden on purpose: a later import of the same phone / website / name is recognised as a duplicate and never comes back. */
+  const remove = async (id: string) => {
+    const a = await db.from("lead_messages").delete().eq("lead_id", id).eq("draft", true);
+    if (a.error) throw a.error;
+    const { error } = await db.from("leads").update({ deleted_at: new Date().toISOString(), status: "skip", needs_reply: false, next_action_at: null }).eq("id", id);
+    if (error) throw error;
+    qc.invalidateQueries({ queryKey: ["approvals"] });
+    refresh();
+  };
+
   return {
     refresh,
     importRows,
     update,
+    remove,
     async add(lead: Partial<Lead>) {
       const { data, error } = await db.rpc("ingest_leads", { rows: [lead] });
       if (error) throw error;

@@ -9,7 +9,7 @@ const btn = "px-3 py-1.5 rounded border border-border text-sm hover:bg-muted dis
 const primary = "px-3 py-1.5 rounded bg-primary text-primary-foreground text-sm disabled:opacity-40";
 const field = "w-full rounded border border-border bg-background px-2 py-1.5 text-sm";
 
-export function LeadPanel({ id }: { id: string }) {
+export function LeadPanel({ id, onDeleted }: { id: string; onDeleted?: () => void }) {
   const { data, isLoading } = useLead(id);
   const act = useLeadActions();
   const toast = useToast();
@@ -117,6 +117,14 @@ export function LeadPanel({ id }: { id: string }) {
           {lead.signal_url && <a className="underline mr-2 text-xs" target="_blank" rel="noreferrer" href={lead.signal_url}>الإعلان</a>}
         </div>
       )}
+
+      <div className="flex justify-end">
+        <button className="text-xs text-red-600 underline" disabled={!!busy} onClick={() => {
+          if (!window.confirm(`حذف «${lead.name}» نهائياً؟
+تُحذف مسوداته المنتظرة ولن يظهر ولن تُكتب له رسالة، ولن يعود إن جمعه الجامع مرة أخرى.`)) return;
+          run("delete", async () => { await act.remove(id); toast.push("🗑 حُذف العميل"); onDeleted?.(); });
+        }}>🗑 احذف العميل نهائياً</button>
+      </div>
 
       <div className="grid grid-cols-2 gap-2">
         <input className={field} defaultValue={lead.email ?? ""} placeholder="email" onBlur={(e) => e.target.value !== (lead.email ?? "") && act.update(id, { email: e.target.value || null })} />

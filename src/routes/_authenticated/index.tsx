@@ -315,7 +315,7 @@ function Home() {
           {sel && (
             <aside className="border-r border-border md:h-[calc(100vh-100px)] overflow-auto">
               <button className="m-2 text-xs underline" onClick={() => setSel(null)}>✕ إغلاق</button>
-              <LeadPanel key={sel} id={sel} />
+              <LeadPanel key={sel} id={sel} onDeleted={() => setSel(null)} />
             </aside>
           )}
         </div>
