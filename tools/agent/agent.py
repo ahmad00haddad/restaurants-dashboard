@@ -446,10 +446,18 @@ URL = re.compile(r"(https?://[^\s)>\]]+|(?:www\.)?[a-z0-9-]+\.(?:com|net|org|app
 _allowed = {"t": 0, "urls": set()}
 
 
+# The example works the templates link to, plus the portfolio: always allowed, whatever agent.env says (it only ADDS links).
+BUILTIN_LINKS = ("ahmadhaddad.lovable.app,behance.net/ahmad00haddad,behance.com/ahmad00haddad,"
+                 "behance.net/gallery/243985595/_,behance.net/gallery/243985595,"
+                 "behance.net/gallery/248490425/_,behance.net/gallery/248490425,"
+                 "behance.net/gallery/242646259/duroub-with-alma,behance.net/gallery/242646259,"
+                 "behance.net/gallery/237148893/duroub-school,behance.net/gallery/237148893")
+
+
 def allowed_urls():
-    """Only Ahmad's full bodies of work may be linked (his choice): personal site, team site, Behance profile."""
+    """Only Ahmad's own bodies of work may be linked: his site, his Behance profile and the example projects in the templates."""
     if not _allowed["urls"]:
-        links = E.get("ALLOWED_LINKS") or "ahmadhaddad.lovable.app,behance.net/gallery/243985595/_,behance.net/gallery/248490425/_,behance.net/gallery/248490425,behance.net/gallery/242646259/duroub-with-alma,behance.net/gallery/242646259,behance.net/gallery/237148893/duroub-school,behance.net/gallery/237148893,behance.net/gallery/243985595,behance.net/ahmad00haddad,behance.com/ahmad00haddad"
+        links = BUILTIN_LINKS + "," + (E.get("ALLOWED_LINKS") or "")
         _allowed["urls"] = {u.strip().lower().replace("https://", "").replace("http://", "").replace("www.", "").rstrip("/") for u in links.split(",") if u.strip()}
     return _allowed["urls"]
 

@@ -762,14 +762,22 @@ def roastery_first(L, team):
     return f"محتوى مرئي: {short_name(L['name'])}", "\n\n".join(paras)
 
 
+def dm_version(text):
+    """WhatsApp / Instagram: 2-3 short lines. The email template without the 'rest of my work' paragraph, the close and the signature
+    block; only the portfolio link line stays."""
+    paras = [p for p in text.split("\n\n") if p.strip()]
+    link = paras[-1].splitlines()[-1]
+    keep = paras[:-1]
+    keep = [p for p in keep if not re.search(r"الرابط أدناه|link below|يسعدني|يسرّني|glad|happy to|welcome a conversation", p)]
+    keep = [p for p in keep if p.splitlines()[0] != paras[-1].splitlines()[0]]
+    return "\n\n".join(keep + [link])
+
+
 def write(L, team, history, channel, mode, hint, model):
     """Write, and retry once if the model skipped the idea or cleanup left too little (never queue a hollow message)."""
-    if mode == "first" and sector(L) == "roastery":
-        return roastery_first(L, team)
-    if mode == "first" and sector(L) == "pharmacy":
-        return pharmacy_first(L, team)
-    if mode == "first" and sector(L) == "education":
-        return school_first(L, team)
+    if mode == "first" and sector(L) in ("roastery", "pharmacy", "education"):
+        subject, text = {"roastery": roastery_first, "pharmacy": pharmacy_first, "education": school_first}[sector(L)](L, team)
+        return subject, (text if channel == "email" else dm_version(text))
     last = None
     for attempt in range(2):
         try:
