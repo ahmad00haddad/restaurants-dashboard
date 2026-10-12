@@ -903,7 +903,8 @@ def intro_for(L, lang):
 def wrong_proof(L, body):
     """Ahmad's rule: no client names in outreach — the website shows who he worked with."""
     body = re.sub(r"https?://\S+", " ", body)  # the allowed portfolio links may carry a project name; only prose counts
-    return [n for n in ALL_CLIENT_NAMES if n.lower() in body.lower()]
+    # whole words only (an optional one-letter Arabic prefix is allowed): "عرفة" must not match inside "معرفة"
+    return [n for n in ALL_CLIENT_NAMES if re.search(r"(?<!\w)[وبلكف]?" + re.escape(n.lower()) + r"(?!\w)", body.lower())]
 
 
 

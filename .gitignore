@@ -43,3 +43,6 @@ tools/harvester/.gprofile/
 tools/harvester/.progress-*.json
 
 tools/harvester/.progress-*.json
+
+# client research and dossiers: never public
+docs/private/
