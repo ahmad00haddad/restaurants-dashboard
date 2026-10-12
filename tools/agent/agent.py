@@ -252,7 +252,7 @@ def _lead_for(addr, is_reply):
     """The lead this sender belongs to: exact email first, else same company domain (never for gmail/hotmail…) among leads we
     wrote to, and only when the mail really answers something (Re: / In-Reply-To) — a newsletter from their domain is not a reply."""
     rows = db.get("leads", select="id,name,status,email,followups", email=f"ilike.{addr}", deleted_at="is.null", limit="2") \
-        or db.get("leads", select="id,name,status,email,followups", deleted_at="is.null", limit="2", **{"profile->contact->>email": f"eq.{addr}"})
+        or db.get("leads", select="id,name,status,email,followups", deleted_at="is.null", limit="2", **{"profile->contact->>email": f"eq.{addr}"})         or db.get("leads", select="id,name,status,email,followups", deleted_at="is.null", limit="2", profile=f'cs.{{"alt_emails":["{addr}"]}}')
     if rows:
         return rows[0]
     dom = addr.split("@")[-1]
@@ -261,6 +261,40 @@ def _lead_for(addr, is_reply):
     rows = db.get("leads", select="id,name,status,email,followups", email=f"ilike.*@{dom}", deleted_at="is.null",
                   status="in.(contacted,replied,meeting,won)", limit="2")
     return rows[0] if len(rows) == 1 else None  # two contacted leads on one domain → ambiguous, skip
+
+
+GENERIC_NAME_WORDS = {"the", "of", "and", "for", "foundation", "organization", "organisation", "association", "society", "school", "schools", "academy",
+                      "center", "centre", "office", "jordan", "jordanian", "international", "مدرسة", "مدارس", "جمعية", "مؤسسة", "شركة", "مركز", "منظمة",
+                      "الأردنية", "الأردني", "الاردنية", "الاردني", "الأردن", "الاردن", "للتنمية", "العالمية", "الدولية"}
+
+
+def _norm(t):
+    t = re.sub("[ً-ْـ]", "", (t or "").lower())  # Arabic diacritics + tatweel
+    t = re.sub(r"[إأآ]", "ا", t).replace("ى", "ي").replace("ة", "ه")
+    return re.sub(r"[^\w\s]", " ", t)
+
+
+def _lead_by_content(subject, body):
+    """A colleague answers from another address (the party's women's secretary replied from her own Gmail): find the lead we wrote to by its
+    name appearing in the reply. Only leads already contacted; exactly one match, otherwise None (a person attaches it)."""
+    text = _norm(f"{subject}\n{body}")
+    rows = db.get("leads", select="id,name,status,email,followups,profile", deleted_at="is.null", status="in.(contacted,replied,meeting)", limit="1000")
+    hits = []
+    for L in rows:
+        words = [w for w in _norm(L["name"]).split() if len(w) >= 3 and w not in GENERIC_NAME_WORDS]
+        if len(words) >= 2 and all(w in text for w in words[:3]):
+            hits.append((len(words), L))
+    if not hits:
+        return None
+    best = max(h[0] for h in hits)
+    top = [h[1] for h in hits if h[0] == best]
+    return top[0] if len(top) == 1 else None
+
+
+def _remember_alt_email(L, addr):
+    prof = L.get("profile") or {}
+    alts = list(dict.fromkeys((prof.get("alt_emails") or []) + [addr]))
+    db.patch("leads", {"id": L["id"]}, {"profile": {**prof, "alt_emails": alts}})
 
 
 def check_inbox():
@@ -295,12 +329,19 @@ def check_inbox():
                 continue
             is_reply = bool(head.get("In-Reply-To") or head.get("References") or re.match(r"\s*(re|aw|sv|رد)\s*:", subj0, re.I))
             L = _lead_for(addr, is_reply)
-            if not L:
-                seen.append(mid)
-                continue
             _, data = box.fetch(i, "(BODY.PEEK[])")
             msg = _email.message_from_bytes(data[0][1])
             subject = str(make_header(decode_header(msg.get("Subject") or "")))
+            if not L:
+                L = _lead_by_content(subject, _plain_body(msg))
+                if L:
+                    _remember_alt_email(L, addr)  # next time this address is recognised at once
+                    log(f"reply matched by content to {L['name']} from another address")
+                else:
+                    if len(_plain_body(msg)) > 40:  # a real person wrote but we could not tell which client: never lose it silently
+                        say(f"📩 رسالة من {addr} لم أستطع ربطها بعميل:\nالموضوع: {subject or '—'}\n────────\n{_plain_body(msg)[:900]}\n────────\nافتحها في Gmail، وإن كانت ردّاً على عميل فأضف إيميلها إلى صفحته.")
+                    seen.append(mid)
+                    continue
             auto = bool(msg.get("Auto-Submitted", "no").lower() != "no" or msg.get("X-Autoreply") or AUTO_SUBJ.search(subject))
             try:
                 when = parsedate_to_datetime(msg.get("Date")).astimezone().isoformat()
