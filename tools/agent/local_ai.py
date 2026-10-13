@@ -1012,8 +1012,8 @@ def finish(body, L, team, lang="en", mode="first"):
     # Our intro line replaces whatever intro the model wrote (no client names, rotated phrasing).
     intro = intro_for(L, lang)
     who = re.compile(r"(?:أنا\s+)?أحمد\s+حد+ّ?اد[^.؟!\n]*[.؟!]?|(?:I'm|I am)?\s*Ahmad Haddad,?[^.!\n]*[.!]?")
-    placed = False
-    for i, p_ in enumerate(paras):
+    placed = mode != "first"  # the "I am Ahmad Haddad" introduction belongs to the FIRST message only; a reply or follow-up keeps its own words
+    for i, p_ in enumerate(paras if mode == "first" else []):
         if who.search(p_):
             paras[i] = re.sub(r"\s{2,}", " ", who.sub(" " + intro + " ", p_, count=1)).strip()
             paras[i] = re.sub(r"([.؟!])(?=[^\s])", r"\1 ", paras[i])
@@ -1033,7 +1033,7 @@ def finish(body, L, team, lang="en", mode="first"):
     text = "\n\n".join(paras + [close])
     # Always one clean greeting: drop whatever greeting-ish lines the model wrote, then add ours.
     ls = text.splitlines()
-    while ls and (not ls[0].strip() or len(ls[0]) < 70 and (re.match(r"\s*(dear|hello|hi|good (morning|evening|afternoon)|السادة|الأخوة|الإخوة|مرحب|تحية|السلام|إلى|مساء الخير|صباح الخير)", ls[0], re.I)
+    while ls and (not ls[0].strip() or len(ls[0]) < 140 and (re.match(r"\s*(dear|hello|hi|good (morning|evening|afternoon)|السادة|الأخوة|الإخوة|مرحب|تحية|السلام|إلى|مساء الخير|صباح الخير)", ls[0], re.I)
                                                           or ls[0].strip().endswith((",", "،")))):
         ls.pop(0)
     text = "\n".join(ls).strip()

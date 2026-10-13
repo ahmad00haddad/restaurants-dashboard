@@ -15,6 +15,8 @@ BIG_ORG_DOMAINS = {"rescue.org", "mercycorps.org", "unicef.org", "undp.org", "un
                    "wvi.org", "worldvision.org", "oxfam.org", "care.org", "nrc.no", "icrc.org", "ifrc.org", "who.int", "unwomen.org", "unfpa.org",
                    "ilo.org", "iom.int", "redcross.org", "caritas.org", "drc.ngo", "plan-international.org", "actionagainsthunger.org", "msf.org",
                    "handicap-international.org", "hi.org", "internationalmedicalcorps.org", "irc.org", "intersos.org", "cesvi.org", "cordaid.org"}
+# Placeholder addresses that website templates ship with (learned from a bounce: example@youremail.com on a harvested site).
+PLACEHOLDER = re.compile(r"(youremail|yourname|your-?email|yourdomain|yoursite|mysite|mydomain|@email\.com$|@domain\.[a-z]+$|@example\.|^(example|name|user|test|email|someone|john\.?doe|jane\.?doe)@)", re.I)
 _mx = {}
 
 
@@ -45,6 +47,8 @@ def check(email):
     if not m:
         return {"ok": False, "role": False, "reason": "صيغة الإيميل غير صالحة"}
     local, domain = email.strip().lower().rsplit("@", 1)
+    if PLACEHOLDER.search(email.strip()):
+        return {"ok": False, "role": False, "reason": "عنوان نموذجي من قالب الموقع وليس عنوان العميل"}
     if domain in DISPOSABLE:
         return {"ok": False, "role": False, "reason": "إيميل مؤقت"}
     if local.replace(".", "") in ROLE and any(domain == d or domain.endswith("." + d) for d in BIG_ORG_DOMAINS):

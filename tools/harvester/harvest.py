@@ -228,7 +228,7 @@ def place(pg):
 
 # ---------------- Website reading ----------------
 EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
-BAD = re.compile(r"(@(?:[a-z0-9-]+\.)*(?:google|googlemail|facebook|instagram|youtube|linkedin|tiktok|whatsapp|wix|godaddy|cloudflare)\.[a-z.]+$|sentry|wixpress|example\.|domain\.|\.(png|jpe?g|gif|svg|webp|css|js)$|noreply|no-reply|@2x)", re.I)
+BAD = re.compile(r"(youremail|yourname|your-?domain|yoursite|mysite|@email\.com$|@domain\.[a-z]+$|^(example|name|user|test|email)@|@(?:[a-z0-9-]+\.)*(?:google|googlemail|facebook|instagram|youtube|linkedin|tiktok|whatsapp|wix|godaddy|cloudflare)\.[a-z.]+$|sentry|wixpress|example\.|domain\.|\.(png|jpe?g|gif|svg|webp|css|js)$|noreply|no-reply|@2x)", re.I)
 SOCIAL = {
     "instagram": r"https?://(?:www\.)?instagram\.com/[A-Za-z0-9_.]+",
     "facebook": r"https?://(?:www\.|m\.)?facebook\.com/[A-Za-z0-9_.\-]+",
