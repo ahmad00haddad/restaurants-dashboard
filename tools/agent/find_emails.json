@@ -67,5 +67,611 @@
   "kind": "ngo",
   "signal": true,
   "written": true
+ },
+ "585a3977-27b1-4e6b-b578-5a1c55992318": {
+  "exa": true,
+  "website_found": "",
+  "email": "communication.jo@undp.org",
+  "confidence": "high",
+  "why": "Found on UNDP Jordan's own media contacts page, directly tied to the organisation and relevant for a communications opportunity like a campaign documentary.",
+  "candidates": {
+   "registry.jo@undp.org": [
+    "https://www.undp.org/jordan/contact-us",
+    "https://www.unhcr.org/publications/undp-jordan"
+   ],
+   "communication.jo@undp.org": [
+    "https://www.undp.org/jordan/contact-us",
+    "https://www.undp.org/jordan/media-contacts",
+    "https://www.facebook.com/UndpJordan/"
+   ],
+   "offers.jo@undp.org": [
+    "https://www.ungm.org/Public/Notice/289484",
+    "https://www.ungm.org/Public/Notice/226897"
+   ]
+  },
+  "name": "UNDP",
+  "kind": "ngo",
+  "signal": true,
+  "written": true
+ },
+ "dfeef87b-2768-4452-b6ff-83870f4b3812": {
+  "exa": false,
+  "website_found": "",
+  "email": "media.hub.rbas@undp.org",
+  "confidence": "high",
+  "why": "Listed as the media contact for UNDP Arab States on the organisation's own media contacts page, with matching phone number and Amman location.",
+  "candidates": {
+   "noeman.alsayyad@undp.org": [
+    "https://www.undp.org/arab-states/press-releases/undp-and-oic-strengthen-regional-cooperation-islamic-philanthropy-early-recovery-and-sustainable-development-and-signed"
+   ],
+   "borhene.fakhfakh@undp.org": [
+    "https://www.undp.org/arab-states/press-releases/undp-and-oic-strengthen-regional-cooperation-islamic-philanthropy-early-recovery-and-sustainable-development-and-signed"
+   ],
+   "media.hub.rbas@undp.org": [
+    "https://www.undp.org/arab-states/news/media-contacts"
+   ],
+   "susanne.dam-hansen@undp.org": [
+    "https://rcp.unescwa.org/maharat/institutions/112",
+    "https://as-rcp.org/maharat/institutions/112"
+   ]
+  },
+  "name": "UNDP RBAS Regional Hub",
+  "kind": "ngo",
+  "signal": true,
+  "written": true
+ },
+ "12fdf7fa-05cb-42fc-ade8-346c4dc8d65b": {
+  "exa": true,
+  "website_found": "",
+  "email": "fab@orange.jo",
+  "confidence": "high",
+  "why": "Found on the organisation's own website (fabjo.org) with matching phone number and address in the contact section.",
+  "candidates": {
+   "fab@orange.jo": [
+    "http://fabjo.org/wp/%d8%a7%d8%aa%d8%b5%d9%84-%d8%a8%d9%86%d8%a7/",
+    "https://fabjo.org/wp/%d8%a7%d8%aa%d8%b5%d9%84-%d8%a8%d9%86%d8%a7/",
+    "https://www.uasma.net/profiles.aspx?pg=14&pi=315"
+   ],
+   "fab@uasma.net": [
+    "https://www.uasma.net/profiles.aspx?pg=14&pi=315"
+   ],
+   "jcpdjordan@gmail.com": [
+    "https://www.jcpd-jo.org/members/gmaay-alsdak-llmkfofyn",
+    "https://www.jcpd-jo.org/members"
+   ],
+   "fabjo@index.com.jo": [
+    "https://www.ecoi.net/en/file/local/1000295/1002_1264804179_jordan.PDF"
+   ]
+  },
+  "name": "جمعية الصداقة للمكفوفين",
+  "kind": "ngo",
+  "signal": true,
+  "written": true
+ },
+ "3537c8d0-3bd0-41bb-a28a-4ab807950e9c": {
+  "exa": true,
+  "website_found": "",
+  "email": "tenders.syria@maginternational.org",
+  "confidence": "high",
+  "why": "The tender submission address is explicitly stated in the Mines Advisory Group opportunity on ReliefWeb and matches the organisation's domain.",
+  "candidates": {
+   "tenders.syria@maginternational.org": [
+    "https://reliefweb.int/job/4233404/tender-spanish-mofa-funded-digital-eore-video-production-whole-syria"
+   ],
+   "tenders.syria@maginyternational.org": [
+    "https://reliefweb.int/job/4233404/tender-spanish-mofa-funded-digital-eore-video-production-whole-syria"
+   ],
+   "humanresources@maginternational.org": [
+    "https://www.maginternational.org/work-for-us/vacancies/",
+    "https://www.maginternational.org/media/filer_public/ff/91/ff91ca7b-8d8c-44fc-bbda-9583188d1b59/tor_consultant_syria_damasqus.pdf"
+   ],
+   "info.usa@maginternational.org": [
+    "https://mag-us.org/contact-us/"
+   ],
+   "info@maginternational.org": [
+    "https://www.jmu.edu/cisr/research/gmar/search/mines-advisory-group-mag.shtml"
+   ]
+  },
+  "name": "Mines Advisory Group",
+  "kind": "ngo",
+  "signal": true,
+  "written": true
+ },
+ "30ba672f-b580-4fb2-94f6-631a344a3aae": {
+  "exa": true,
+  "website_found": "",
+  "email": "info@alamanfund.jo",
+  "confidence": "high",
+  "why": "The email appears on the organisation's own website (alamanfund.jo) in the contact-us page and is clearly associated with Al Aman Fund For the Future of Orphans.",
+  "candidates": {
+   "info@alamanfund.jo": [
+    "http://www.alamanfund.jo/",
+    "https://alamanfund.jo/contact-us",
+    "http://www.alamanfund.jo/stay-connected/contact-us"
+   ]
+  },
+  "name": "Al Aman Fund For the Future of Orphans",
+  "kind": "ngo",
+  "signal": true,
+  "written": true
+ },
+ "a3e29c3d-19cd-4abe-967e-d3a5ca64e8d3": {
+  "exa": true,
+  "website_found": "",
+  "email": "segreteria.amman@aics.gov.it",
+  "confidence": "rejected",
+  "why": "بريد حكومي أجنبي (سفارة أو وزارة): خوادمهم ترفض المرسل الغريب، وغالباً ليسوا جهة التعاقد",
+  "candidates": {
+   "segreteria.amman@aics.gov.it": [
+    "https://www.aics.gov.it/aics/field-offices/?lang=en",
+    "https://trasparenzaislamabad.aics.gov.it/archivio13_strutture_0_8954.html",
+    "https://beirut.aics.gov.it/aics/sedi-estere/?lang=en"
+   ],
+   "amman@aics.gov.it": [
+    "https://www.aics.gov.it/oltremare/sedi-estere/"
+   ],
+   "amman.aics@esteri.it": [
+    "https://ambamman.esteri.it/it/chi-siamo/gli-uffici/"
+   ],
+   "amman@pec.aics.gov.it": [
+    "https://trasparenzaislamabad.aics.gov.it/archivio13_strutture_0_8954.html"
+   ],
+   "infonet@aics.gov.it": [
+    "https://trasparenzaamman.aics.gov.it/pagina65_telefono-e-posta-elettronica.html"
+   ],
+   "protocollo.aics@pec.aics.gov.it": [
+    "https://trasparenzaamman.aics.gov.it/pagina65_telefono-e-posta-elettronica.html"
+   ]
+  },
+  "name": "Italian Agency For Development Cooperation AICS Amman",
+  "kind": "ngo",
+  "signal": true,
+  "written": false
+ },
+ "4cdc3f0e-ea14-4091-aee9-73f2901df907": {
+  "exa": true,
+  "website_found": "",
+  "email": "communication.jo@undp.org",
+  "confidence": "high",
+  "why": "Listed as the Partnerships and Communications email on UNDP Jordan's official contact page, matching the organisation's name, city, and phone number.",
+  "candidates": {
+   "firas.salameh@undp.org": [
+    "https://www.undp.org/jordan/press-releases/undp-and-japan-mark-conclusion-aqaba-and-wadi-rum-project-creating-opportunities-over-2000-young-people",
+    "https://jordan.un.org/en/press-centre/media-contacts"
+   ],
+   "yasmeen.zaj@undp.org": [
+    "https://www.undp.org/jordan/press-releases/undp-and-japan-mark-conclusion-aqaba-and-wadi-rum-project-creating-opportunities-over-2000-young-people"
+   ],
+   "registry.jo@undp.org": [
+    "https://www.undp.org/jordan/contact-us",
+    "https://jordan.un.org/en/contact-us",
+    "https://www.unhcr.org/publications/undp-jordan"
+   ],
+   "communication.jo@undp.org": [
+    "https://www.undp.org/jordan/contact-us",
+    "https://www.undp.org/jordan/media-contacts",
+    "https://www.facebook.com/UndpJordan/"
+   ],
+   "jordan.co@unwomen.org": [
+    "https://jordan.un.org/en/contact-us"
+   ],
+   "undss.jo@undp.org": [
+    "https://jordan.un.org/en/contact-us"
+   ],
+   "amman@unesco.org": [
+    "https://jordan.un.org/en/contact-us"
+   ],
+   "anwarab@unops.org": [
+    "https://jordan.un.org/en/press-centre/media-contacts"
+   ]
+  },
+  "name": "UNDP Jordan",
+  "kind": "ngo",
+  "signal": true,
+  "written": true
+ },
+ "80542c4f-6203-4ad2-b070-cd6bc74d0b2f": {
+  "exa": true,
+  "website_found": "",
+  "email": "",
+  "confidence": "low",
+  "why": "No candidate email matches جورميه in إربد; all candidates are unrelated (Kuwait Gourmet, Irbid Chamber of Industry).",
+  "candidates": {
+   "info@kuwaitgourmet.com": [
+    "https://kuwaitgourmet.com/contact-us/"
+   ],
+   "info@ici.org.jo": [
+    "https://www.ici.org.jo/Contact_us.aspx"
+   ]
+  },
+  "name": "جورميه",
+  "kind": "restaurant",
+  "signal": true,
+  "written": false
+ },
+ "2fdf4fe9-eeea-464e-8f2b-b7fdf1b377c9": {
+  "exa": true,
+  "website_found": "",
+  "email": "globalplatformjordan@drabzeen.org",
+  "confidence": "high",
+  "why": "Found on a page explicitly about Global Platform Jordan with matching phone and Jordan location, tied to the organisation's own domain via Drabzeen.",
+  "candidates": {
+   "globalplatformjordan@drabzeen.org": [
+    "https://exa.ai/library/place/sg03gxdplp1"
+   ],
+   "globalplatform@drabzeen.org": [
+    "https://www.globalplatforms.org/platforms"
+   ],
+   "contact@globalplatforms.org": [
+    "https://www.globalplatforms.org/platform-contact",
+    "https://globalplatforms.org/contact"
+   ],
+   "info@biddingsource.com": [
+    "https://www.biddingsource.com/tenders/10181314"
+   ],
+   "secretariat@globalplatform.org": [
+    "https://globalplatform.org/",
+    "https://globalplatform.org/about-globalplatform/"
+   ],
+   "info@drabzeen.org": [
+    "http://www.civilsociety-jo.net/en/organization/52368/drabzeen-human-development",
+    "https://www.linkedin.com/posts/drabzeen-human-development_hiring-admin-jordan-activity-7425940284720431104-b02x",
+    "https://www.linkedin.com/posts/drabzeen-human-development_hiring-finance-jordans-activity-7432765462511443968-3cNX"
+   ],
+   "info@phenixcenter.net": [
+    "http://www.civilsociety-jo.net/en/organization/52368/drabzeen-human-development"
+   ],
+   "john@drabzeen.org": [
+    "https://www.datanyze.com/companies/drabzeen/443254553"
+   ],
+   "john.smith@drabzeen.org": [
+    "https://www.datanyze.com/companies/drabzeen/443254553"
+   ],
+   "johnsmith@drabzeen.org": [
+    "https://www.datanyze.com/companies/drabzeen/443254553"
+   ],
+   "smith@drabzeen.org": [
+    "https://www.datanyze.com/companies/drabzeen/443254553"
+   ]
+  },
+  "name": "Global Platform Jordan",
+  "kind": "ngo",
+  "signal": true,
+  "written": true
+ },
+ "e1153f5f-a1b3-4d90-9a40-66c79f34e8fe": {
+  "exa": true,
+  "website_found": "",
+  "email": "",
+  "confidence": "low",
+  "why": "No candidate email is clearly tied to مطاعم مش طبيعي; the found addresses belong to factjo.com and irbid-now.com, which are media/directory sites, not the restaurant itself.",
+  "candidates": {
+   "info@factjo.com": [
+    "https://www.factjo.com/news/148940"
+   ],
+   "business@irbid-now.com": [
+    "https://irbid-now.com/provider/%D9%85%D8%B7%D8%A7%D8%B9%D9%85-%D9%85%D8%B4-%D8%B7%D8%A8%D9%8A%D8%B9%D9%8A-%D8%A7%D9%84%D8%AD%D9%8A-%D8%A7%D9%84%D8%AC%D9%86%D9%88%D8%A8%D9%8A-bakeries",
+    "https://irbid-now.com/en/provider/%D9%85%D8%B7%D8%A7%D8%B9%D9%85-%D9%85%D8%B4-%D8%B7%D8%A8%D9%8A%D8%B9%D9%8A-%D8%A7%D9%84%D8%AD%D9%8A-%D8%A7%D9%84%D8%AC%D9%86%D9%88%D8%A8%D9%8A-bakeries",
+    "https://irbid-now.com/provider/%D9%85%D8%B7%D8%A7%D8%B9%D9%85-%D9%85%D8%B4-%D8%B7%D8%A8%D9%8A%D8%B9%D9%8A-grills"
+   ]
+  },
+  "name": "مطاعم مش طبيعي ( الحي الجنوبي )",
+  "kind": "restaurant",
+  "signal": true,
+  "written": false
+ },
+ "4a213345-ca08-4f6b-9ad6-65f902393d89": {
+  "exa": true,
+  "website_found": "",
+  "email": "",
+  "confidence": "low",
+  "why": "No candidate email is clearly tied to JOY NURSERY; all belong to unrelated organisations or platforms.",
+  "candidates": {
+   "info@amman-now.com": [
+    "https://amman-now.com/places/tots-joy-nursery-amman"
+   ],
+   "hello@houseofjoyjo.com": [
+    "https://houseofjoyjo.com/policies/contact-information"
+   ],
+   "info@willow-jo.com": [
+    "https://www.willow-jo.com/contact"
+   ],
+   "smileykidsjo@gmail.com": [
+    "https://exa.ai/library/place/wj26d1g65jy"
+   ]
+  },
+  "name": "JOY NURSERY",
+  "kind": "school",
+  "signal": true,
+  "written": false
+ },
+ "a9a5b992-d380-4b7c-a024-a8101e50e4b8": {
+  "exa": true,
+  "website_found": "",
+  "email": "info@tua.jo",
+  "confidence": "high",
+  "why": "The email appears on the organisation's own contact page (tua.jo) in both Arabic and English versions, directly associated with تكية أم علي.",
+  "candidates": {
+   "info@tua.jo": [
+    "https://tua.jo/ar/contact-us",
+    "https://tua.jo/contact-us"
+   ],
+   "feedback@tua.jo": [
+    "https://tua.jo/ar/contact-us/complaint"
+   ]
+  },
+  "name": "تكية أم علي",
+  "kind": "ngo",
+  "signal": false,
+  "written": true
+ },
+ "d429c736-7db6-4c0f-b612-df3fffb2359f": {
+  "exa": true,
+  "website_found": "",
+  "email": "info@promisejo.org",
+  "confidence": "high",
+  "why": "Found on the organisation's own website (promisejo.org) in the contact section, directly matching the organisation's name and phone number.",
+  "candidates": {
+   "info@promisejo.org": [
+    "http://promisejo.org/N1/%d8%a7%d8%aa%d8%b5%d9%84-%d8%a8%d9%86%d8%a7/"
+   ]
+  },
+  "name": "جمعية الأيدي الواعدة",
+  "kind": "ngo",
+  "signal": false,
+  "written": true
+ },
+ "ef73f7d6-d1cf-49ef-bdb9-40ee8da9c209": {
+  "exa": true,
+  "website_found": "",
+  "email": "info@sigi-jordan.org",
+  "confidence": "high",
+  "why": "Found on the organisation's own website contact page and vacancy page, matching the name Sigi - Jordan and Amman location.",
+  "candidates": {
+   "info@sigi-jordan.org": [
+    "https://www.sigi-jordan.org/en/contactUs",
+    "https://www.sigi-jordan.org/article/fundrais-2"
+   ],
+   "sigi@nets.com.jo": [
+    "https://arabinfomall.bibalex.org/En/Index.aspx?orgid=734&sectionid=1"
+   ]
+  },
+  "name": "Sigi - Jordan",
+  "kind": "ngo",
+  "signal": false,
+  "written": true
+ },
+ "10110264-548c-4723-a74f-1a4b4fa49bb5": {
+  "exa": true,
+  "website_found": "",
+  "email": "info@ksrelief.org",
+  "confidence": "high",
+  "why": "The email appears on KSRelief's official website (ksrelief.org) on the contact page, directly associated with the organisation's domain and contact information.",
+  "candidates": {
+   "info@ksrelief.org": [
+    "https://www.ksrelief.org/",
+    "https://www.ksrelief.org/ar/Pages/contact",
+    "https://www.ksrelief.org/ar/Pages/AboutDetails/a10dbc83-5fe4-43e3-af4a-e22e2d7ee27d"
+   ]
+  },
+  "name": "King Salman Humanitarian Aid and Relief Center (KSRelief) - Jordan office",
+  "kind": "ngo",
+  "signal": false,
+  "written": true
+ },
+ "d1f747b2-e230-451c-9669-581f6de0cf03": {
+  "exa": true,
+  "website_found": "",
+  "email": "jes@jes-jo.org",
+  "confidence": "high",
+  "why": "Found on the Jordan Environment Society's own website (jes-jo.org) with matching name, phone (06-5238205), and address details.",
+  "candidates": {
+   "jes@jes-jo.org": [
+    "https://www.jes-jo.org/%D8%A7%D8%AA%D8%B5%D9%84-%D8%A8%D9%86%D8%A7/",
+    "https://www.jes-jo.org/%d8%a7%d8%aa%d8%b5%d9%84-%d8%a8%d9%86%d8%a7/"
+   ],
+   "jes@jes.org.jo": [
+    "https://mio-ecsde.org/location/jordan-environment-society-jes/",
+    "https://grc-jordan.org/info_card/jordan-environment-society/"
+   ],
+   "info@moenv.gov.jo": [
+    "https://moenv.gov.jo/EN/Pages/Contact_Us"
+   ],
+   "kananzeh@yahoo.com": [
+    "https://www.gju.edu.jo/sites/default/files/630dc4_49aa34cacf0c4019b3010e386254fe8f.pdf"
+   ]
+  },
+  "name": "Jordan Environment Society",
+  "kind": "ngo",
+  "signal": false,
+  "written": true
+ },
+ "7fe514de-c65d-4367-9bc6-4e8459269e79": {
+  "exa": true,
+  "website_found": "",
+  "email": "info.jordan@savethechildren.org",
+  "confidence": "high",
+  "why": "Found on Save the Children Jordan's own website contact page with matching Jordan address and phone number.",
+  "candidates": {
+   "info.jordan@savethechildren.org": [
+    "https://savethechildren.org.jo/ar/contact-us"
+   ],
+   "jordanhr@savethechildren.org": [
+    "https://linkedin.com/company/savechildrenjor"
+   ],
+   "rania.malki@savethechildren.org": [
+    "https://data.unhcr.org/ar/partners/view/388"
+   ]
+  },
+  "name": "Save The Children Jordan",
+  "kind": "ngo",
+  "signal": false,
+  "written": true
+ },
+ "9733b0cb-c42f-40d4-8ee9-bd429bd69fa3": {
+  "exa": false,
+  "website_found": "",
+  "email": "",
+  "confidence": "none",
+  "why": "لم يظهر أي إيميل في المصادر",
+  "candidates": {},
+  "name": "Al Hussein Society Jordan Center For Training & Inclusion",
+  "kind": "ngo",
+  "signal": false,
+  "written": false
+ },
+ "5f34c909-2f67-480d-84fe-bc71e3c46b40": {
+  "exa": false,
+  "website_found": "",
+  "email": "",
+  "confidence": "none",
+  "why": "لم يظهر أي إيميل في المصادر",
+  "candidates": {},
+  "name": "Medair - Jordan",
+  "kind": "ngo",
+  "signal": false,
+  "written": false
+ },
+ "79d643ce-9623-4f46-9e9b-c4e3b846fe86": {
+  "exa": true,
+  "website_found": "",
+  "email": "info@scout-jo.org",
+  "confidence": "high",
+  "why": "The email appears on the organisation's own website (scout-jo.org) alongside matching phone number and Arabic name, confirming it as their official contact.",
+  "candidates": {
+   "info@scout-jo.org": [
+    "https://scout-jo.org/"
+   ],
+   "ayyoubalshmasne@yahoo.com": [
+    "https://www.wagggs.org/en/our-world/arab-region/member-organisations/jordan/",
+    "https://www.wagggs.org/ar/our-world/arab-region/member-organisations/jordan/"
+   ],
+   "worldbureau@isgf.org": [
+    "https://www.isgf.org/fr/telecharger/profiles/2186-profile-jordan/file"
+   ]
+  },
+  "name": "Scouts and Guides Association of Jordan",
+  "kind": "ngo",
+  "signal": false,
+  "written": true
+ },
+ "b5695fa1-8638-4ca5-86f3-6dfe03fea90d": {
+  "exa": true,
+  "website_found": "",
+  "email": "adminrscn@rscn.org.jo",
+  "confidence": "high",
+  "why": "The email appears on the organisation's own website (rscn.org.jo) in the contact section, clearly associated with The Royal Society for the Conservation of Nature.",
+  "candidates": {
+   "adminrscn@rscn.org.jo": [
+    "http://www.rscn.org.jo/",
+    "http://www.rscn.org.jo/contact-us?lang=ar",
+    "http://www.rscn.org.jo/contact-us"
+   ]
+  },
+  "name": "The Royal Society For The Conservation of Nature",
+  "kind": "ngo",
+  "signal": false,
+  "written": true
+ },
+ "7116008b-0da0-4c97-a475-406a7087911c": {
+  "exa": false,
+  "website_found": "",
+  "email": "anerajordan@anera.org",
+  "confidence": "high",
+  "why": "Found on Anera's contact page with Jordan office address and phone, directly tied to the Jordan branch.",
+  "candidates": {
+   "anerajordan@anera.org": [
+    "https://www.anera.org/contact-us/",
+    "https://www.anera.org/anera-request-form/"
+   ],
+   "anera@anera-jwg.org": [
+    "https://www.anera.org/contact-us/"
+   ],
+   "anera@aneralebanon.org": [
+    "https://www.anera.org/contact-us/"
+   ]
+  },
+  "name": "Anera Jordan",
+  "kind": "ngo",
+  "signal": false,
+  "written": true
+ },
+ "ca4d0f92-98f9-411e-be7e-d58055a0c62b": {
+  "exa": false,
+  "website_found": "",
+  "email": "environmentsouklahad@gmail.com",
+  "confidence": "medium",
+  "why": "The Facebook post explicitly links the email to 'جمعية أحباء البيئة' (Environment Lovers Association), matching the organisation's name and purpose, and specifies it is for receiving CVs for a recruitment opportunity.",
+  "candidates": {
+   "friendcancer70@gmail.com": [
+    "https://www.facebook.com/mriashat/"
+   ],
+   "environmentsouklahad@gmail.com": [
+    "https://www.facebook.com/ELASLT/posts/%D8%AC%D9%85%D8%B9%D9%8A%D8%A9-%D8%A3%D8%AD%D8%A8%D8%A7%D8%A1-%D8%A7%D9%84%D8%A8%D9%8A%D8%A6%D8%A9-%D8%A7%D8%B9%D9%84%D8%A7%D9%86-%D9%81%D8%AA%D8%AD-%D8%A8%D8%A7%D8%A8-%D8%A7%D9%84%D8%AA%D8%B1%D8%B4%D8%AD-%D9%84%D8%A7%D9%86%D8%AA%D8%AF%D8%A7%D8%A8-%D9%85%D8%AA%D8%B9%D8%A7%D9%82%D8%AF%D9%8A%D9%86-%D9%88%D9%81%D9%82-%D8%A7%D9%84%D9%8A%D8%A9-%D8%A7%D9%84%D8%B9%D9%85%D9%84-%D8%A7%D9%84%D8%AA%D8%B7%D9%88%D8%B9%D9%8A-/2431728443634850/"
+   ],
+   "ibdq2024@gmail.com": [
+    "https://ibd.org.sa/privacy-policy"
+   ],
+   "adljendouba2011@gmail.com": [
+    "https://adljendouba.blogspot.com/p/blog-page_871.html"
+   ],
+   "association.guermassa@yahoo.fr": [
+    "https://www.facebook.com/groups/295629657192757/"
+   ]
+  },
+  "name": "جمعية أحباء",
+  "kind": "ngo",
+  "signal": false,
+  "written": true
+ },
+ "7cc4490f-6499-48a0-8816-5ce5d6305082": {
+  "exa": true,
+  "website_found": "",
+  "email": "jsmo@jsmo.gov.jo",
+  "confidence": "high",
+  "why": "The email appears on JSMO's official contact page with matching phone number and organization name in Arabic text.",
+  "candidates": {
+   "jsmo@jsmo.gov.jo": [
+    "http://www.jsmo.gov.jo/AR/Pages/اتصل_بنا_"
+   ],
+   "cmu@jsmo.gov.jo": [
+    "http://www.jsmo.gov.jo/AR/Pages/اتصل_بنا_"
+   ],
+   "hbdoor@jsmo.gov.jo": [
+    "http://www.jsmo.gov.jo/AR/Pages/اتصل_بنا_"
+   ]
+  },
+  "name": "Jordan Standards and Metrology Organization (JSMO)",
+  "kind": "ngo",
+  "signal": false,
+  "written": true
+ },
+ "8c6968ac-bd51-4ae2-9b22-6793a0d4d0cf": {
+  "exa": true,
+  "website_found": "",
+  "email": "info@mindset-res.com",
+  "confidence": "high",
+  "why": "Found on the organisation's own contact page with matching name and phone number.",
+  "candidates": {
+   "info@mindset-res.com": [
+    "http://www.mindset-res.com/contact-us"
+   ]
+  },
+  "name": "Mindset",
+  "kind": "ngo",
+  "signal": false,
+  "written": true
+ },
+ "99e918a1-9e0e-4e98-a9ba-bc8da29f3ef3": {
+  "exa": false,
+  "website_found": "",
+  "email": "",
+  "confidence": "none",
+  "why": "لم يظهر أي إيميل في المصادر",
+  "candidates": {},
+  "name": "International Youth Foundation / Youth For The Future",
+  "kind": "ngo",
+  "signal": false,
+  "written": false
  }
 }

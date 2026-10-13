@@ -360,13 +360,9 @@ def person_email(L, people, site_emails=None):
 
 
 def best_channel(L, p):
-    """The channel we can really use: the model's pick only when that contact exists (email needs a usable address or a named contact)."""
-    ec = p.get("email_check") or {}
-    mail = bool(L.get("email")) and ec.get("ok") is not False or bool((p.get("contact") or {}).get("email"))
-    want = p.get("channel")
-    if want == "email" and mail or want == "whatsapp" and L.get("phone") or want == "instagram" and L.get("instagram"):
-        return want
-    return "email" if mail else "whatsapp" if L.get("phone") else "instagram" if L.get("instagram") else "email"
+    """Outreach goes by email only (Ahmad's rule, 2026-10-13): a lead without an address gets one found (find_emails), never a
+    WhatsApp / Instagram message instead. WhatsApp stays for answering people who wrote to us there."""
+    return "email"
 
 
 def tier_of(score, L, p):
@@ -407,7 +403,7 @@ def analyze(db, L, team, model):
         if not isinstance(p.get(k), list):
             p[k] = [p[k]] if p.get(k) else []
     if p.get("channel") not in ("email", "whatsapp", "instagram"):
-        p["channel"] = "email" if L.get("email") else "whatsapp" if L.get("phone") else "instagram"
+        p["channel"] = "email"
     if p.get("lang") not in ("ar", "en"):
         p["lang"] = "ar"
     if p.get("link_pick") not in ("personal", "team", "behance"):

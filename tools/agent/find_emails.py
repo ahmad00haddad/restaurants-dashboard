@@ -25,9 +25,11 @@ from urllib.parse import urljoin, urlparse, unquote
 
 import httpx
 
-import agent
 import emailcheck
 import local_ai
+
+# inside the running agent (agent.py is __main__) use it as is; importing agent.py again would load a second copy of its state
+agent = sys.modules["__main__"] if hasattr(sys.modules["__main__"], "db") else __import__("agent")
 
 HERE = Path(__file__).parent
 OUT = HERE / "find_emails.json"
@@ -343,6 +345,9 @@ def main():
     log(f"{len(todo)} leads to search")
 
     def one(L):
+        cur = agent.db.get("leads", select="email", id=f"eq.{L['id']}")
+        if cur and cur[0]["email"]:
+            return  # found meanwhile (another source, or by hand)
         try:
             v = hunt(L)
         except Exception as e:

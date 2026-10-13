@@ -29,7 +29,7 @@ export function LeadPanel({ id, onDeleted }: { id: string; onDeleted?: () => voi
 
   useEffect(() => {
     if (!lead) return;
-    setChannel(lead.profile?.channel ?? (lead.email ? "email" : lead.phone ? "whatsapp" : "instagram"));
+    setChannel("email"); // outreach goes by email; WhatsApp/Instagram stay selectable by hand
   }, [lead?.id]);
   useEffect(() => {
     setSubject(saved?.subject ?? "");

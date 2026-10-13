@@ -784,13 +784,12 @@ def approve(mid, tg_mid, own_claim=False):
         return "🛑 لم تُرسل — الفحص أوقفها:\n• " + "\n• ".join(problems) + "\nعدّلها (✏️ من الموقع) ثم أعد إرسالها للموافقة."
     if m["channel"] == "email":
         to, cc = recipients(L)
+        if not to:  # outreach is email only: no switching to WhatsApp, look for the address instead
+            L = find_email(L)
+            to, cc = recipients(L)
         if not to:
-            if L.get("phone") or L.get("instagram"):  # no email: ask for the same message on the channel we do have, instead of dead-ending
-                alt = "whatsapp" if L.get("phone") else "instagram"
-                db.patch("lead_messages", {"id": mid}, {"review": "rejected", "review_note": f"لا إيميل: أُعيد كتابتها على {alt}"})
-                db.req("POST", "lead_messages", body={"lead_id": L["id"], "channel": alt, "direction": "out", "draft": True, "review": "write", "body": ""})
-                return f"لا يوجد إيميل لهذا العميل، فطلبت كتابة الرسالة على {alt} وتصلك مسودتها هنا."
-            return "لا يوجد إيميل ولا هاتف ولا إنستغرام لهذا العميل: أضف وسيلة تواصل في صفحته"
+            db.patch("lead_messages", {"id": mid}, {"review": "failed", "review_note": "لا إيميل حتى بعد البحث العميق — أضف الإيميل في صفحة العميل"})
+            return "📭 لم تُرسل: لا يوجد إيميل لهذا العميل حتى بعد البحث العميق (الموقع، فيسبوك/إنستغرام عبر البحث، الأدلة). أضفه في صفحته ثم أعد الموافقة."
         send_email(to, m.get("subject"), m["body"], cc=cc, rush=is_rush(m, L))
         STATE["sent_mids"] = (STATE.get("sent_mids", []) + [mid])[-500:]  # remembered before the database is told
         STATE["next_send_at"] = time.time() + next_gap()
@@ -1110,6 +1109,24 @@ def ensure_contact(L):
     return L
 
 
+def find_email(L):
+    """Deep search (find_emails.hunt: website, opportunity page, Exa, DuckDuckGo, directory copies of their Facebook page).
+    Only a confident address is saved; the lead comes back with it, or unchanged."""
+    if L.get("email"):
+        return L
+    try:
+        import find_emails
+        v = find_emails.hunt(L)
+    except Exception as e:
+        log(f"email hunt failed for {L['name']}: {e}")
+        return L
+    if v.get("email") and v.get("confidence") in ("high", "medium"):
+        db.patch("leads", {"id": L["id"]}, {"email": v["email"]})
+        log(f"found email for {L['name']}: {v['email']} ({v['confidence']})")
+        return {**L, "email": v["email"]}
+    return L
+
+
 def local_ai_read_site(d):
     import local_ai
     return local_ai.read_site(d)
@@ -1143,17 +1160,10 @@ def write_requested():
     if not _local["model"]:
         db.patch("lead_messages", {"id": m["id"]}, {"review": "failed", "review_note": "Ollama غير شغّال على الجهاز"})
         return
-    if m["channel"] == "email" and not recipients(L)[0]:  # an email draft for someone with no usable address: use the contact we do have
-        L = ensure_contact(L)
-        alt = "whatsapp" if L.get("phone") else "instagram" if L.get("instagram") else None
-        if recipients(L)[0]:
-            pass
-        elif alt:
-            m["channel"] = alt
-            db.patch("lead_messages", {"id": m["id"]}, {"channel": alt})
-            log(f"{L['name']}: no email, drafting on {alt}")
-        else:
-            db.patch("lead_messages", {"id": m["id"]}, {"review": "failed", "review_note": "لا توجد وسيلة تواصل (إيميل أو هاتف أو إنستغرام) — أضفها في صفحة العميل"})
+    if m["channel"] == "email" and not recipients(L)[0]:  # outreach is email only: find the address (site, then deep search), never switch channel
+        L = find_email(ensure_contact(L))
+        if not recipients(L)[0]:
+            db.patch("lead_messages", {"id": m["id"]}, {"review": "failed", "review_note": "لا إيميل حتى بعد البحث العميق — أضف الإيميل في صفحة العميل"})
             return
     hist = db.get("lead_messages", select="direction,channel,subject,body,created_at", lead_id=f"eq.{L['id']}", draft="eq.false", order="created_at")
     history = "\n\n".join(f"[{'THEM' if h['direction'] == 'in' else 'US'} · {h['channel']} · {h['created_at'][:10]}]\n{h['body']}" for h in hist)

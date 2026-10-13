@@ -55,8 +55,9 @@ function Home() {
   const [limit, setLimit] = useState(100);
   const [bulk, setBulk] = useState<string | null>(null);
   /** Which leads a batch may target, and on which channel — follows the contact filter. */
-  const reachable = (l: Lead) => (contact === "email" ? !!l.email : contact === "phone" ? !!l.phone : !!(l.email || l.phone));
-  const channelFor = (l: Lead): "email" | "whatsapp" => (contact === "phone" ? "whatsapp" : contact === "email" ? "email" : l.email ? "email" : "whatsapp");
+  // Outreach goes by email; WhatsApp only when the phone filter is chosen on purpose.
+  const reachable = (l: Lead) => (contact === "phone" ? !!l.phone : !!l.email);
+  const channelFor = (l: Lead): "email" | "whatsapp" => (contact === "phone" ? "whatsapp" : "email");
 
   /** Emails we already wrote to (on any lead record) — a duplicate record with the same address must not get a first message. */
   const contactedEmails = useMemo(() => new Set(leads.filter((l) => l.email && ["contacted", "replied", "meeting", "won", "lost"].includes(l.status)).map((l) => l.email!.trim().toLowerCase())), [leads]);
