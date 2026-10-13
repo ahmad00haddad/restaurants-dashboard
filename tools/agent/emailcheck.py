@@ -21,6 +21,9 @@ PLACEHOLDER = re.compile(r"(youremail|yourname|your-?email|yourdomain|yoursite|m
 WRONG_DESK = re.compile(r"^(donat\w*|donor\w*|giving|monthlygiving|supporter\w*|fundrais\w*|career\w*|jobs?|recruit\w*|hr|billing|invoice\w*|accounts?|complaints?|"
                         r"privacy|legal|abuse|postmaster|webmaster|unsubscribe|donatori\w*|spende\w*|don)$", re.I)
 NEWS_ADDR = re.compile(r"(news|akhbar|ammon|jordanzad|khaberni|alraqeb|7areer)", re.I)
+# Foreign government mail servers (embassies, ministries abroad) refuse unknown senders: a South African embassy address bounced with
+# "550 5.4.1 Recipient address rejected: Access denied". Jordanian .gov.jo stays allowed (real clients and tenders).
+FOREIGN_GOV = re.compile(r"\.(gov|gouv|go|mil|govt)(\.[a-z]{2})?$|\.gob\.[a-z]{2}$|(^|\.)itamaraty\.|\.admin\.ch$", re.I)
 _mx = {}
 
 
@@ -51,6 +54,8 @@ def check(email):
     if not m:
         return {"ok": False, "role": False, "reason": "صيغة الإيميل غير صالحة"}
     local, domain = email.strip().lower().rsplit("@", 1)
+    if FOREIGN_GOV.search(domain) and not domain.endswith(".jo"):
+        return {"ok": False, "role": False, "reason": "بريد حكومي أجنبي (سفارة أو وزارة): خوادمهم ترفض المرسل الغريب، وغالباً ليسوا جهة التعاقد"}
     if WRONG_DESK.match(local.replace(".", "").replace("_", "").replace("-", "")):
         return {"ok": False, "role": True, "reason": "صندوق تبرعات أو وظائف أو فواتير وليس جهة القرار: ابحث عن عنوان التواصل أو الإعلام"}
     if NEWS_ADDR.search(domain) or NEWS_ADDR.search(local):
