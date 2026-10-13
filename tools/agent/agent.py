@@ -20,7 +20,7 @@ STATE_FILE = HERE / "state.json"
 
 
 ENV_KEYS = ("SUPABASE_URL", "SUPABASE_KEY", "AGENT_EMAIL", "AGENT_PASSWORD", "GMAIL_USER", "GMAIL_APP_PASSWORD", "SENDER_NAME",
-            "DAILY_CAP", "DAILY_MAX", "RAMP_STEP", "RAMP_DAYS", "RUSH_DAYS", "RUSH_EXTRA", "SEND_HOURS", "OFF_DAYS", "ALLOWED_LINKS", "PACED")
+            "DAILY_CAP", "DAILY_MAX", "RAMP_STEP", "RAMP_DAYS", "RUSH_DAYS", "RUSH_EXTRA", "SEND_HOURS", "OFF_DAYS", "ALLOWED_LINKS", "PACED", "WHATSAPP_NUMBER")
 
 
 def load_env():
@@ -35,7 +35,7 @@ def load_env():
 
 
 E = load_env()
-for _k in ("NVIDIA_API_KEY", "OLLAMA_MODEL", "EXA_API_KEY"):  # local_ai reads these from the environment
+for _k in ("NVIDIA_API_KEY", "OLLAMA_MODEL", "EXA_API_KEY", "WHATSAPP_NUMBER"):  # local_ai reads these from the environment
     if E.get(_k):
         os.environ[_k] = E[_k]
 _state_lock = threading.RLock()
@@ -542,7 +542,10 @@ BUILTIN_LINKS = ("ahmadhaddad.lovable.app,behance.net/ahmad00haddad,behance.com/
                  "behance.net/gallery/248490425/_,behance.net/gallery/248490425,"
                  "behance.net/gallery/242646259/duroub-with-alma,behance.net/gallery/242646259,"
                  "behance.net/gallery/237148893/duroub-school,behance.net/gallery/237148893,"
-                 "behance.net/gallery/126287243/_,behance.net/gallery/126287243")
+                 "behance.net/gallery/126287243/_,behance.net/gallery/126287243,"
+                 "behance.net/gallery/240973859/_,behance.net/gallery/240973859,"
+                 "behance.net/gallery/226584981/qrta,behance.net/gallery/226584981,"
+                 "behance.net/gallery/206048153/rajaa-usaid,behance.net/gallery/206048153")
 
 
 def allowed_urls():
@@ -619,7 +622,8 @@ def gate(m, L):
             why.append(f"رابط غير مسموح (المسموح: موقعك، موقع الفريق، Behance فقط): {u}")
     try:
         import local_ai
-        wrong = local_ai.wrong_proof(L, body) if L.get("kind") else []
+        # Ahmad names past work when he answers someone who replied; the no-names rule is for first contact only
+        wrong = local_ai.wrong_proof(L, body) if L.get("kind") and L.get("status") not in ("replied", "meeting") else []
     except Exception:
         wrong = []
     if wrong:
@@ -1007,7 +1011,7 @@ def analyze_one():
         return
     rank = {"roastery": 0, "pharmacy": 0, "school": 0, "ngo": 1, "org": 2, "hotel": 3, "brand": 4, "event": 5, "restaurant": 6}
     irbid = lambda L: not re.search(r"irbid|إربد|اربد", f"{L.get('city') or ''} {L.get('address') or ''}", re.I)
-    rows.sort(key=lambda L: (not L.get("signal"), irbid(L), rank.get(L["kind"], 7), not L.get("website")))
+    rows.sort(key=lambda L: (not L.get("signal"), not local_ai.is_local(L), irbid(L), rank.get(L["kind"], 7), not L.get("website")))
     L = rows[0]
     try:
         if L.get("kind") == "school" and school_gate(L) is None:

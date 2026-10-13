@@ -791,6 +791,63 @@ def roastery_first(L, team):
     return f"محتوى مرئي: {short_name(L['name'])}", "\n\n".join(paras)
 
 
+# ---------------- How Ahmad answers a reply (learned from his own edits of the Civil Party and Nour Al-Khair replies) ----------------
+REPLY_WORKS = {
+    "social": ("https://www.behance.net/gallery/240973859/_", "يوجد به عدة فيديوهات قصيرة مناسبة لوسائل التواصل."),
+    "long": ("https://www.behance.net/gallery/226584981/QRTA", "فيلم QRTA الطويل:"),
+    "women": ("https://www.behance.net/gallery/206048153/Rajaa-USAID", "فيلم رجاء:"),
+}
+
+
+INTERNATIONAL_NAME = re.compile(r"international|global|united nations|\bUN\b|\bUN[A-Z]+\b|USAID|embassy|european|\bEU\b|world |oxfam|red cross|red crescent|rescue|mercy corps|care |save the children", re.I)
+LOCAL_KINDS = {"school", "pharmacy", "roastery", "restaurant", "brand", "hotel", "event"}
+
+
+def is_local(L):
+    """Local first: an Arabic name, an Arabic-language profile, a .jo address, or a local business; never a big international body."""
+    name = L.get("name") or ""
+    arabic = bool(re.search("[؀-ۿ]", name))
+    if not arabic and L.get("kind") in ("ngo", "org") and INTERNATIONAL_NAME.search(name):
+        return False
+    if arabic or (L.get("profile") or {}).get("lang") == "ar" or re.search(r"\.jo(/|$)", (L.get("website") or "") + "/") or (L.get("email") or "").lower().endswith(".jo"):
+        return True
+    return L.get("kind") in LOCAL_KINDS
+
+
+def reply_playbook(L, theirs, price_asked):
+    """The answer to an interested reply (a price question or a request to meet), in Ahmad's own manner:
+    greet like they did, thank, a quick online meeting, one concrete commitment if they raised a concern, five scoping questions,
+    a quote within a day or two AFTER those answers (never a price in writing), two relevant works with a line each,
+    WhatsApp, and his name only. Fixed text: no model, nothing invented."""
+    t = f"{theirs}\n{L.get('name') or ''}"
+    salam = bool(re.search(r"السلام عليكم", theirs or "")) or bool(re.search(r"جمعية|خير|إغاثة|الاغاثة|zakat|charity|islamic", t, re.I))
+    women = bool(re.search(r"نساء|المرأة|النساء|women", t, re.I))
+    lines = ["السلام عليكم ورحمة الله وبركاته،" if salam else "تحية طيبة،",
+             f"السادة في {short_name(L['name'])} المحترمين،",
+             "شكراً لردّكم الكريم واهتمامكم." + (" وقبل أن أتحدث عن الكلفة، أحتاج أن أفهم الفيلم نفسه." if price_asked else " ويسعدني أن نحدد معاً الفيلم الذي يناسبكم."),
+             "يسعدني عقد اجتماع بسيط وسريع أونلاين لمناقشة الفيلم معاً، بحسب ما يناسبكم، وأتكيّف مع الموعد الذي تختارونه."]
+    if re.search(r"خصوصي|كرام", theirs or ""):
+        lines.append("وما أشرتم إليه من خصوصية المستفيدين وكرامتهم أمر أراعيه في هذا النوع من الأفلام: لا يُصوَّر أحد دون موافقته الواضحة، وصاحب القصة هو من يقرر ما يظهر منها.")
+    q2 = "عدد النساء اللواتي ستُروى قصصهنّ، وهل هنّ في عمّان أم في أكثر من محافظة؟" if women else "أي برنامج من برامجكم تودّون إبرازه"
+    lines.append("ولتكون الجلسة مفيدة، سأكون شاكراً إن أخبرتموني قبلها:\n\n1. مدة الفيلم التي تتصورونها (من ثلاث إلى خمس دقائق، أم أطول؟)\n"
+                 f"2. {q2}\n3. أين سيُعرض الفيلم: وسائل التواصل، أم فعاليات الجهة، أم جهات داعمة؟\n"
+                 "4. هل تحتاجون ترجمة أو نسخة بلغتين للفيلم؟\n5. الموعد الذي تريدونه لتسليم الفيلم.")
+    lines.append("ثم أرسل لكم عرضاً مفصّلاً بالكلفة خلال يوم إلى يومي عمل، لأن الكلفة تتحدد بحسب الفيلم نفسه.")
+    works = (["women"] if women else []) + ["social", "long"]
+    block = "ومن أقرب الأعمال السابقة في هذا الخط:\n\n" + "\n\n".join(
+        (f"{REPLY_WORKS[k][1]}\n{REPLY_WORKS[k][0]}" if k != "social" else f"{REPLY_WORKS[k][0]}\n{REPLY_WORKS[k][1]}") for k in works)
+    lines.append(block)
+    lines.append("يسعدني أن أحدد معكم موعداً يناسبكم هذا الأسبوع.")
+    return "\n\n".join(lines)
+
+
+def last_inbound(history):
+    """The newest 'THEM' message in the conversation text the agent builds ('[THEM · email · date]\\n...')."""
+    parts = re.split(r"\n\n(?=\[(?:THEM|US) ·)", history or "")
+    them = [p for p in parts if p.startswith("[THEM")]
+    return re.sub(r"^\[THEM[^\]]*\]\n?", "", them[-1]).strip() if them else ""
+
+
 def dm_version(text):
     """WhatsApp / Instagram: 2-3 short lines. The email template without the 'rest of my work' paragraph, the close and the signature
     block; only the portfolio link line stays."""
@@ -804,6 +861,17 @@ def dm_version(text):
 
 def write(L, team, history, channel, mode, hint, model):
     """Write, and retry once if the model skipped the idea or cleanup left too little (never queue a hollow message)."""
+    if mode == "reply":
+        theirs = last_inbound(history)
+        try:
+            cat = review_reply(model, L, "", theirs)["category"] if theirs else "other"
+        except Exception:
+            cat = "other"
+        if cat in ("question", "meeting_request", "interested"):  # an interested reply gets Ahmad's own playbook, not a model's guess
+            wa = os.environ.get("WHATSAPP_NUMBER", "").strip()
+            price = bool(re.search(r"تكلف|سعر|كلفة|أسعار|cost|price|quot|budget", theirs, re.I))
+            body = reply_playbook(L, theirs, price) + "\n\n" + (f"واتساب : {wa}\n\n" if wa else "") + "مع خالص التقدير،\nأحمد حدّاد"
+            return ("الكلفة وموعد اللقاء" if price else "موعد اللقاء"), (body if channel == "email" else dm_version(body))
     if mode == "first" and sector(L) in ("roastery", "pharmacy", "education"):
         subject, text = {"roastery": roastery_first, "pharmacy": pharmacy_first, "education": school_first}[sector(L)](L, team)
         return subject, (text if channel == "email" else dm_version(text))
@@ -1030,7 +1098,7 @@ def finish(body, L, team, lang="en", mode="first"):
     paras = [p_ for p_ in paras if p_]
     # First message only: an easy, polite way out. Someone who can simply say "no" does not press "spam", the strongest bad signal.
     close = close_for(L, lang, mode) + (" " + opt_out_for(L, lang) if mode == "first" else "")  # one closing paragraph, not two
-    text = "\n\n".join(paras + [close])
+    text = "\n\n".join(paras + ([] if mode == "reply" else [close]))  # a reply ends in its own words, not a stock close
     # Always one clean greeting: drop whatever greeting-ish lines the model wrote, then add ours.
     ls = text.splitlines()
     while ls and (not ls[0].strip() or len(ls[0]) < 140 and (re.match(r"\s*(dear|hello|hi|good (morning|evening|afternoon)|السادة|الأخوة|الإخوة|مرحب|تحية|السلام|إلى|مساء الخير|صباح الخير)", ls[0], re.I)
@@ -1042,6 +1110,11 @@ def finish(body, L, team, lang="en", mode="first"):
     text = (f"السادة في {short_name(L['name'])} المحترمين،" if lang == "ar" else f"Dear {first}," if first else f"Dear {short_name(L['name'])} team,") + "\n\n" + text
     p = L.get("profile") or {}
     site = SITES.get(p.get("link_pick"), SITES["personal" if L.get("kind") in ("ngo", "org", "school") else "team"])
+    if mode == "reply":  # Ahmad's own replies end: WhatsApp line, a short closing, his name only (no title, company or site link)
+        wa = os.environ.get("WHATSAPP_NUMBER", "").strip()
+        wa_line = (f"واتساب : {wa}" if lang == "ar" else f"WhatsApp: {wa}") if wa else ""
+        sig = ["مع خالص التقدير،", "أحمد حدّاد"] if lang == "ar" else ["Best regards,", "Ahmad Haddad"]
+        return text + "\n\n" + ((wa_line + "\n\n") if wa_line else "") + "\n".join(sig)
     if lang == "ar":
         sig = ["أحمد حدّاد", "مخرج ومدير تصوير، FAII HOUSE", f"بعض أعمالي ومن عملت معهم: {site}"]
     else:

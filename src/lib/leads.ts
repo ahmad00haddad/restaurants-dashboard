@@ -121,6 +121,18 @@ export const DEFAULT_TEAM: TeamSettings = {
   focus: "الوثائقيات وأفلام الأثر للمنظمات هي الأولوية عندما تناسب العميل.",
 };
 
+/** Local first (Ahmad's decision after the first replies: local organisations answer, big international ones do not).
+ *  Local = an Arabic name, an Arabic-language profile, a .jo address, or a local business; never a big international body. */
+const INTERNATIONAL = /international|global|united nations|\bUN\b|\bUN[A-Z]+\b|USAID|embassy|european|\bEU\b|world |oxfam|red cross|red crescent|rescue|mercy corps|care |save the children/i;
+const LOCAL_KINDS = new Set(["school", "pharmacy", "roastery", "restaurant", "brand", "hotel", "event"]);
+export function isLocal(l: { name: string; kind: string; email: string | null; website: string | null; profile: { lang?: string } | null }): boolean {
+  const arabic = /[؀-ۿ]/.test(l.name);
+  if (!arabic && (l.kind === "ngo" || l.kind === "org") && INTERNATIONAL.test(l.name)) return false;
+  if (arabic || l.profile?.lang === "ar" || /\.jo(\/|$)/i.test(`${l.website ?? ""}/`) || /\.jo$/i.test(l.email ?? "")) return true;
+  return LOCAL_KINDS.has(l.kind);
+}
+export const localFirst = (l: Parameters<typeof isLocal>[0]) => (isLocal(l) ? 0 : 1);
+
 /** Irbid is home turf: its leads are worked first. */
 export const irbidFirst = (l: { city: string | null; address?: string | null }) =>
   /irbid|إربد|اربد/i.test(`${l.city ?? ""} ${l.address ?? ""}`) ? 0 : 1;
