@@ -545,7 +545,9 @@ BUILTIN_LINKS = ("ahmadhaddad.lovable.app,behance.net/ahmad00haddad,behance.com/
                  "behance.net/gallery/126287243/_,behance.net/gallery/126287243,"
                  "behance.net/gallery/240973859/_,behance.net/gallery/240973859,"
                  "behance.net/gallery/226584981/qrta,behance.net/gallery/226584981,"
-                 "behance.net/gallery/206048153/rajaa-usaid,behance.net/gallery/206048153")
+                 "behance.net/gallery/206048153/rajaa-usaid,behance.net/gallery/206048153,"
+                 "behance.net/gallery/225987725/_,behance.net/gallery/225987725,"
+                 "behance.net/gallery/131010035/-ezwitti,behance.net/gallery/131010035")
 
 
 def allowed_urls():

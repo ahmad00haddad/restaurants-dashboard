@@ -793,6 +793,105 @@ def review_reply(model, L, ours, theirs, auto=False):
             "lesson": str(out.get("lesson") or "")[:400] or None, "suggestion": str(out.get("suggestion") or "")[:400] or None, "confidence": conf}
 
 
+# ---------------- First email to an organisation: fixed template, the idea is chosen in code from a vetted library ----------------
+NGO_TOPICS = [  # (key, pattern); the name and category are tested first, then the site text is COUNTED (most matches wins)
+    ("disability", r"إعاقة|الاعاقة|معاق|مكفوف|الصم\b|ذوي الاحتياجات|disabilit|blind|deaf|special needs"),
+    ("children", r"أيتام|يتيم|طفل|أطفال|children|orphan|kids|\bchild"),
+    ("women", r"نساء|المرأة|سيدات|women|female|gender"),
+    ("health", r"صحي|صحة|طبي|مستشفى|سرطان|medical|health|clinic|cancer|hospital"),
+    ("education", r"تعليم|طلاب|طالب|مدرس|تدريب|educat|student|school|training|scholar|learning"),
+    ("youth", r"شباب|youth|young"),
+    ("environment", r"بيئ|مياه|مناخ|تدوير|environment|green|climate|recycl|water|wildlife|conservation"),
+    ("arts", r"ثقاف|مسرح|تراث|متحف|cultur|\barts?\b|museum|theat|heritage|music|gallery"),
+    ("economic", r"ريادة|تمكين اقتصادي|مشاريع صغيرة|entrepreneur|livelihood|microfinance|business development|\bskills\b"),
+    ("rights", r"حقوق|ديمقراط|مجتمع مدني|\brights\b|democra|advocacy|civic|governance"),
+    ("research", r"أبحاث|بحث علمي|research|science|institute"),
+    ("relief", r"لاجئ|إغاثة|خير|زكاة|صدقة|طعام|غزة|refugee|relief|humanitarian|charit|zakat|food bank|gaza|human development"),
+]
+NGO_IDEAS = {
+    "ar": {
+        "disability": "يمكننا تصوير فيلم قصير يتابع شخصاً استفاد من خدماتكم، يروي قصته بصوته ويُظهر قدراته واستقلاليته.",
+        "children": "يمكننا تصوير فيلم قصير يتابع يوماً في حياة طفل أو أسرة تدعمونها، بما يحفظ خصوصية الأطفال وكرامتهم.",
+        "women": "يمكننا تصوير فيلم قصير يتابع امرأة استفادت من برامجكم، يروي رحلتها وأثر هذا الدعم في حياتها وأسرتها بصوتها.",
+        "health": "يمكننا تصوير فيلم قصير يتابع أحد المستفيدين أو أحد أفراد فريقكم، ويُظهر الجهد الإنساني خلف خدماتكم.",
+        "education": "يمكننا تصوير فيلم قصير يتابع طالباً أو معلماً في أحد برامجكم، ويُظهر ما يتغيّر في يومه بفضلها.",
+        "youth": "يمكننا تصوير فيلم قصير يتابع شاباً أو شابة في أحد برامجكم، من أول خطوة حتى ما حققه بعدها.",
+        "environment": "يمكننا تصوير فيلم قصير يتابع العاملين على أحد مشاريعكم في الميدان، ويُظهر أثر العمل على الأرض.",
+        "arts": "يمكننا تصوير فيلم قصير يتابع فناناً أو مشاركاً في أحد برامجكم، من التحضير حتى العرض.",
+        "economic": "يمكننا تصوير فيلم قصير يتابع مشاركاً في أحد برامج التدريب لديكم حتى يطلق مشروعه الصغير.",
+        "rights": "يمكننا تصوير فيلم قصير يتابع أحد المشاركين في أنشطتكم، ويروي كيف أصبح فاعلاً في مجتمعه.",
+        "research": "يمكننا تصوير فيلم قصير يتابع باحثاً أو مستفيداً من عملكم، ويُظهر أثر العمل العلمي في الحياة اليومية.",
+        "relief": "يمكننا تصوير فيلم قصير يتابع أسرة استفادت من برامجكم، ويروي بصوتها ما غيّره هذا الدعم.",
+        "general": "يمكننا تصوير فيلم قصير يتابع أحد المستفيدين من برامجكم، ويروي أثرها من خلال قصته.",
+        "company": "يمكننا تصوير فيلم قصير يتابع فريقكم وهو ينجز أحد مشاريعكم، ويُظهر الناس الذين يقفون خلف الخدمة.",
+    },
+    "en": {
+        "disability": "We could film a short documentary following someone who has benefited from your services, telling their own story and showing their abilities and independence.",
+        "children": "We could film a short documentary following a day in the life of a child or family you support, with full respect for the children's privacy and dignity.",
+        "women": "We could film a short documentary following a woman who has benefited from your programmes, telling in her own voice how this support changed her life and her family's.",
+        "health": "We could film a short documentary following one of the people you serve, or a member of your team, showing the human effort behind your services.",
+        "education": "We could film a short documentary following a student or a teacher in one of your programmes, showing what changes in their day because of it.",
+        "youth": "We could film a short documentary following a young person in one of your programmes, from the first step to what they achieved afterwards.",
+        "environment": "We could film a short documentary following the people working on one of your projects in the field, showing the impact on the ground.",
+        "arts": "We could film a short documentary following an artist or a participant in one of your programmes, from preparation to the performance.",
+        "economic": "We could film a short documentary following a participant in one of your training programmes until they launch their own small business.",
+        "rights": "We could film a short documentary following a participant in your activities, telling how they became an active voice in their community.",
+        "research": "We could film a short documentary following a researcher or a beneficiary of your work, showing how the research reaches everyday life.",
+        "relief": "We could film a short documentary following a family that has benefited from your programmes, telling in their own voice what this support changed.",
+        "general": "We could film a short documentary following one of the people your programmes serve, telling their impact through their story.",
+        "company": "We could film a short documentary following your team as it delivers one of your projects, showing the people behind the service.",
+    },
+}
+NGO_WORKS = {  # one strong example per topic, chosen in code
+    "women": "https://www.behance.net/gallery/126287243/_", "children": "https://www.behance.net/gallery/225987725/_",
+    "disability": "https://www.behance.net/gallery/225987725/_", "health": "https://www.behance.net/gallery/225987725/_",
+    "youth": "https://www.behance.net/gallery/131010035/-Ezwitti", "education": "https://www.behance.net/gallery/226584981/QRTA",
+    "economic": "https://www.behance.net/gallery/206048153/Rajaa-USAID", "relief": "https://www.behance.net/gallery/206048153/Rajaa-USAID",
+}
+NGO_DEFAULT_WORK = "https://www.behance.net/gallery/226584981/QRTA"
+NGO_LEAD = {
+    "ar": ["هذا مثال على فيلم صوّرته في مجال قريب من عملكم:", "ومن أعمالي في مجال قريب من عملكم:", "مثال على ما صوّرته في هذا المجال:"],
+    "en": ["Here is an example of a film I made in a field close to yours:", "One of my films in a related field:", "An example of what I filmed in this field:"],
+}
+NGO_REST = {
+    "ar": ["وبقية أعمالي في الرابط أدناه، شاهدوها على مهلكم.", "وأعمالي كلها في الرابط أدناه، وأترك لكم الحكم عليها.", "وستجدون بقية أعمالي في الرابط أدناه."],
+    "en": ["The rest of my work is at the link below, to look through at your own pace.", "All my work is at the link below. I'll leave it to speak for itself.", "You'll find the rest of my work at the link below."],
+}
+
+
+def ngo_topic(L):
+    """What the organisation does, from its name, category and the text of its site; decided by keywords, never by a model."""
+    p = L.get("profile") or {}
+    text = f"{L.get('name') or ''} {L.get('category') or ''} {(L.get('about') or '')[:1500]} {p.get('summary') or ''}".lower()
+    name_text = f"{L.get('name') or ''} {L.get('category') or ''}".lower()
+    own_name = (L.get("name") or "").lower()  # the category often says "NGO" even for a business found by an NGO search: judge by the name only
+    ngo_like = re.search(r"جمعية|مؤسسة|منظمة|مركز|صندوق|رابطة|اتحاد|association|foundation|society|\bngo\b|charit|fund|cent(er|re)|council|commission|institute|initiative|academy|union|network|group", own_name)
+    if re.search(r"\bl\.?l\.?c\b|\bltd\b|\bco\.|\binc\b|شركة|solutions|technolog|consult|software|services", own_name) and not ngo_like:
+        return "company"  # a business, not an organisation with beneficiaries
+    for key, rx in NGO_TOPICS:  # the name and category decide first
+        if re.search(rx, name_text):
+            return key
+    counts = [(len(re.findall(rx, text)), -i, key) for i, (key, rx) in enumerate(NGO_TOPICS)]
+    best = max(counts)
+    return best[2] if best[0] >= 3 else "general"  # the site must clearly say it (3+ mentions); otherwise the safe general idea
+
+
+def ngo_first(L, team):
+    """First email to an organisation: who I am, ONE idea chosen for its field from a vetted library, one matching work, the portfolio.
+    Fixed text: no model writes it, so nothing is invented, garbled, or mixed between languages."""
+    import hashlib
+    lang = lang_for(L)
+    lang = "ar" if lang == "ar" else "en"
+    h = int(hashlib.md5(("nb" + str(L.get("id") or L.get("name"))).encode()).hexdigest(), 16)
+    topic = ngo_topic(L)
+    body = intro_for(L, lang) + "\n\n" + NGO_IDEAS[lang][topic] + "\n\n" + NGO_REST[lang][h % 3]
+    paras = finish(body, L, team, lang, "first").split("\n\n")
+    work = NGO_WORKS.get(topic, NGO_DEFAULT_WORK)
+    paras.insert(len(paras) - 3, f"{NGO_LEAD[lang][(h >> 4) % 3]}\n{work}")
+    subject = f"عن عمل {short_name(L['name'])}" if lang == "ar" else f"On the work of {short_name(L['name'])}"
+    return subject, "\n\n".join(paras)
+
+
 def roastery_first(L, team):
     """First email to a coffee roastery: one line about me, ONE strong example, the portfolio link. Fixed template, no model."""
     import hashlib
@@ -965,8 +1064,8 @@ def write(L, team, history, channel, mode, hint, model):
             price = bool(re.search(r"تكلف|سعر|كلفة|أسعار|cost|price|quot|budget", theirs, re.I))
             body = reply_playbook(L, theirs, price) + "\n\n" + (f"واتساب : {wa}\n\n" if wa else "") + "مع خالص التقدير،\nأحمد حدّاد"
             return ("الكلفة وموعد اللقاء" if price else "موعد اللقاء"), (body if channel == "email" else dm_version(body))
-    if mode == "first" and sector(L) in ("roastery", "pharmacy", "education"):
-        subject, text = {"roastery": roastery_first, "pharmacy": pharmacy_first, "education": school_first}[sector(L)](L, team)
+    if mode == "first" and sector(L) in ("roastery", "pharmacy", "education", "ngo"):
+        subject, text = {"roastery": roastery_first, "pharmacy": pharmacy_first, "education": school_first, "ngo": ngo_first}[sector(L)](L, team)
         return subject, (text if channel == "email" else dm_version(text))
     last = None
     for attempt in range(2):
@@ -1071,6 +1170,9 @@ def intro_for(L, lang):
 def wrong_proof(L, body):
     """Ahmad's rule: no client names in outreach — the website shows who he worked with."""
     body = re.sub(r"https?://\S+", " ", body)  # the allowed portfolio links may carry a project name; only prose counts
+    for own in {(L or {}).get("name") or "", short_name((L or {}).get("name") or "")}:  # the client's own name is not name-dropping ("UNICEF Jordan")
+        if own:
+            body = re.sub(re.escape(own), " ", body, flags=re.I)
     # whole words only (an optional one-letter Arabic prefix is allowed): "عرفة" must not match inside "معرفة"
     return [n for n in ALL_CLIENT_NAMES if re.search(r"(?<!\w)[وبلكف]?" + re.escape(n.lower()) + r"(?!\w)", body.lower())]
 
