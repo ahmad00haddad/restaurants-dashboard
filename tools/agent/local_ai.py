@@ -853,6 +853,23 @@ def reply_playbook(L, theirs, price_asked):
     return "\n\n".join(lines)
 
 
+ALLOWED_LATIN = {"faii", "house", "behance", "qrta", "usaid", "whatsapp", "unicef", "undp", "unhcr", "instagram", "youtube", "online", "email", "http", "https"}
+
+
+def foreign_words(body, L):
+    """Latin words inside an Arabic message that are not part of the client's own name (models sometimes leak words of other languages:
+    'organizzata', 'mostrando' were found in sent emails). English-majority messages are not checked."""
+    text = re.sub(r"https?://\S+", " ", body or "")
+    toks = re.findall(r"[A-Za-z]{4,}", text)  # hyphenated names split into their parts, like the name tokens below
+    if len(re.findall(r"[؀-ۿ]+", text)) < len(toks):
+        return []
+    allowed = ALLOWED_LATIN | {w.lower() for w in re.findall(r"[A-Za-z]{3,}", f"{L.get('name') or ''} {L.get('category') or ''}")}
+    return sorted({t for t in toks if t.lower() not in allowed})
+
+
+PHONE_ASK = re.compile(r"رقم (هاتف|جوال|الهاتف|الجوال|تلفون)|رقمك|هاتفك|جوالك|ارسل لي رقم|أرسل لي رقم|اتصل بك|للاتصال بك|phone number|your number|call you|give you a call", re.I)
+
+
 def last_inbound(history):
     """The newest 'THEM' message in the conversation text the agent builds ('[THEM · email · date]\\n...')."""
     parts = re.split(r"\n\n(?=\[(?:THEM|US) ·)", history or "")
@@ -879,6 +896,11 @@ def write(L, team, history, channel, mode, hint, model):
             cat = review_reply(model, L, "", theirs)["category"] if theirs else "other"
         except Exception:
             cat = "other"
+        wa_ = os.environ.get("WHATSAPP_NUMBER", "").strip()
+        if theirs and PHONE_ASK.search(theirs) and wa_:  # they only asked for a number to call: give it, nothing more
+            body = (f"السادة في {short_name(L['name'])} المحترمين،\n\nشكراً لردّكم، ويسعدني التعاون معكم.\n\nرقمي {wa_} (واتساب أيضاً)، "
+                    "ويسعدني أن تتصلوا بي في الوقت الذي يناسبكم، أو أتصل بكم إن فضّلتم، ويكفي أن تحددوا لي الموعد.\n\nمع خالص التقدير،\nأحمد حدّاد")
+            return "رقم التواصل", (body if channel == "email" else dm_version(body))
         if cat in ("question", "meeting_request", "interested"):  # an interested reply gets Ahmad's own playbook, not a model's guess
             wa = os.environ.get("WHATSAPP_NUMBER", "").strip()
             price = bool(re.search(r"تكلف|سعر|كلفة|أسعار|cost|price|quot|budget", theirs, re.I))
@@ -893,12 +915,12 @@ def write(L, team, history, channel, mode, hint, model):
             subject, final = _write_once(L, team, history, channel, mode,
                                          hint if attempt == 0 else ((hint or "") + " The idea sentence is mandatory: say plainly what short film we could shoot for them."), model)
             core = " ".join(final.split("\n\n")[1:-2])
-            tells = ai_tells(final)
+            tells = ai_tells(final) + (["كلمات أجنبية داخل رسالة عربية: " + ", ".join(foreign_words(final, L)[:4])] if foreign_words(final, L) else [])
             if (mode != "first" or OFFER.search(core)) and (not tells or attempt == 1):
                 return subject, final  # tells that survive a second try are caught by the send gate, never sent silently
             last = ValueError("the message has no clear film idea" if not tells else "reads machine-written: " + ", ".join(tells))
             if tells:
-                hint = (hint or "") + " Write it plainly, like a person: no 'not just X but Y', no dramatic closing line, no inflated words."
+                hint = (hint or "") + " Write it plainly, like a person: no 'not just X but Y', no dramatic closing line, no inflated words. Use ONLY the message's own language: no words from any other language."
         except ValueError as e:
             last = e
     raise last
@@ -1039,6 +1061,7 @@ SITES = {"personal": "https://ahmadhaddad.lovable.app", "team": "https://ahmadha
 
 def short_name(name):
     """'International Rescue Committee (IRC) - Jordan' → 'IRC Jordan'; Arabic names stay as they are."""
+    name = re.sub(r"\.(org|com|net|jo|edu)\b", "", name or "", flags=re.I)  # "ACHR.ORG" reads as a web address in a greeting
     acr = re.search(r"\(([A-Za-z]{2,8})\)", name)
     if acr:
         return acr.group(1) + (" Jordan" if "jordan" in name.lower() else "")

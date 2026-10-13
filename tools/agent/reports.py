@@ -84,6 +84,8 @@ def daily(agent):
              f"⏳ جاهزة للإرسال: {q.get('approved', 0)} · بانتظار موافقتك: {q.get('pending', 0)} · تُكتب الآن: {q.get('write', 0)}"
              + (f" · فشلت: {q.get('failed', 0)}" if q.get("failed") else ""),
              f"🛡 ارتدادات آخر 7 أيام: {bounces}" + (" ⚠️ مرتفعة" if rate > 0.04 else "")]
+    if q.get("sending", 0):
+        lines.append(f"⚠️ {q['sending']} إيميل عالق بحالة «تُرسل الآن»: افتح Gmail (Sent) وتأكد هل خرج، ولا تُعد إرساله قبل ذلك.")
     if q.get("pending", 0):
         lines.append("افتح الموقع (✅ اليوم) لمراجعة المسودات التي تنتظرك.")
     return "\n\n".join(lines)

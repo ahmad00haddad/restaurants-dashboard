@@ -363,7 +363,7 @@ def check_inbox():
 
 REFUSAL = re.compile(r"\b(unsubscribe|remove (me|us|our)|take (me|us) off|stop (e-?mailing|contacting|writing)|do not (contact|email|write)|don['’]?t (contact|email|write)|"
                      r"not interested|no,? thank(s| you)|we (are|['’]re) not looking|please stop)\b|"
-                     r"إلغاء الاشتراك|أزيلو|احذفو|لا (نرغب|نحتاج|حاجة)|غير مهتم|لا تراسل|توقفوا عن|نعتذر عن عدم|شكرا[ًا]?،? لا", re.I)
+                     r"إلغاء الاشتراك|أزيلو|احذفو|لا (نرغب|نحتاج|حاجة)|غير مهتم|لا تراسل|توقفوا عن|نعتذر عن عدم (إمكانية|القدرة|التمكن|المتابعة|المضي|التعاون|الاستمرار|المشاركة)|يؤسفنا|لن (نستطيع|نتمكن) (من )?المضي|شكرا[ًا]?،? لا(?!\w)", re.I)
 
 
 def is_refusal(body):
@@ -643,10 +643,13 @@ def gate(m, L):
         import local_ai
         for t in local_ai.ai_tells(body):
             why.append(f"تبدو مكتوبة بالذكاء الاصطناعي: {t}")
+        fw = local_ai.foreign_words(body, L)
+        if fw:
+            why.append("كلمات أجنبية غريبة داخل رسالة عربية: " + ", ".join(fw[:5]) + " — عدّلها قبل الإرسال")
     except Exception:
         pass
     dnc = STATE.get("do_not_contact", {})
-    if m["channel"] == "email" and any((a or "").strip().lower() in dnc for a in recipients(L)):
+    if m["channel"] == "email" and L.get("status") in ("lost", "skip") and any((a or "").strip().lower() in dnc for a in recipients(L)):  # a lead a person restored is not blocked by an old automatic closure
         why.append("طلبوا عدم مراسلتهم — لن نراسلهم أبداً")
     if m["channel"] == "email" and L.get("status") in ("new", "skip", None) and L.get("email"):
         addr = L["email"].strip().lower()
@@ -1100,9 +1103,15 @@ def local_ai_read_site(d):
     return local_ai.read_site(d)
 
 
+_write_backoff, _write_tries = {}, {}
+TRANSIENT = re.compile(r"resting|timed? ?out|timeout|connection|connect|unavailable|rate|429|502|503|504|NVIDIA|Ollama|ReadError|RemoteProtocol", re.I)
+
+
 def write_requested():
     """Drafts the site asked this PC to write (review='write'), then they go to Telegram for approval."""
-    rows = db.get("lead_messages", select="*,leads(*)", review="eq.write", order="created_at", limit="1")
+    rows = [r for r in db.get("lead_messages", select="*,leads(*)", review="eq.write", order="created_at", limit="10")
+            if _write_backoff.get(r["id"], 0) <= time.time()]  # a draft that failed for a passing reason waits, it does not block the others
+    rows = rows[:1]
     if not rows:
         return
     import local_ai
@@ -1165,6 +1174,11 @@ def write_requested():
         log(f"✍️ wrote {mode} for {L['name']}")
         push_pending()
     except Exception as e:
+        tries = _write_tries[m["id"]] = _write_tries.get(m["id"], 0) + 1
+        if TRANSIENT.search(str(e)) and tries < 5:  # models resting / network: try again in 10 minutes, quietly
+            _write_backoff[m["id"]] = time.time() + 600
+            log(f"write for {L['name']} postponed ({tries}/5): {str(e)[:80]}")
+            return
         db.patch("lead_messages", {"id": m["id"]}, {"review": "failed", "review_note": f"الكتابة المحلية فشلت: {e}"[:300]})
         log(f"write failed for {L['name']}: {e}")
 
