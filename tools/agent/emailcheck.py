@@ -17,6 +17,10 @@ BIG_ORG_DOMAINS = {"rescue.org", "mercycorps.org", "unicef.org", "undp.org", "un
                    "handicap-international.org", "hi.org", "internationalmedicalcorps.org", "irc.org", "intersos.org", "cesvi.org", "cordaid.org"}
 # Placeholder addresses that website templates ship with (learned from a bounce: example@youremail.com on a harvested site).
 PLACEHOLDER = re.compile(r"(youremail|yourname|your-?email|yourdomain|yoursite|mysite|mydomain|@email\.com$|@domain\.[a-z]+$|@example\.|^(example|name|user|test|email|someone|john\.?doe|jane\.?doe)@)", re.I)
+# Mailboxes that are never the person who decides about a film: donation / supporter / jobs / billing desks, and addresses of news sites.
+WRONG_DESK = re.compile(r"^(donat\w*|donor\w*|giving|monthlygiving|supporter\w*|fundrais\w*|career\w*|jobs?|recruit\w*|hr|billing|invoice\w*|accounts?|complaints?|"
+                        r"privacy|legal|abuse|postmaster|webmaster|unsubscribe|donatori\w*|spende\w*|don)$", re.I)
+NEWS_ADDR = re.compile(r"(news|akhbar|ammon|jordanzad|khaberni|alraqeb|7areer)", re.I)
 _mx = {}
 
 
@@ -47,6 +51,10 @@ def check(email):
     if not m:
         return {"ok": False, "role": False, "reason": "صيغة الإيميل غير صالحة"}
     local, domain = email.strip().lower().rsplit("@", 1)
+    if WRONG_DESK.match(local.replace(".", "").replace("_", "").replace("-", "")):
+        return {"ok": False, "role": True, "reason": "صندوق تبرعات أو وظائف أو فواتير وليس جهة القرار: ابحث عن عنوان التواصل أو الإعلام"}
+    if NEWS_ADDR.search(domain) or NEWS_ADDR.search(local):
+        return {"ok": False, "role": False, "reason": "عنوان موقع إخباري وليس العميل: غالباً التقطه الجامع من صفحة خارجية"}
     if PLACEHOLDER.search(email.strip()):
         return {"ok": False, "role": False, "reason": "عنوان نموذجي من قالب الموقع وليس عنوان العميل"}
     if domain in DISPOSABLE:

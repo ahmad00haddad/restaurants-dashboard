@@ -1062,10 +1062,38 @@ SITES = {"personal": "https://ahmadhaddad.lovable.app", "team": "https://ahmadha
 def short_name(name):
     """'International Rescue Committee (IRC) - Jordan' → 'IRC Jordan'; Arabic names stay as they are."""
     name = re.sub(r"\.(org|com|net|jo|edu)\b", "", name or "", flags=re.I)  # "ACHR.ORG" reads as a web address in a greeting
+    name = re.sub(r"[‎‏_]+", " ", name)  # invisible direction marks and underscores in Google names ("FOCCEC_سواعد التغيير_ Amman")
     acr = re.search(r"\(([A-Za-z]{2,8})\)", name)
     if acr:
         return acr.group(1) + (" Jordan" if "jordan" in name.lower() else "")
-    return re.sub(r"\s+[-–|]\s+[^-–|]*$", "", name).strip() or name
+    name = re.sub(r"\s*\([^)]{12,}\)", "", name)  # a long parenthetical is the name in a second language
+    out = re.sub(r"\s+[-–|]\s+[^-–|]*$", "", name).strip() or name
+    out = re.sub(r"\s+(country\s+|regional\s+)?office$", "", out, flags=re.I).strip() or out  # "Mercy Corps Jordan Office" → "Mercy Corps Jordan"
+    if re.search(r"[؀-ۿ]", out):  # an Arabic greeting keeps the Arabic part: "FOCCEC سواعد التغيير Amman" → "سواعد التغيير"
+        ar = re.findall(r"[؀-ۿ][؀-ۿ\s]*[؀-ۿ]", out)
+        if ar and len(re.findall(r"[A-Za-z]{3,}", out)) <= 3:
+            out = max(ar, key=len).strip()
+    return re.sub(r"\s{2,}", " ", out)
+
+
+GENERIC_FIRST = {"office", "team", "info", "contact", "admin", "support", "media", "press", "communications", "hello", "mail", "sales", "service", "enquiries"}
+
+
+def _dedupe_sentences(paras):
+    """Drop a sentence that repeats an earlier one (the writer's own intro surviving next to ours: 'I make short films about the people
+    behind programmes… I make short films about the people behind programmes…')."""
+    seen, out = [], []
+    for p_ in paras:
+        keep = []
+        for s_ in [x for x in re.split(r"(?<=[.؟?!])\s+", p_) if x.strip()]:
+            w = set(re.findall(r"\w{3,}", s_.lower()))
+            if w and any(len(w & o) / max(1, min(len(w), len(o))) >= 0.7 and min(len(w), len(o)) >= 4 for o in seen):
+                continue
+            seen.append(w)
+            keep.append(s_)
+        if keep:
+            out.append(" ".join(keep))
+    return out
 
 
 def finish(body, L, team, lang="en", mode="first"):
@@ -1130,7 +1158,7 @@ def finish(body, L, team, lang="en", mode="first"):
             paras = [sents[0], " ".join([intro] + sents[1:])]
     # drop any sentence that still name-drops a client
     paras = [" ".join(x for x in re.split(r"(?<=[.؟?!])\s+", p_) if not any(n.lower() in x.lower() for n in ALL_CLIENT_NAMES)).strip() for p_ in paras]
-    paras = [p_ for p_ in paras if p_]
+    paras = _dedupe_sentences([p_ for p_ in paras if p_])
     # First message only: an easy, polite way out. Someone who can simply say "no" does not press "spam", the strongest bad signal.
     close = close_for(L, lang, mode) + (" " + opt_out_for(L, lang) if mode == "first" else "")  # one closing paragraph, not two
     text = "\n\n".join(paras + ([] if mode == "reply" else [close]))  # a reply ends in its own words, not a stock close
@@ -1142,6 +1170,8 @@ def finish(body, L, team, lang="en", mode="first"):
     text = "\n".join(ls).strip()
     c = (L.get("profile") or {}).get("contact")  # a person whose name is in the email address itself; English only (gender unknown in Arabic)
     first = re.match(r"[A-Za-z]{3,}", c["name"]).group(0).capitalize() if c and re.match(r"[A-Za-z]{3,}", c["name"]) else None
+    if first and first.lower() in GENERIC_FIRST:
+        first = None  # "Hi Office team": a desk is not a person's first name
     text = (f"السادة في {short_name(L['name'])} المحترمين،" if lang == "ar" else f"Dear {first}," if first else f"Dear {short_name(L['name'])} team,") + "\n\n" + text
     p = L.get("profile") or {}
     site = SITES.get(p.get("link_pick"), SITES["personal" if L.get("kind") in ("ngo", "org", "school") else "team"])
