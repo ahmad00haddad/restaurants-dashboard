@@ -359,6 +359,16 @@ def person_email(L, people, site_emails=None):
     return None
 
 
+def best_channel(L, p):
+    """The channel we can really use: the model's pick only when that contact exists (email needs a usable address or a named contact)."""
+    ec = p.get("email_check") or {}
+    mail = bool(L.get("email")) and ec.get("ok") is not False or bool((p.get("contact") or {}).get("email"))
+    want = p.get("channel")
+    if want == "email" and mail or want == "whatsapp" and L.get("phone") or want == "instagram" and L.get("instagram"):
+        return want
+    return "email" if mail else "whatsapp" if L.get("phone") else "instagram" if L.get("instagram") else "email"
+
+
 def tier_of(score, L, p):
     """A = worth hand-checking and sending first; B = normal; C = low touch. Decided in code, never by the model.
     A: strong fit AND a reachable person (named mailbox or phone) AND a concrete reason now (fresh news, live signal, or a personal mailbox)."""
@@ -405,6 +415,7 @@ def analyze(db, L, team, model):
     p["analysed_by"] = f"local:{model}"
     if L.get("email"):
         p["email_check"] = emailcheck.check(L["email"])
+    p["channel"] = best_channel(L, p)
     if recent:
         p["recent"] = recent
         h = recent_hook(L, recent, p["lang"], model)
@@ -467,6 +478,7 @@ def refresh(db, L, model):
     score = min(100, base + 10) if active else base
     if L.get("email"):
         p["email_check"] = emailcheck.check(L["email"])
+    p["channel"] = best_channel(L, p)
     if L.get("kind") in ORG_KINDS and score >= 60 and not p.get("people"):
         people = find_people(L, model)
         if people:
