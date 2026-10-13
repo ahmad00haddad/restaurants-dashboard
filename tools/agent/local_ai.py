@@ -901,7 +901,7 @@ def foreign_words(body, L):
     if len(re.findall(r"[؀-ۿ]+", text)) < len(toks):
         return []
     allowed = ALLOWED_LATIN | {w.lower() for w in re.findall(r"[A-Za-z]{3,}", f"{L.get('name') or ''} {L.get('category') or ''}")}
-    return sorted({t for t in toks if t.lower() not in allowed})
+    return sorted({t for t in toks if t.lower() not in allowed and not t.isupper()})  # ALL-CAPS tokens are acronyms (UNFPA, BPWA), not stray words
 
 
 def qa_flags(body, L):

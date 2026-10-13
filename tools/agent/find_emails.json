@@ -48,5 +48,24 @@
   "kind": "ngo",
   "signal": true,
   "written": true
+ },
+ "67107ca9-0f77-4c56-b89a-1e1d17ba87da": {
+  "exa": true,
+  "website_found": "",
+  "email": "ashrafalbkour@gmail.com",
+  "confidence": "medium",
+  "why": "The email is listed on the IFSW member organisation page for the Jordanian Association of Social Work, directly associated with Mr. Ashraf Albkour, and matches the organisation's name and Jordan location.",
+  "candidates": {
+   "info@alwakeelnews.com": [
+    "https://www.alwakeelnews.com/Section_1/%D8%A3%D8%AE%D8%A8%D8%A7%D8%B1-%D9%85%D8%AD%D9%84%D9%8A%D8%A9/%D9%88%D8%B2%D8%A7%D8%B1%D8%A9-%D8%A7%D9%84%D8%AA%D9%86%D9%85%D9%8A%D8%A9-%D8%A7%D9%84%D8%A7%D8%AC%D8%AA%D9%85%D8%A7%D8%B9%D9%8A%D8%A9-%D8%AA%D8%B7%D9%84%D9%82-%D9%85%D9%86%D8%AD%D8%A7-%D9%84%D8%AF%D8%B9%D9%85-%D8%A5%D9%86%D8%B4%D8%A7%D8%A1-%D9%88%D8%AA%D8%B7%D9%88%D9%8A%D8%B1-%D8%A7%D9%84%D8%AD%D8%B6%D8%A7%D9%86%D8%A7%D8%AA-%D8%A7%D9%84%D8%AE%D8%A7%D8%B5%D8%A9_791170"
+   ],
+   "ashrafalbkour@gmail.com": [
+    "https://www.ifsw.org/member-organisation/national-association-of-social-workers-of-jordan/"
+   ]
+  },
+  "name": "الجمعية الأردنية للعمل الاجتماعي",
+  "kind": "ngo",
+  "signal": true,
+  "written": true
  }
 }
