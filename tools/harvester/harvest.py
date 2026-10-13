@@ -12,7 +12,7 @@ CITIES = ["Irbid", "Ramtha", "Amman", "Zarqa", "Aqaba", "Salt", "Madaba", "Jeras
 PRESETS = {
     "ngo": ["NGO", "non-profit organization", "charity", "foundation", "UN agency", "humanitarian organization",
             "community development organization", "women empowerment organization", "youth organization",
-            "refugee support organization", "environmental organization", "cultural center", "embassy",
+            "refugee support organization", "environmental organization", "cultural center",
             "منظمة غير حكومية", "جمعية خيرية"],
     "org": ["university", "private school", "hospital", "museum", "marketing agency", "real estate developer", "bank",
             "tech company", "conference center", "clinic"],
@@ -39,8 +39,13 @@ def _blocklist():
     return re.compile("|".join(re.escape(w) for w in words), re.I) if words else None
 
 
+DIPLOMATIC = re.compile(r"embassy|consulate|high commission|سفارة|قنصلية|المفوضية السامية", re.I)
+
+
 def is_blocked(d):
     """True for a lead whose name, website or social account matches a line of blocklist.txt (old clients, chains with many branches)."""
+    if DIPLOMATIC.search(str(d.get("name") or "")):  # embassies and consulates: closed government mail, central decisions, not our market
+        return True
     rx = _blocklist()
     if not rx:
         return False
