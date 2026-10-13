@@ -643,6 +643,8 @@ def gate(m, L):
         import local_ai
         for t in local_ai.ai_tells(body):
             why.append(f"تبدو مكتوبة بالذكاء الاصطناعي: {t}")
+        for q in local_ai.qa_flags(body, L):
+            why.append("خطأ كتابة: " + q)
         fw = local_ai.foreign_words(body, L)
         if fw:
             why.append("كلمات أجنبية غريبة داخل رسالة عربية: " + ", ".join(fw[:5]) + " — عدّلها قبل الإرسال")
@@ -680,6 +682,14 @@ def card(m):
         head += f"\n🔔 {L['signal']}"
     if m["channel"] == "email" and email_site_mismatch(L):
         head += f"\n⚠️ انتبه: الإيميل لا يشبه موقعهم ({L.get('website')}) — قد يكون لجهة أخرى. تأكد قبل الموافقة."
+    if (m.get("review_note") or "").startswith("🔎"):
+        head += "\n" + m["review_note"]
+    try:  # show now what the send gate would stop, so the card says it before Ahmad presses ✅
+        stops = [p for p in gate(m, L) if "راسلنا هذا الإيميل سابقاً" not in p]
+        if stops:
+            head += "\n⚠️ لن تُرسل قبل أن تُصحَّح: " + " · ".join(stops)[:400]
+    except Exception:
+        pass
     subj = f"\nالموضوع: {m['subject']}" if m.get("subject") else ""
     return f"{head}{subj}\n────────\n{m['body']}"
 
@@ -1174,7 +1184,10 @@ def write_requested():
             theirs_subj = next((h.get("subject") for h in reversed(hist) if h["direction"] == "in" and h.get("subject")), None)
             if theirs_subj:
                 subject = theirs_subj if re.match(r"\s*(re|رد)\s*:", theirs_subj, re.I) else "Re: " + theirs_subj
-        db.patch("lead_messages", {"id": m["id"]}, {"subject": subject, "body": body, "review": "pending", "review_note": None, "tg_message_id": None})
+        issues = local_ai.LAST_REVIEW.get("issues") or []
+        local_ai.LAST_REVIEW["issues"] = []
+        note = ("🔎 ملاحظات المراجعة الآلية: " + " | ".join(issues))[:300] if issues else None
+        db.patch("lead_messages", {"id": m["id"]}, {"subject": subject, "body": body, "review": "pending", "review_note": note, "tg_message_id": None})
         log(f"✍️ wrote {mode} for {L['name']}")
         push_pending()
     except Exception as e:

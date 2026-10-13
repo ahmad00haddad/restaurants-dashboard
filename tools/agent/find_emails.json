@@ -1,0 +1,52 @@
+{
+ "32b86792-21b9-4e43-b148-301cbb03a68d": {
+  "exa": true,
+  "website_found": "",
+  "email": "info@leadersinternational.org",
+  "confidence": "medium",
+  "why": "Found on ERC Jordan listing page for Leaders International with matching phone number and clear association to the organisation.",
+  "candidates": {
+   "info@leadersinternational.org": [
+    "https://erc-jordan.org/listing/leaders-international/"
+   ],
+   "info@erc-jordan.org": [
+    "https://erc-jordan.org/listing/leaders-international/"
+   ],
+   "n.zahran@leadersinternational.org": [
+    "https://tadamon.community/organisations/leaders-international"
+   ],
+   "j.doe@leadersinternational.org": [
+    "https://prospeo.io/c/leaders-international"
+   ],
+   "j.doej@leadersinternational.org": [
+    "https://prospeo.io/c/leaders-international"
+   ],
+   "leaders@leaders.ps": [
+    "https://linkedin.com/company/leadersinternational"
+   ]
+  },
+  "name": "Leaders International Jordan",
+  "kind": "ngo",
+  "signal": true,
+  "written": true
+ },
+ "384ec842-d4e6-4b0f-9f61-554055dd12b3": {
+  "exa": true,
+  "website_found": "",
+  "email": "info@irteqaajo.com",
+  "confidence": "high",
+  "why": "The email appears on the organisation's own website contact page and matches the NGO's name and Amman location.",
+  "candidates": {
+   "info@irteqaajo.com": [
+    "https://irteqaajo.com/contact-us/"
+   ],
+   "universal@universaljordan.com": [
+    "https://universaljordan.com/contact-us-i/"
+   ]
+  },
+  "name": "Al Irteqaa For Universal Foundation",
+  "kind": "ngo",
+  "signal": true,
+  "written": true
+ }
+}

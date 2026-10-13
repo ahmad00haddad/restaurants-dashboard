@@ -853,6 +853,43 @@ def reply_playbook(L, theirs, price_asked):
     return "\n\n".join(lines)
 
 
+LAST_REVIEW = {"issues": []}  # read by the agent right after write(): shown on the approval card, never sent
+
+
+PROOF_SYSTEM = """You are a meticulous native {lang_name} copy editor. You receive a short first-contact email from Ahmad Haddad, a Jordanian film
+director, to an organisation, plus the CLIENT TEXT the facts must come from. Fix ONLY real mistakes and return the corrected email.
+Fix: grammar and agreement (verb gender, case endings, plural/singular), calques and passive 'تم ...' constructions, broken or garbled words
+(a stray letter before a Latin word), a name transliterated into Arabic letters when its real Arabic or Latin name exists (use the Arabic name
+the client uses, or keep the Latin name), a sentence with no verb, an address or phone number or menu text pasted into the body, a sentence
+whose subject is wrong (e.g. 'we implement the client's programme' when the CLIENT implements it), word repetitions and duplicate sentences,
+mixed languages (the whole email in one language), awkward or funny wording.
+Forbidden: adding any fact, number, name, place or claim that is not in the CLIENT TEXT; removing the film idea; making the idea a certainty
+(it stays a possibility: 'يمكننا' / 'we could'); changing the greeting line, the signature lines, or any link; adding praise words or exclamation marks.
+If a sentence states a specific scene or detail that the CLIENT TEXT does not support (a named factory, a city, a number), rewrite it generically.
+Keep the length similar. If nothing needs fixing return the text unchanged.
+Return JSON only: {"body":"the corrected full email","issues":["short Arabic note per fix"]}"""
+
+
+def proofread(model, L, subject, body, lang):
+    """A second model pass over a finished draft (found by reading 89 sent emails: garbled words, wrong subjects, invented details).
+    The result is accepted only when links, greeting and signature are untouched and no new Latin words appear."""
+    try:
+        out = chat(model, PROOF_SYSTEM.replace("{lang_name}", "Arabic" if lang == "ar" else "English"),
+                   f"CLIENT TEXT (the only source of facts):\n{(L.get('about') or '')[:2500]}\n{json.dumps(L.get('profile') or {}, ensure_ascii=False)[:1200]}\n\nEMAIL:\n{body}")
+    except Exception:
+        return subject, body, []
+    new, issues = out.get("body"), [str(i)[:140] for i in (out.get("issues") or [])][:6]
+    if not isinstance(new, str) or new.strip() == body.strip():
+        return subject, body, []
+    old_l, new_l = [x.strip() for x in body.strip().splitlines() if x.strip()], [x.strip() for x in new.strip().splitlines() if x.strip()]
+    ok = (old_l[0] == new_l[0] and old_l[-3:] == new_l[-3:]                                   # greeting and signature untouched
+          and sorted(re.findall(r"https?://\S+", body)) == sorted(re.findall(r"https?://\S+", new))   # links untouched
+          and 0.7 <= len(new) / max(1, len(body)) <= 1.2
+          and not (set(re.findall(r"[A-Za-z]{4,}", new.lower())) - set(re.findall(r"[A-Za-z]{4,}", body.lower())) - ALLOWED_LATIN))  # no new Latin words
+    LAST_REVIEW["issues"] = issues  # even when the model could not fix them, the person who approves sees what it noticed
+    return (subject, new.strip(), issues) if ok else (subject, body, issues)
+
+
 ALLOWED_LATIN = {"faii", "house", "behance", "qrta", "usaid", "whatsapp", "unicef", "undp", "unhcr", "instagram", "youtube", "online", "email", "http", "https"}
 
 
@@ -865,6 +902,28 @@ def foreign_words(body, L):
         return []
     allowed = ALLOWED_LATIN | {w.lower() for w in re.findall(r"[A-Za-z]{3,}", f"{L.get('name') or ''} {L.get('category') or ''}")}
     return sorted({t for t in toks if t.lower() not in allowed})
+
+
+def qa_flags(body, L):
+    """Deterministic checks for the writing mistakes found in the agent's drafts. Returns short Arabic reasons (empty = nothing found)."""
+    out = []
+    paras = [p_.strip() for p_ in (body or "").split("\n\n") if p_.strip()]
+    text = "\n\n".join(paras[:-1]) if paras else ""  # without the signature block
+    if re.search(r"(?<![؀-ۿ])[؀-ۿ] [A-Za-z]{3,}", text):
+        out.append("كلمة مقطوعة أو مشوّهة (حرف عربي وحيد قبل كلمة لاتينية)")
+    for p_ in paras[1:-1]:
+        if re.search(r"(شارع|منطقة|P\.?O\.? ?Box|ص\.ب|Street)", p_) and len(re.findall(r"\s[-–]\s", p_)) >= 2:
+            out.append("فقرة تبدو عنواناً منسوخاً من موقعهم وليست جملة")
+        if len(p_) < 120 and not re.search(r"[.؟?!:،,]$|https?://|^\d\.", p_) and not p_.startswith(("السادة", "Dear", "أحمد", "Ahmad")):
+            out.append("فقرة مقطوعة بلا نهاية")
+    first = paras[1] if len(paras) > 1 else ""
+    if re.match(r"\s*(ننفّذ|نقدّم|نقدم|نعمل|نوفّر|نوفر|نطلق|أطلقنا|نحن)\b", first):
+        out.append("الجملة الأولى تنسب عمل الجهة إلينا (يبدو أن الكاتب خلط بين «نحن» و«هم»)")
+    if re.search(r"(مخرج ومدير تصوير)[^\n]{0,40}\1", text):
+        out.append("تكرار «مخرج ومدير تصوير» في نفس الفقرة")
+    if re.search(r"\b(تم|تمّ) (إنشاء|انشاء|تنفيذ|إطلاق|اطلاق|تقديم)", text):
+        out.append("صيغة مبنية للمجهول مترجمة حرفياً («تم …»)")
+    return list(dict.fromkeys(out))
 
 
 PHONE_ASK = re.compile(r"رقم (هاتف|جوال|الهاتف|الجوال|تلفون)|رقمك|هاتفك|جوالك|ارسل لي رقم|أرسل لي رقم|اتصل بك|للاتصال بك|phone number|your number|call you|give you a call", re.I)
@@ -917,6 +976,13 @@ def write(L, team, history, channel, mode, hint, model):
             core = " ".join(final.split("\n\n")[1:-2])
             tells = ai_tells(final) + (["كلمات أجنبية داخل رسالة عربية: " + ", ".join(foreign_words(final, L)[:4])] if foreign_words(final, L) else [])
             if (mode != "first" or OFFER.search(core)) and (not tells or attempt == 1):
+                try:  # a second model proofreads the finished draft before it reaches Telegram
+                    LAST_REVIEW["issues"] = []
+                    subject, final, fixes = proofread(model, L, subject, final, lang_for(L))
+                    if fixes:
+                        print("  ✎ proofread:", "; ".join(fixes)[:200], flush=True)
+                except Exception:
+                    pass
                 return subject, final  # tells that survive a second try are caught by the send gate, never sent silently
             last = ValueError("the message has no clear film idea" if not tells else "reads machine-written: " + ", ".join(tells))
             if tells:
@@ -1062,6 +1128,9 @@ SITES = {"personal": "https://ahmadhaddad.lovable.app", "team": "https://ahmadha
 def short_name(name):
     """'International Rescue Committee (IRC) - Jordan' → 'IRC Jordan'; Arabic names stay as they are."""
     name = re.sub(r"\.(org|com|net|jo|edu)\b", "", name or "", flags=re.I)  # "ACHR.ORG" reads as a web address in a greeting
+    if "|" in name:  # "Cultures Village | قرية الثقافات|CVskills|KidsMBA": one brand per segment, greet the Arabic one (else the first)
+        parts = [x.strip() for x in name.split("|") if x.strip()]
+        name = next((x for x in parts if re.search("[؀-ۿ]", x)), parts[0] if parts else name)
     name = re.sub(r"[‎‏_]+", " ", name)  # invisible direction marks and underscores in Google names ("FOCCEC_سواعد التغيير_ Amman")
     acr = re.search(r"\(([A-Za-z]{2,8})\)", name)
     if acr:

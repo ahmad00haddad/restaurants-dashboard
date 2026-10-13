@@ -136,18 +136,18 @@ def exa(query, n=8):
     """[(url, title+highlights)] from Exa, paced to one call every 4 s. While Exa is cooling down after a rate limit we skip it
     (DuckDuckGo carries the search) and the lead is marked so a later run can repeat it with Exa."""
     with _exa_lock:
-        if time.time() < _exa_next[0] - 4:
-            return None
-        time.sleep(max(0, _exa_next[0] - time.time()))
+        if time.time() < _exa_next[0] - 4 and _ddg_next[0] - time.time() <= 30:
+            return None  # Exa resting, DuckDuckGo carries the search
+        time.sleep(max(0, _exa_next[0] - time.time()))  # both resting: wait for Exa rather than search with nothing
         _exa_next[0] = time.time() + 4
     try:
         local_ai._exa_block["until"] = 0
         txt = local_ai._exa(query, n)
     except local_ai.ExaLimit:
         with _exa_lock:
-            _exa_next[0] = time.time() + 600
-        log("Exa rate limit — DuckDuckGo only for 10 min")
-        return None
+            _exa_next[0] = time.time() + 300
+        log("Exa rate limit — resting 5 min")
+        return exa(query, n) if _ddg_next[0] - time.time() > 30 else None
     except Exception as e:
         log("Exa error", str(e)[:80])
         return []
@@ -163,28 +163,28 @@ _ddg_next = [0.0]
 
 
 def ddg(query):
-    """[(url, title + snippet)] from DuckDuckGo's HTML page, paced to one call every 3 s; backs off when it shows a challenge."""
-    for attempt in range(3):
+    """[(url, title + snippet)] from DuckDuckGo's HTML page, one call every 8 s. When it shows a bot challenge it rests for
+    10 minutes and the hunt goes on with Exa alone (never blocks a lead)."""
+    with _ddg_lock:
+        if _ddg_next[0] - time.time() > 30:
+            return []  # resting after a challenge
+        time.sleep(max(0, _ddg_next[0] - time.time()))
+        _ddg_next[0] = time.time() + 8
+    try:
+        r = httpx.post("https://html.duckduckgo.com/html/", data={"q": query}, headers=UA, timeout=25)
+    except Exception:
+        return []
+    out = []
+    for m in re.finditer(r'result__a" href="([^"]+)"[^>]*>(.*?)</a>.*?result__snippet[^>]*>(.*?)</a>', r.text, re.S):
+        url = m.group(1)
+        if "uddg=" in url:
+            url = unquote(re.search(r"uddg=([^&]+)", url).group(1))
+        out.append((url, deobfuscate(html.unescape(re.sub(r"<[^>]+>", "", m.group(2) + " — " + m.group(3))))))
+    if not out and "result--no-result" not in r.text:
         with _ddg_lock:
-            time.sleep(max(0, _ddg_next[0] - time.time()))
-            _ddg_next[0] = time.time() + 3
-        try:
-            r = httpx.post("https://html.duckduckgo.com/html/", data={"q": query}, headers=UA, timeout=25)
-        except Exception:
-            continue
-        out = []
-        for m in re.finditer(r'result__a" href="([^"]+)"[^>]*>(.*?)</a>.*?result__snippet[^>]*>(.*?)</a>', r.text, re.S):
-            url = m.group(1)
-            if "uddg=" in url:
-                url = unquote(re.search(r"uddg=([^&]+)", url).group(1))
-            text = html.unescape(re.sub(r"<[^>]+>", "", m.group(2) + " — " + m.group(3)))
-            out.append((url, deobfuscate(text)))
-        if out or "result--no-result" in r.text or "No results" in r.text:
-            return out
-        with _ddg_lock:
-            _ddg_next[0] = time.time() + 60 * (attempt + 1)  # challenge page: let it cool
-        log("DuckDuckGo challenge — backing off")
-    return []
+            _ddg_next[0] = time.time() + 600
+        log("DuckDuckGo challenge — resting 10 min")
+    return out
 
 
 STOP = set("""the and for of in at to a an school schools academy academic college kindergarten nursery preschool kg center centre
@@ -339,7 +339,7 @@ def main():
             and (L["kind"] in KINDS or L["signal"])]
     todo.sort(key=lambda L: (not L["signal"], L["kind"] != "ngo"))  # opportunities first, then NGOs, then schools
     report = json.loads(OUT.read_text(encoding="utf-8")) if OUT.exists() else {}
-    todo = [L for L in todo if L["id"] not in report]
+    todo = [L for L in todo if L["id"] not in report or (not report[L["id"]].get("email") and not report[L["id"]].get("exa", True))]
     log(f"{len(todo)} leads to search")
 
     def one(L):
