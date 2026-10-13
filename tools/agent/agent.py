@@ -1143,7 +1143,7 @@ def write_requested():
         else:
             db.patch("lead_messages", {"id": m["id"]}, {"review": "failed", "review_note": "لا توجد وسيلة تواصل (إيميل أو هاتف أو إنستغرام) — أضفها في صفحة العميل"})
             return
-    hist = db.get("lead_messages", select="direction,channel,body,created_at", lead_id=f"eq.{L['id']}", draft="eq.false", order="created_at")
+    hist = db.get("lead_messages", select="direction,channel,subject,body,created_at", lead_id=f"eq.{L['id']}", draft="eq.false", order="created_at")
     history = "\n\n".join(f"[{'THEM' if h['direction'] == 'in' else 'US'} · {h['channel']} · {h['created_at'][:10]}]\n{h['body']}" for h in hist)
     mode = "reply" if L.get("needs_reply") else "followup" if L.get("status") == "contacted" else "first" if L.get("status") in ("new", "skip") else "reply"
     try:
@@ -1170,6 +1170,10 @@ def write_requested():
         subject, body = local_ai.write(L, _local["team"], history, m["channel"], mode, m.get("review_note"), writer)
         if m["channel"] != "email":
             subject = None  # WhatsApp / Instagram have no subject
+        elif mode == "reply":  # same subject with "Re:" so Gmail keeps it in the conversation
+            theirs_subj = next((h.get("subject") for h in reversed(hist) if h["direction"] == "in" and h.get("subject")), None)
+            if theirs_subj:
+                subject = theirs_subj if re.match(r"\s*(re|رد)\s*:", theirs_subj, re.I) else "Re: " + theirs_subj
         db.patch("lead_messages", {"id": m["id"]}, {"subject": subject, "body": body, "review": "pending", "review_note": None, "tg_message_id": None})
         log(f"✍️ wrote {mode} for {L['name']}")
         push_pending()

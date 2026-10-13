@@ -88,6 +88,17 @@ def _deadline_ok(d):
     return d is not None and date.today() <= d <= date.today() + timedelta(days=550)
 
 
+NOT_A_CALL = re.compile(r"volunteer|wolontariusz|ticket|bilet|accreditation|press pass|careers?|vacanc|job opening|newsletter|cookie", re.I)
+
+
+def supports_deadline(evidence, dl):
+    """A deadline is believed only when the quote the model gave actually contains that date (its year or day number) and is not about
+    volunteers, tickets or jobs. Found by testing: Camerimage's volunteer recruitment was read as the film submission deadline."""
+    if not evidence or dl is None or NOT_A_CALL.search(evidence):
+        return False
+    return str(dl.year) in evidence or re.search(r"(?<!\d)0?%d(?!\d)" % dl.day, evidence) is not None
+
+
 def fit_score(it):
     """0-100, decided in code: how well the opportunity fits a Jordanian cinematographer-photographer."""
     s = 40
@@ -136,6 +147,8 @@ def _extract(model, field, scope, query, text):
         dl = _parse_date(x.get("deadline"))
         if x.get("deadline") and not _deadline_ok(dl):
             continue  # a stated deadline that is past or implausible: the call is closed or misread
+        if dl is not None and not supports_deadline(x.get("evidence"), dl):
+            dl = None  # the quote does not show that date: keep the opportunity, drop the unproven deadline
         f = str(x.get("field") or field).lower()
         it = {"title": title[:200], "organizer": org[:120], "kind": kind, "field": f if f in ("photo", "film", "both") else field,
               "scope": scope, "url": url, "deadline": dl.isoformat() if dl else None,
@@ -195,14 +208,14 @@ def refresh(db, model, log=print, max_pages=3):
             if len(text) > 300:
                 out = local_ai.chat(model, PAGE_SYSTEM, f"Today is {date.today().isoformat()}.\nProgramme: {r['title']}\nPAGE TEXT:\n{text[:7000]}")
                 st, dl = str(out.get("status") or "unknown").lower(), _parse_date(out.get("deadline"))
-                if st in ("open", "upcoming") and _deadline_ok(dl):
+                if st in ("open", "upcoming") and _deadline_ok(dl) and supports_deadline(out.get("evidence"), dl):
                     patch.update(deadline=dl.isoformat())
                 elif st == "closed":
                     patch.update(deadline=None, notes=((r.get("notes") or "") + " [الدورة الحالية مغلقة حسب الصفحة]").strip())
                 for k in ("prize", "fee", "eligibility"):
                     if out.get(k):
                         patch[k] = str(out[k])[:200]
-                if out.get("evidence"):
+                if out.get("evidence") and "deadline" in patch:
                     patch["evidence"] = str(out["evidence"])[:300]
                 patch["fit"] = fit_score({**r, **patch})
                 done += 1
