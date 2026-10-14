@@ -361,9 +361,68 @@ def check_inbox():
         save_state()
 
 
+
+def check_sent():
+    """Replies Ahmad writes himself in Gmail count too (Nour Al-Khair and ACHR, 2026-10-13, stayed 'waiting for your answer' after he had
+    answered): each sent mail to a lead that the agent did not send is logged in the site, the lead stops waiting, its drafts are cancelled."""
+    import imaplib, email as _email
+    from email.header import decode_header, make_header
+    from email.utils import getaddresses, parsedate_to_datetime
+    seen = STATE.setdefault("sent_seen", [])
+    since = (date.today() - timedelta(days=3)).strftime("%d-%b-%Y")
+    box = imaplib.IMAP4_SSL("imap.gmail.com", timeout=30)
+    found = []
+    try:
+        box.login(E["GMAIL_USER"], E["GMAIL_APP_PASSWORD"].replace(" ", ""))
+        box.select('"[Gmail]/Sent Mail"', readonly=True)
+        _, ids = box.search(None, f"(SINCE {since})")
+        for i in ids[0].split()[-200:]:
+            _, data = box.fetch(i, "(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])")
+            mid = (_email.message_from_bytes(data[0][1]).get("Message-ID") or i.decode()).strip()
+            if mid in seen:
+                continue
+            seen.append(mid)
+            _, data = box.fetch(i, "(BODY.PEEK[])")
+            msg = _email.message_from_bytes(data[0][1])
+            to = [a.lower() for _, a in getaddresses(msg.get_all("To", []) + msg.get_all("Cc", [])) if "@" in a]
+            try:
+                when = parsedate_to_datetime(msg.get("Date")).astimezone()
+            except Exception:
+                when = datetime.now().astimezone()
+            found.append((to, str(make_header(decode_header(msg.get("Subject") or ""))), _plain_body(msg), when))
+    finally:
+        try:
+            box.logout()
+        except Exception:
+            pass
+    STATE["sent_seen"] = seen[-3000:]
+    save_state()
+    for to, subject, body, when in found:
+        L = next((x for x in (_lead_for(a, True) for a in to) if x), None)
+        if not L or not body:
+            continue
+        key = re.sub(r"\s+", " ", body)[:80]
+        outs = db.get("lead_messages", select="body", lead_id=f"eq.{L['id']}", direction="eq.out", draft="eq.false", order="created_at.desc", limit="20")
+        if any(re.sub(r"\s+", " ", o.get("body") or "")[:80] == key for o in outs):
+            continue  # the agent's own send, already in the site
+        db.req("POST", "lead_messages", body={"lead_id": L["id"], "channel": "email", "direction": "out", "draft": False, "review": "sent",
+                                              "subject": subject or None, "body": body, "created_at": when.isoformat(), "sent_at": when.isoformat()})
+        last_in = db.get("lead_messages", select="created_at", lead_id=f"eq.{L['id']}", direction="eq.in", order="created_at.desc", limit="1")
+        if last_in and datetime.fromisoformat(last_in[0]["created_at"]) > when:
+            continue  # they wrote again after this answer: still waiting for a reply
+        db.req("PATCH", "lead_messages", {"lead_id": f"eq.{L['id']}", "draft": "eq.true", "review": "in.(pending,approved,write,failed)"},
+               {"review": "rejected", "review_note": "أُلغيت: أجبتَ بنفسك من Gmail"})
+        after_send(L)
+        log(f"✉️ your own Gmail reply to {L['name']} logged")
+
+
 REFUSAL = re.compile(r"\b(unsubscribe|remove (me|us|our)|take (me|us) off|stop (e-?mailing|contacting|writing)|do not (contact|email|write)|don['’]?t (contact|email|write)|"
                      r"not interested|no,? thank(s| you)|we (are|['’]re) not looking|please stop)\b|"
                      r"إلغاء الاشتراك|أزيلو|احذفو|لا (نرغب|نحتاج|حاجة)|غير مهتم|لا تراسل|توقفوا عن|نعتذر عن عدم (إمكانية|القدرة|التمكن|المتابعة|المضي|التعاون|الاستمرار|المشاركة)|يؤسفنا|لن (نستطيع|نتمكن) (من )?المضي|شكرا[ًا]?،? لا(?!\w)", re.I)
+
+# They close the exchange themselves (ACHR, 2026-10-13: "إن شاء الله سأتصل بك غداً"): logged, no reply drafted.
+CLOSING = re.compile(r"سأتصل|ساتصل|سوف أتصل|سوف اتصل|سنتصل|سنتواصل|سأتواصل|ساتواصل|نتواصل معك|سأكلمك|بحكيك|بتصل فيك|بتصل عليك|"
+                     r"I'?ll call|I will call|will call you|we will contact you|will get back to you|we'?ll be in touch", re.I)
 
 
 def is_refusal(body):
@@ -438,6 +497,13 @@ def process_reply(L, addr, subject, body, when, auto):
         log(f"🚫 {L['name']} declined — closed, never contacted again")
         say(f"🚫 {L['name']} ({addr}) ردّوا بالرفض أو طلبوا عدم المراسلة:\n────────\n{body[:800]}\n────────\n"
             "صنّفتهم «لم تنجح» ولن يكتب لهم النظام مرة أخرى. إن رأيت أن الرد يستحق جواباً شخصياً، اكتبه بنفسك.")
+        return
+    if CLOSING.search(body) and not re.search(r"[?؟]", body) and len(body) < 300:  # "thanks, I'll call you tomorrow": nothing to answer
+        db.patch("leads", {"id": L["id"]}, {"status": "meeting" if L["status"] in ("meeting", "won") else "replied", "needs_reply": False})
+        db.req("PATCH", "lead_messages", {"lead_id": f"eq.{L['id']}", "draft": "eq.true", "review": "in.(pending,approved,write,failed)"},
+               {"review": "rejected", "review_note": "أُلغيت: الردّ لا يحتاج جواباً"})
+        log(f"📩 {L['name']}: closing reply, nothing to answer")
+        say(f"📩 ردّ من {L['name']} ({addr}) لا يحتاج جواباً:\n────────\n{body[:800]}\n────────\nلم أكتب مسودة.")
         return
     db.patch("leads", {"id": L["id"]}, {"status": "meeting" if L["status"] in ("meeting", "won") else "replied",
                                         "needs_reply": True, "next_action_at": date.today().isoformat()})
@@ -1328,7 +1394,7 @@ def main():
                 last_push = time.time()
             if time.time() - last_bounce > 300:  # inbox: replies + bounces, every 5 min
                 last_bounce = time.time()
-                for fn in (check_inbox, check_bounces):
+                for fn in (check_inbox, check_sent, check_bounces):
                     try:
                         fn()
                     except Exception as e:
