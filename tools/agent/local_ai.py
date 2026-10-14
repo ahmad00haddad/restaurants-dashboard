@@ -1053,7 +1053,7 @@ def write(L, team, history, channel, mode, hint, model):
         wa_ = os.environ.get("WHATSAPP_NUMBER", "").strip()
         if theirs and PHONE_ASK.search(theirs) and wa_:  # they only asked for a number to call: give it, nothing more
             body = (f"السادة في {short_name(L['name'])} المحترمين،\n\nشكراً لردّكم، ويسعدني التعاون معكم.\n\nرقمي {wa_} (واتساب أيضاً)، "
-                    "ويسعدني أن تتصلوا بي في الوقت الذي يناسبكم، أو أتصل بكم إن فضّلتم، ويكفي أن تحددوا لي الموعد.\n\nمع خالص التقدير،\nأحمد حدّاد")
+                    "ويسعدني أن تتصلوا بي في الوقت الذي يناسبكم.\n\nمع خالص التقدير،\nأحمد حدّاد")
             return "رقم التواصل", (body if channel == "email" else dm_version(body))
         if cat in ("question", "meeting_request", "interested"):  # an interested reply gets Ahmad's own playbook, not a model's guess
             wa = os.environ.get("WHATSAPP_NUMBER", "").strip()
