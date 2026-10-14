@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useOpportunities, useOpportunityActions } from "@/hooks/useOpportunities";
 import { useToast } from "@/hooks/useToast";
 import {
-  OPP_FIELD_LABEL, OPP_KIND_LABEL, OPP_SCOPE_LABEL, OPP_STATUS_LABEL, daysLeft, isActiveOpp, sortOpps,
+  OPP_FIELD_LABEL, OPP_KIND_LABEL, OPP_SCOPE_LABEL, OPP_STATUS_LABEL, daysLeft, isActiveOpp, isJapanOpp, sortOpps,
   type OppKind, type OppStatus, type Opportunity,
 } from "@/lib/opportunities";
 
@@ -95,13 +95,15 @@ export function Radar() {
   const [kind, setKind] = useState("");
   const [scope, setScope] = useState("");
   const [field, setField] = useState("");
+  const [japan, setJapan] = useState(false);
   const [show, setShow] = useState<"active" | "mine" | "all">("active");
   const [open, setOpen] = useState<string | null>(null);
 
   const list = useMemo(() => opps
     .filter((o) => (!kind || o.kind === kind) && (!scope || o.scope === scope) && (!field || o.field === field || o.field === "both"))
+    .filter((o) => !japan || isJapanOpp(o))
     .filter((o) => show === "all" ? true : show === "mine" ? ["saved", "applying", "submitted", "won"].includes(o.status) : isActiveOpp(o))
-    .sort(sortOpps), [opps, kind, scope, field, show]);
+    .sort(sortOpps), [opps, kind, scope, field, show, japan]);
 
   const closing = opps.filter((o) => isActiveOpp(o) && (daysLeft(o.deadline) ?? 99) <= 14).length;
   const applying = opps.filter((o) => o.status === "applying").length;
@@ -127,6 +129,7 @@ export function Radar() {
           <option value="photo">فوتوغراف</option>
           <option value="film">سينما / فيديو</option>
         </select>
+        <button className={`${btn} ${japan ? "bg-primary text-primary-foreground" : ""}`} onClick={() => setJapan(!japan)}>🇯🇵 اليابان</button>
         <AddManual />
         <span className="text-xs text-muted-foreground">
           {closing > 0 && <b className="text-amber-600">⏰ {closing} تُغلق خلال 14 يوماً · </b>}

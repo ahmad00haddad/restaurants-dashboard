@@ -53,3 +53,8 @@ export function sortOpps(a: Opportunity, b: Opportunity) {
   if (db != null) return 1;
   return (b.fit ?? 0) - (a.fit ?? 0);
 }
+
+/** Japan is the travel goal: anything that mentions it can be shown on its own. */
+const JAPAN = /japan|tokyo|kyoto|osaka|hokkaido|okinawa|aomori|yamagata|hiroshima|nikon|اليابان|طوكيو/i;
+export const isJapanOpp = (o: Opportunity) =>
+  JAPAN.test([o.title, o.organizer, o.description, o.eligibility, o.prize, o.url].filter(Boolean).join(" "));

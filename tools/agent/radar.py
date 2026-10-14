@@ -1,6 +1,8 @@
 """Opportunity radar: photo / film competitions, festivals, grants, fellowships, open calls, tenders and jobs.
 
 Two jobs, both feeding the `opportunities` table (the site's 🏆 tab):
+  Free calls only: anything with an entry, submission or membership fee is dropped (scan) or hidden (refresh). Japan gets extra
+  searches and a higher fit, since travelling there to shoot is the goal.
   scan()    web search (Exa) for open calls, in English and Arabic, worldwide / regional / Jordan, plus public LinkedIn job and post
             pages that the search engine already indexes (we never scrape LinkedIn itself).
   refresh() re-reads the official page of each seeded programme and fills in the CURRENT deadline, prize and fee.
@@ -47,6 +49,18 @@ QUERIES = [
     ("both", "local", "مسابقة تصوير الأردن {y}"),
     ("film", "local", "مسابقة أفلام الأردن الهيئة الملكية للأفلام {y}"),
     ("both", "local", "Jordan youth media award photography video {y} application"),
+    # Japan: Ahmad's goal is to travel there to shoot, so free residencies, grants, festivals and commissions in Japan get their own searches
+    ("both", "international", "artist residency Japan open call {y} photography film airfare covered"),
+    ("both", "international", "Japan residency fully funded international artists travel stipend {y}"),
+    ("both", "international", "AIR Japan open call {y} filmmaker photographer accommodation travel expenses"),
+    ("film", "international", "Japan film festival call for entries {y} no submission fee"),
+    ("film", "international", "Japan documentary pitch OR co-production forum call for projects {y}"),
+    ("photo", "international", "Japan international photo contest free entry {y}"),
+    ("both", "international", "Japan Foundation OR Japanese embassy program artists filmmakers Middle East {y}"),
+    ("both", "international", "hiring videographer photographer shoot in Japan foreign crew {y}"),
+    ("both", "regional", "منحة اليابان تصوير أفلام {y} الأردن"),
+    # free residencies elsewhere that pay the trip
+    ("both", "international", "fully funded artist residency photographer filmmaker {y} travel covered no application fee"),
     # jobs / commissions seen on public pages (LinkedIn pages the search engine indexes; never scraped by us)
     ("both", "local", "videographer cinematographer hiring Jordan site:linkedin.com"),
     ("both", "local", "video producer photographer vacancy Amman site:linkedin.com"),
@@ -59,6 +73,7 @@ An opportunity = a photo or film COMPETITION, festival call for entries, grant, 
 Return JSON only: {"items":[{"index":<snippet number>,"title":"","organizer":"","kind":"competition|festival|grant|fellowship|residency|open_call|tender|job",
 "field":"photo|film|both","deadline":"YYYY-MM-DD or null","prize":"","fee":"","open_to_jordan":"yes|no|unknown","eligibility":"one short line",
 "description":"one line","evidence":"a short exact quote from the snippet that shows the deadline or that the call is open"}]}
+"fee": copy the entry / application fee exactly as written (e.g. "$25 per image", "free", "no application fee"); empty if the snippet does not say.
 Rules: only what the snippet says; never guess a date; if the snippet only shows an old edition or a closed call, skip it; if the deadline is not
 in the snippet use null. The organiser must be named in the snippet. Skip news articles that are not an open call, and skip anything not about
 photography, film, video or media production."""
@@ -99,6 +114,21 @@ def supports_deadline(evidence, dl):
     return str(dl.year) in evidence or re.search(r"(?<!\d)0?%d(?!\d)" % dl.day, evidence) is not None
 
 
+PAID = re.compile(r"\d|\$|€|£|¥|usd|eur|chf|jpy|yen|membership|subscription|اشتراك|رسوم", re.I)
+FREE = re.compile(r"free|no (entry |submission |application )?fee|without fee|waived|بدون رسوم|مجان", re.I)
+
+
+def is_paid(fee):
+    """Ahmad wants free calls only: a fee that names money or a membership, and does not also say free / no fee, is paid.
+    "Not specified" or empty is unknown, not paid."""
+    fee = str(fee or "")
+    return bool(PAID.search(fee)) and not FREE.search(fee) and not re.search(r"not (specified|mentioned|stated)|unknown", fee, re.I)
+
+
+JAPAN = re.compile(r"japan|tokyo|kyoto|osaka|hokkaido|okinawa|aomori|yamagata|hiroshima|nagoya|fukuoka|nikon|اليابان|طوكيو", re.I)
+TRAVEL = re.compile(r"airfare|flight|travel (cost|expense|grant|support|allowance|stipend)|round.?trip|fully funded|تذاكر|سفر", re.I)
+
+
 def fit_score(it):
     """0-100, decided in code: how well the opportunity fits a Jordanian cinematographer-photographer."""
     s = 40
@@ -107,10 +137,13 @@ def fit_score(it):
     if it.get("field") in ("film", "both"):
         s += 8
     fee = (it.get("fee") or "").lower()
-    if not fee or re.search(r"free|no fee|بدون|مجان", fee):
+    if not fee or FREE.search(fee):
         s += 8
-    elif re.search(r"\d", fee):
-        s -= 6
+    blob = " ".join(str(it.get(k) or "") for k in ("title", "organizer", "description", "eligibility", "prize", "url"))
+    if JAPAN.search(blob):
+        s += 15
+    if TRAVEL.search(blob):
+        s += 8
     if it.get("open_to_jordan") == "unknown":
         s -= 5
     d = _parse_date(it.get("deadline"))
@@ -142,8 +175,8 @@ def _extract(model, field, scope, query, text):
         if not url or len(title) < 6 or len(org) < 2 or org.lower().split()[0] not in body.lower():
             continue  # the organiser must be named in the text we read
         kind = str(x.get("kind") or "").lower()
-        if kind not in KINDS or str(x.get("open_to_jordan")).lower() == "no":
-            continue
+        if kind not in KINDS or str(x.get("open_to_jordan")).lower() == "no" or is_paid(x.get("fee")):
+            continue  # not open to Jordanians, or charges an entry / membership fee (free calls only)
         dl = _parse_date(x.get("deadline"))
         if x.get("deadline") and not _deadline_ok(dl):
             continue  # a stated deadline that is past or implausible: the call is closed or misread
@@ -215,6 +248,8 @@ def refresh(db, model, log=print, max_pages=3):
                 for k in ("prize", "fee", "eligibility"):
                     if out.get(k):
                         patch[k] = str(out[k])[:200]
+                if is_paid(out.get("fee")) and r.get("status") == "new":
+                    patch.update(status="skip", notes=((r.get("notes") or "") + " [مدفوعة: أُخفيت تلقائياً]").strip())
                 if out.get("evidence") and "deadline" in patch:
                     patch["evidence"] = str(out["evidence"])[:300]
                 patch["fit"] = fit_score({**r, **patch})
