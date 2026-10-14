@@ -242,8 +242,8 @@ def _plain_body(msg):
         if text.strip():
             break
     m = QUOTE_START.search(text)
-    if m:
-        text = text[:m.start()]
+    if m:  # reply above the quote (usual); a reply written BELOW the quote (Al-Gharaa, 2026-10-14) is what follows the quoted lines
+        text = text[:m.start()] if text[:m.start()].strip() else text[m.end():]
     text = "\n".join(l for l in text.splitlines() if not l.lstrip().startswith(">"))
     return re.sub(r"\n{3,}", "\n\n", text).strip()[:4000]
 
@@ -380,8 +380,8 @@ def learn_from_reply(L, msg_id, subject, body, auto):
     safe automatic fixes (an address that only reaches a support desk is marked bad so no lead is picked by it again)."""
     import local_ai
     model = local_model()
-    if not model:
-        return None
+    if not model or not (body or "").strip() or body.startswith("(رسالة بلا نص"):
+        return None  # nothing to learn from an empty body: a lesson guessed from nothing is a wrong lesson
     try:
         ours = db.get("lead_messages", select="body", lead_id=f"eq.{L['id']}", direction="eq.out", draft="eq.false", order="created_at.desc", limit="1")
         ins = local_ai.review_reply(model, L, ours[0]["body"] if ours else "", f"{subject or ''}\n{body}", auto)

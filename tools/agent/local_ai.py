@@ -106,7 +106,7 @@ def chat(model, system, user):
     m = re.search(r"\{.*\}", txt, re.S)
     if not m:
         raise ValueError("model returned no JSON")
-    return json.loads(m.group(0))
+    return json.loads(m.group(0), strict=False)  # models put raw line breaks inside JSON strings
 
 
 # ---------------- Fresh facts (Exa web search, no key) ----------------
@@ -1057,7 +1057,7 @@ def write(L, team, history, channel, mode, hint, model):
             return "رقم التواصل", (body if channel == "email" else dm_version(body))
         if cat in ("question", "meeting_request", "interested"):  # an interested reply gets Ahmad's own playbook, not a model's guess
             wa = os.environ.get("WHATSAPP_NUMBER", "").strip()
-            price = bool(re.search(r"تكلف|سعر|كلفة|أسعار|cost|price|quot|budget", theirs, re.I))
+            price = bool(re.search(r"تكلف|سعر|كلفة|أسعار|مجان|ببلاش|تبرع|تطوع|مقابل|نقود|فلوس|مصاري|cost|price|quot|budget|free|fee|paid", theirs, re.I))
             body = reply_playbook(L, theirs, price) + "\n\n" + (f"واتساب : {wa}\n\n" if wa else "") + "مع خالص التقدير،\nأحمد حدّاد"
             return ("الكلفة وموعد اللقاء" if price else "موعد اللقاء"), (body if channel == "email" else dm_version(body))
     if mode == "first" and sector(L) in ("roastery", "pharmacy", "education", "ngo"):
