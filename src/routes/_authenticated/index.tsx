@@ -1,7 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useRef, useState, type ReactNode } from "react";
-import { useServerFn } from "@tanstack/react-start";
-import { draftMessage, researchLead } from "@/lib/ai.functions";
 import { useAgentStatus, useApprovals, useLastMessages, useLeadActions, useLeads, useTouchedLeads, type LastMessage } from "@/hooks/useLeads";
 import { useToast } from "@/hooks/useToast";
 import { useAuth } from "@/hooks/useAuth";
@@ -13,7 +11,7 @@ import { Radar } from "@/components/Radar";
 import { ReplyLessons } from "@/components/ReplyLessons";
 import { useOpportunities } from "@/hooks/useOpportunities";
 import { daysLeft, isActiveOpp } from "@/lib/opportunities";
-import { KIND_LABEL, STATUS_LABEL, emailBad, irbidFirst, localFirst, tierOf, tierRank, type Lead, type LeadStatus } from "@/lib/leads";
+import { KIND_LABEL, STATUS_LABEL, emailBad, irbidFirst, localFirst, tierRank, type Lead, type LeadStatus } from "@/lib/leads";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({ meta: [{ title: "FAII — Sales" }] }),
@@ -21,7 +19,7 @@ export const Route = createFileRoute("/_authenticated/")({
 });
 
 /** Four places, one question each: what do I do now / who did we write to / who is next / which tenders are open. */
-type View = "today" | "convos" | "new" | "opps" | "radar" | "approvals" | "stats";
+type View = "today" | "convos" | "new" | "opps" | "approvals" | "stats";
 const today = (plus = 0) => new Date(Date.now() + plus * 864e5).toLocaleDateString("en-CA"); // local date, not UTC
 const daysAgo = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / 864e5);
 const STAGES: { status: LeadStatus; label: string }[] = [
@@ -39,8 +37,6 @@ function Home() {
   const act = useLeadActions();
   const toast = useToast();
   const { signOut } = useAuth();
-  const research = useServerFn(researchLead);
-  const draft = useServerFn(draftMessage);
   const { data: approvals = [] } = useApprovals();
   const { data: touched = new Set<string>() } = useTouchedLeads();
   const { data: agent } = useAgentStatus();
@@ -50,16 +46,9 @@ function Home() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<View>("today");
   const [kind, setKind] = useState("");
-  const [contact, setContact] = useState<"" | "email" | "phone">("");
   const [q, setQ] = useState("");
   const [sel, setSel] = useState<string | null>(null);
   const [limit, setLimit] = useState(100);
-  const [bulk, setBulk] = useState<string | null>(null);
-  /** Which leads a batch may target, and on which channel — follows the contact filter. */
-  // Outreach goes by email; WhatsApp only when the phone filter is chosen on purpose.
-  const reachable = (l: Lead) => (contact === "phone" ? !!l.phone : !!l.email);
-  const channelFor = (l: Lead): "email" | "whatsapp" => (contact === "phone" ? "whatsapp" : "email");
-
   /** Emails we already wrote to (on any lead record) — a duplicate record with the same address must not get a first message. */
   const contactedEmails = useMemo(() => new Set(leads.filter((l) => l.email && ["contacted", "replied", "meeting", "won", "lost"].includes(l.status)).map((l) => l.email!.trim().toLowerCase())), [leads]);
   const alreadyMailed = (l: Lead) => !!l.email && contactedEmails.has(l.email.trim().toLowerCase());
@@ -79,61 +68,21 @@ function Home() {
     return { reply, followup, nextStep, signals, closing, fresh, convos };
   }, [leads, contactedEmails]);
 
-  const filtered = (L: Lead[]) => L.filter((l) => (!kind || l.kind === kind) && (contact !== "email" || l.email) && (contact !== "phone" || l.phone));
+  const filtered = (L: Lead[]) => L.filter((l) => !kind || l.kind === kind);
   const found = useMemo(() => {
     if (!q.trim()) return null;
     const s = q.toLowerCase();
     return leads.filter((l) => [l.name, l.category, l.city, l.email, l.profile?.summary].some((x) => x?.toLowerCase().includes(s)));
   }, [leads, q]);
 
-  /** Research + write first messages for the best new leads and queue them for phone approval (Lovable credit). */
-  const draftBatch = async (n: number) => {
-    const queued = new Set(approvals.map((a) => a.lead_id));
-    const targets = [...groups.signals.filter((l) => l.status === "new"), ...groups.fresh.filter((l) => l.score != null)]
-      .filter((l, i, a) => a.indexOf(l) === i && !queued.has(l.id) && !touched.has(l.id) && !alreadyMailed(l) && reachable(l) && (!kind || l.kind === kind)).slice(0, n);
-    for (let i = 0; i < targets.length; i++) {
-      const l = targets[i];
-      setBulk(`كتابة ${i + 1}/${targets.length}: ${l.name}`);
-      try {
-        if (!l.profile) await research({ data: { id: l.id, refetch: false } });
-        await draft({ data: { id: l.id, mode: "first", channel: channelFor(l) } });
-        await act.queueDraft(l.id);
-      } catch (e) {
-        toast.push(`${l.name}: ${(e as Error).message}`, "error");
-        if (/رصيد|حد الاستخدام/.test((e as Error).message)) break;
-      }
-    }
-    setBulk(null);
-    toast.push("📤 المسودات في طريقها إلى هاتفك");
-  };
-
   /** Written on the PC (free): signals first, then the best analysed, then not-yet-analysed (the PC analyses each before writing). */
   const localBatch = async (n: number) => {
     if (!agent?.online) toast.push("⚠️ الوكيل متوقف — ستُكتب عند تشغيل run.bat", "info");
     const queued = new Set(approvals.map((a) => a.lead_id));
     const targets = [...groups.signals.filter((l) => l.status === "new"), ...groups.fresh]
-      .filter((l, i, a) => a.indexOf(l) === i && !queued.has(l.id) && !touched.has(l.id) && !alreadyMailed(l) && reachable(l) && (!kind || l.kind === kind)).slice(0, n);
-    for (const l of targets) await act.requestLocalWrite(l.id, channelFor(l));
+      .filter((l, i, a) => a.indexOf(l) === i && !queued.has(l.id) && !touched.has(l.id) && !alreadyMailed(l) && !!l.email && (!kind || l.kind === kind)).slice(0, n);
+    for (const l of targets) await act.requestLocalWrite(l.id, "email");
     toast.push(`💻 ${targets.length} رسائل في طابور جهازك — تصلك على Telegram تباعاً`);
-  };
-
-  const analyseBatch = async (n: number) => {
-    const targets = leads
-      .filter((l) => !l.profile && (kind ? l.kind === kind : true) && (l.email || l.phone || l.instagram))
-      .sort((a, b) => localFirst(a) - localFirst(b) || irbidFirst(a) - irbidFirst(b) || Number(b.kind === "ngo") - Number(a.kind === "ngo") || Number(!!b.website) - Number(!!a.website))
-      .slice(0, n);
-    for (let i = 0; i < targets.length; i++) {
-      setBulk(`تحليل ${i + 1}/${targets.length}: ${targets[i].name}`);
-      try {
-        await research({ data: { id: targets[i].id, refetch: false } });
-      } catch (e) {
-        toast.push((e as Error).message, "error");
-        if (/رصيد|حد الاستخدام/.test((e as Error).message)) break;
-      }
-      if (i % 5 === 4) act.refresh();
-    }
-    setBulk(null);
-    act.refresh();
   };
 
   const importFile = async (f: File) => {
@@ -161,33 +110,35 @@ function Home() {
     </button>
   );
 
-  const row = (l: Lead, extra?: ReactNode) => (
+  /** "Done" on a Today item: it leaves the list (a reply answered elsewhere, a follow-up not needed). */
+  const done = (l: Lead) => act.update(l.id, l.needs_reply ? { needs_reply: false } : { next_action_at: null })
+    .then(() => toast.push(`✓ ${l.name}`), (e) => toast.push((e as Error).message, "error"));
+  const row = (l: Lead, extra?: ReactNode, doneBtn = false) => (
     <tr key={l.id} onClick={() => setSel(l.id)} className={`cursor-pointer border-b border-border hover:bg-muted ${sel === l.id ? "bg-muted" : ""}`}>
       <td className="p-2">
-        <div className="font-medium">{l.needs_reply && "🔥 "}{l.signal && "🔔 "}{l.name}</div>
+        <div className="font-medium">{l.name}</div>
         {extra}
-        <div className="text-xs text-muted-foreground">{KIND_LABEL[l.kind]}{l.category ? ` · ${l.category}` : ""}{l.city ? ` · ${l.city}` : ""}</div>
+        <div className="text-xs text-muted-foreground">{KIND_LABEL[l.kind]}{l.city ? ` · ${l.city}` : ""}</div>
       </td>
-      <td className="p-2 text-center w-14">{l.score != null ? <><b>{l.score}</b><div className="text-[10px] text-muted-foreground">{tierOf(l)}</div></> : "—"}</td>
-      <td className="p-2 text-xs w-16 whitespace-nowrap">{l.email && "✉"} {l.phone && "☎"} {l.instagram && "IG"}</td>
-      <td className="p-2 text-xs w-20">{STATUS_LABEL[l.status]}</td>
+      <td className="p-2 text-xs w-24 text-muted-foreground">{STATUS_LABEL[l.status]}</td>
+      {doneBtn && <td className="p-2 w-16"><button className={btn} onClick={(e) => { e.stopPropagation(); done(l); }}>✓ تم</button></td>}
     </tr>
   );
   const lastLine = (l: Lead) => {
     const m = last[l.id];
     return m ? <div className="text-xs text-muted-foreground">{m.direction === "in" ? "💬 ردّوا" : "📤 أرسلنا"} عبر {m.channel} · قبل {daysAgo(m.created_at)} يوم</div> : null;
   };
-  const table = (L: Lead[], extra?: (l: Lead) => ReactNode) => (
+  const table = (L: Lead[], extra?: (l: Lead) => ReactNode, doneBtn = false) => (
     <>
-      <table className="w-full text-sm"><tbody>{L.slice(0, limit).map((l) => row(l, extra?.(l)))}</tbody></table>
+      <table className="w-full text-sm"><tbody>{L.slice(0, limit).map((l) => row(l, extra?.(l), doneBtn))}</tbody></table>
       {L.length > limit && <button className="m-3 underline text-sm" onClick={() => setLimit(limit + 200)}>عرض المزيد ({L.length - limit})</button>}
     </>
   );
-  const section = (title: string, L: Lead[], extra?: (l: Lead) => ReactNode) =>
+  const section = (title: string, L: Lead[], extra?: (l: Lead) => ReactNode, doneBtn = true) =>
     L.length > 0 && (
       <div key={title}>
         <h3 className="px-3 pt-4 pb-1 text-sm font-semibold">{title} ({L.length})</h3>
-        {table(L, extra)}
+        {table(L, extra, doneBtn)}
       </div>
     );
   const signalLine = (l: Lead) => l.signal && <div className="text-xs text-amber-600">{l.signal}{l.signal_until ? ` — ${l.signal_until}` : ""}</div>;
@@ -198,7 +149,7 @@ function Home() {
       const radarNote = radarClosing.length > 0 && (
         <div className="m-3 rounded border border-amber-500/50 bg-amber-500/10 p-3 flex items-center justify-between gap-2 text-sm">
           <span>🏆 {radarClosing.length} مسابقة أو منحة تُغلق خلال 14 يوماً، أقربها: {radarClosing.sort((a, b) => (daysLeft(a.deadline) ?? 99) - (daysLeft(b.deadline) ?? 99))[0].title}</span>
-          <button className={btn} onClick={() => go("radar")}>افتح الرادار</button>
+          <button className={btn} onClick={() => go("opps")}>افتح الفرص</button>
         </div>
       );
       return todayCount === 0 ? <>{radarNote}<p className="p-6 text-muted-foreground">✨ لا شيء ينتظرك اليوم. اذهب إلى «🎯 الجدد» لتكتب لأفضل 10.</p></> : (
@@ -213,11 +164,18 @@ function Home() {
           )}
           {section("↩️ متابعات حان موعدها", groups.followup, lastLine)}
           {section("🤝 خطوة تالية مع من ردّوا", groups.nextStep, lastLine)}
-          {section("⚠️ مناقصات تُغلق خلال 7 أيام", groups.closing, signalLine)}
+          {section("⚠️ فرص تُغلق خلال 7 أيام", groups.closing, signalLine, false)}
         </>
       );
     }
-    if (view === "opps") return groups.signals.length ? table(groups.signals, signalLine) : <p className="p-6 text-muted-foreground">لا فرص مفتوحة الآن. الوكيل يبحث كل صباح (أو أرسل /opps على Telegram).</p>;
+    if (view === "opps") return (
+      <>
+        <h3 className="px-3 pt-4 pb-1 text-sm font-semibold">🔔 منظمات وعطاءات تحتاج تصويراً ({groups.signals.length})</h3>
+        {groups.signals.length ? table(groups.signals, signalLine) : <p className="px-3 text-sm text-muted-foreground">لا شيء مفتوح الآن.</p>}
+        <h3 className="px-3 pt-6 pb-1 text-sm font-semibold">🏆 منح وجوائز وإقامات ومسابقات ({radarOpen})</h3>
+        <Radar />
+      </>
+    );
     // view === "new"
     const L = filtered(groups.fresh);
     return (
@@ -227,17 +185,12 @@ function Home() {
             <option value="">كل الأنواع</option>
             {Object.entries(KIND_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
-          <select className="rounded border border-border bg-background px-2 py-1.5 text-sm" value={contact} onChange={(e) => setContact(e.target.value as "" | "email" | "phone")}>
-            <option value="">كل طرق التواصل</option>
-            <option value="email">✉ لديهم إيميل</option>
-            <option value="phone">☎ لديهم هاتف/واتساب</option>
-          </select>
           <button className="px-3 py-1.5 rounded bg-primary text-primary-foreground text-sm" onClick={() => localBatch(10)}>
-            {contact === "email" ? "💻 اكتب إيميلات لأفضل 10" : contact === "phone" ? "💻 اكتب واتساب لأفضل 10" : "💻 اكتب لأفضل 10"}
+            ✍️ اكتب لأفضل 10 لم نراسلهم
           </button>
-          <span className="text-xs text-muted-foreground">A = {L.filter((l) => l.score != null && tierOf(l) === "A").length} · لم يُحلَّل {L.filter((l) => l.score == null).length}</span>
+          <span className="text-xs text-muted-foreground">تصلك المسودات على Telegram، ولا يُرسل شيء قبل موافقتك</span>
         </div>
-        {table(L, (l) => l.profile?.angle && <div className="text-xs text-muted-foreground">💡 {l.profile.best_service}: {l.profile.angle}</div>)}
+        {table(L.filter((l) => l.email))}
       </>
     );
   })();
@@ -264,9 +217,6 @@ function Home() {
     <div dir="rtl" className="min-h-screen bg-background text-foreground">
       <header className="flex flex-wrap items-center gap-4 border-b border-border px-4 py-2 text-sm">
         <b>FAII Sales</b>
-        <span className="text-muted-foreground">
-          تواصلنا مع {stats.contacted} · ردّ {stats.replied} · صفقات {won.length} ({stats.revenue} د.أ) · قيد التفاوض {stats.pipeline} د.أ
-        </span>
         <div className="flex-1" />
         <span title="وكيل الجهاز: يكتب ويحلّل ويرسل">{agent?.online ? "🟢 الوكيل شغّال" : "🔴 الوكيل متوقف"}</span>
         <Link to="/settings" className="underline">الإعدادات</Link>
@@ -277,8 +227,7 @@ function Home() {
         {tab("today", "✅ اليوم", todayCount)}
         {tab("convos", "💬 المحادثات", groups.convos.length)}
         {tab("new", "🎯 الجدد", groups.fresh.length)}
-        {tab("opps", "🔔 فرص عملاء", groups.signals.length)}
-        {tab("radar", "🏆 مسابقات ومنح", radarOpen)}
+        {tab("opps", "🔔 الفرص", groups.signals.length + radarOpen)}
         <div className="flex-1" />
         <input className="rounded border border-border bg-background px-2 py-1.5 text-sm w-48" placeholder="🔍 بحث في كل البيانات" value={q} onChange={(e) => setQ(e.target.value)} />
         {tab("stats", "📊 القياس")}
@@ -287,16 +236,17 @@ function Home() {
           <div className="absolute left-0 z-10 mt-1 flex w-64 flex-col gap-2 rounded border border-border bg-background p-2 shadow">
             <AddLead onAdded={(name) => setQ(name)} />
             <button className={btn} onClick={() => fileRef.current?.click()}>⬆️ استيراد من الجامع</button>
-            <button disabled={!!bulk} className={btn} onClick={() => draftBatch(10)}>✍️ اكتب لأفضل 10 (رصيد Lovable)</button>
-            <button disabled={!!bulk} className={btn} onClick={() => analyseBatch(20)}>{bulk ?? "🧠 حلّل 20 (رصيد Lovable)"}</button>
           </div>
         </details>
         <input ref={fileRef} type="file" accept=".json" hidden onChange={(e) => e.target.files?.[0] && importFile(e.target.files[0])} />
       </div>
-      {bulk && <div className="px-4 py-1 text-xs text-muted-foreground border-b border-border">{bulk}</div>}
 
-      {view === "stats" && !found ? <><Funnel leads={leads} /><ReplyLessons /></>
-      : view === "radar" && !found ? <Radar />
+      {view === "stats" && !found ? (
+        <>
+          <p className="px-4 pt-3 text-sm text-muted-foreground">تواصلنا مع {stats.contacted} · ردّ {stats.replied} · صفقات {won.length} ({stats.revenue} د.أ) · قيد التفاوض {stats.pipeline} د.أ</p>
+          <Funnel leads={leads} /><ReplyLessons />
+        </>
+      )
       : view === "approvals" && !found ? (
         <>
           <button className="m-3 underline text-sm" onClick={() => go("today")}>→ رجوع إلى اليوم</button>
@@ -307,12 +257,6 @@ function Home() {
           <div className="overflow-auto md:h-[calc(100vh-100px)]">
             {isLoading && <p className="p-4 text-muted-foreground">...</p>}
             {error && <p className="p-4 text-red-600">خطأ في قراءة البيانات: {(error as Error).message}</p>}
-            {!isLoading && !error && leads.length === 0 && (
-              <button className="m-4 px-3 py-1.5 rounded bg-primary text-primary-foreground text-sm" onClick={() =>
-                act.restoreOld().then((r) => toast.push(`استُرجع ${r.inserted} مطعم (دُمج ${r.merged} مكرر)`), (e) => toast.push(e.message, "error"))}>
-                استرجاع المطاعم القديمة
-              </button>
-            )}
             {view === "convos" && !found ? board : main}
           </div>
           {sel && (
