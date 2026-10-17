@@ -1371,6 +1371,22 @@ def worker():
         time.sleep(3)
 
 
+def draft_opportunities():
+    """Every open opportunity gets a first email written by itself (Ahmad, 2026-10-17: no opportunity left unwritten). It is only
+    a draft: it waits for his ✅ like every other message. A lead already written to or tried (any message or draft) is skipped."""
+    today = date.today().isoformat()
+    leads = db.get("leads", select="id,name,signal_until", signal="not.is.null", status="eq.new", deleted_at="is.null", limit="500")
+    leads = [L for L in leads if not L.get("signal_until") or L["signal_until"] >= today]
+    if not leads:
+        return
+    tried = {m["lead_id"] for m in db.get("lead_messages", select="lead_id", lead_id=f"in.({','.join(L['id'] for L in leads)})")}
+    for L in leads:
+        if L["id"] in tried:
+            continue
+        db.req("POST", "lead_messages", body={"lead_id": L["id"], "channel": "email", "direction": "out", "draft": True, "review": "write", "body": ""})
+        log(f"🔔 opportunity {L['name']}: first email queued for writing")
+
+
 def main():
     threading.Thread(target=worker, daemon=True).start()
     threading.Thread(target=learn_backlog, daemon=True).start()
@@ -1394,7 +1410,7 @@ def main():
                 last_push = time.time()
             if time.time() - last_bounce > 300:  # inbox: replies + bounces, every 5 min
                 last_bounce = time.time()
-                for fn in (check_inbox, check_sent, check_bounces):
+                for fn in (check_inbox, check_sent, check_bounces, draft_opportunities):
                     try:
                         fn()
                     except Exception as e:
