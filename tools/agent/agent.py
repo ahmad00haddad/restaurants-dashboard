@@ -1375,7 +1375,7 @@ def draft_opportunities():
     """Every open opportunity gets a first email written by itself (Ahmad, 2026-10-17: no opportunity left unwritten). It is only
     a draft: it waits for his ✅ like every other message. A lead already written to or tried (any message or draft) is skipped."""
     today = date.today().isoformat()
-    leads = db.get("leads", select="id,name,signal_until", signal="not.is.null", status="eq.new", deleted_at="is.null", limit="500")
+    leads = db.get("leads", select="id,name,signal_until", signal="not.is.null", status="eq.new", deleted_at="is.null", kind="in.(ngo,org)", limit="500")
     leads = [L for L in leads if not L.get("signal_until") or L["signal_until"] >= today]
     if not leads:
         return

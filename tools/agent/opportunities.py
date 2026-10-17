@@ -31,15 +31,11 @@ JORDAN_QUERIES = [  # tender aggregators mirror JONEPS / UNGM / donor notices, s
     "Jordan call for consultants impact documentary film {y}",
     "Amman tender provision of video production services ministry",
 ]
-JORDAN_SIGNAL_QUERIES = [  # signal-first discovery of NEW organisations: something happened now that creates a need for film/photo
+JORDAN_SIGNAL_QUERIES = [  # signal-first discovery of NEW organisations (NGOs, institutions; never shops, brands or restaurants)
     "Jordan NGO launches new project {y}",
     "Jordan organisation announces grant funding awarded programme {y}",
-    "Amman new branch opening {y}",
-    "Jordan brand launches new campaign {y}",
     "Amman conference forum summit {y} organised by",
-    "Jordan company launches new product {y}",
     "Jordan annual report launch {y} organisation",
-    "Jordan rebrand new visual identity {y}",
     "Jordan new programme launched youth women refugees {y}",
 ]
 TENDER_QUERIES = [
@@ -221,7 +217,7 @@ def scan(db, model, seen, log=print, max_new=40):
     known = set(seen)
 
     from concurrent.futures import ThreadPoolExecutor
-    jobs = [(q.format(y=today.year), 8, True) for q in JORDAN_QUERIES + JORDAN_SIGNAL_QUERIES] + [(q.format(y=today.year), 8, False) for q in TENDER_QUERIES] +            [(q.format(y=today.year, r=r), 5, False) for r in REGIONS for q in PROSPECT_QUERIES[:2]]
+    jobs = [(q.format(y=today.year), 8, True) for q in JORDAN_QUERIES + JORDAN_SIGNAL_QUERIES] + [(q.format(y=today.year), 8, False) for q in TENDER_QUERIES] 
     with ThreadPoolExecutor(4) as ex:
         results = list(ex.map(lambda j: _snippets(j[0], j[1]), jobs))
     batches = []  # (is_jordan, snippets)
@@ -234,11 +230,13 @@ def scan(db, model, seen, log=print, max_new=40):
         for k in range(0, len(s_), 8):
             batch = s_[k:k + 8]
             for it in _extract(model, batch):
-                ok = _valid(it, batch, today, {"tender", "commission", "opening", "event", "news_signal"})
+                ok = _valid(it, batch, today, {"tender", "commission", "news_signal"})  # openings / events of shops and hotels are not opportunities
                 if ok and ok.pop("needs_deadline"):
                     ok["deadline"] = _find_deadline(model, ok["url"], today)
                     if not ok["deadline"]:
                         continue  # cannot prove it is still open
+                if ok and ok["kind"] == "news_signal" and ok.get("org_type") not in ("ngo", "org"):
+                    continue  # a restaurant, hotel or brand in the news is not an opportunity (Ahmad, 2026-10-17)
                 if ok:
                     ok["jo"] = jo or bool(re.search(r"jordan|amman|الأردن", (ok.get("country") or "") + ok["text"][:400], re.I))
                     found.append(ok)

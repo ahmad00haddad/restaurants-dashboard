@@ -194,9 +194,67 @@ def _extract(model, field, scope, query, text):
     return items
 
 
+FOR9A = {  # for9a.com category → our kind (scholarships for students, courses and volunteering are not for Ahmad)
+    "منح-مالية": "grant", "جوائز-ومسابقات": "competition", "زمالات": "fellowship", "برامج-تبادل-ثقافي-و-اقامات": "residency",
+    "فعاليات-ومؤتمرات": "open_call",
+}
+RELEVANT = re.compile(r"تصوير|فوتوغراف|أفلام|افلام|فيلم|سينما|وثائقي|إخراج|اخراج|مخرج|صناع المحتوى|صناعة المحتوى|بصري|مرئي|رواة القصص|صحفي|إعلامي|اعلامي|"
+                      r"film|photo|cinema|documentar|storytell|video|visual|journalis|\bmedia\b", re.I)
+ARTIST = re.compile(r"فنان|فنون|فنية|ثقاف|إبداع|ابداع|artist|\barts?\b|cultur|creative", re.I)  # counts only for grants, residencies, fellowships
+OFF = re.compile(r"أطفال|اطفال|للاطفال|لحضور|زيارة|رسم|أزياء|ازياء|معماري|بوستر|مقالات|شعر|رواية|كتّاب|الكتاب|خط عربي|موسيق|جامعة|احتضان|الشركات الناشئة|لليافعين|"
+                 r"children|kids|poster|fashion|architect|poetry|novel|essay|universit|startup|incubat|rotary", re.I)
+STUDENT = re.compile(r"ماجستير|دكتوراه|بكالوريوس|طلاب|طالب|الجامعي|مدرسي|master|phd|bachelor|undergrad|students?\b", re.I)
+ARAB = {"jo", "sa", "ae", "qa", "kw", "bh", "om", "eg", "lb", "ps", "iq", "sy", "ma", "tn", "dz", "ly", "sd", "ye"}
+
+
+FOR9A_Q = """query { opportunities(first: 50, page: PAGE, input: {type: EDU, landing_filter: {field: "all", funding: "all", nationality: "all",
+  opportunityLocation: "all", subType: "all", type: "CAT"}}) { paginatorInfo { hasMorePages } data { url title deadline closed
+  tags { keyword } organization { name } country { place { code } } } } }"""
+
+
+def for9a(log=print, pages=6):
+    """Open calls listed on for9a.com (grants, awards, fellowships, residencies, events) that fit a film director / photographer.
+    Read from the site's own public data API (no model): closed or past calls are dropped, student scholarships too."""
+    out, today = [], date.today()
+    for cat, kind in FOR9A.items():
+        for page in range(1, pages + 1):
+            try:
+                r = httpx.post("https://lara.for9a.com/graphql", timeout=30, json={"query": FOR9A_Q.replace("PAGE", str(page)).replace("CAT", cat)},
+                               headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128 Safari/537.36",
+                                        "Origin": "https://www.for9a.com", "Referer": "https://www.for9a.com/"})
+                ops = r.json()["data"]["opportunities"]
+            except Exception as e:
+                log("radar: for9a failed:", cat, str(e)[:60])
+                break
+            for o in ops.get("data") or []:
+                title = (o.get("title") or "").strip()
+                tags = " ".join(t.get("keyword") or "" for t in o.get("tags") or [])
+                org = ((o.get("organization") or {}).get("name") or "").strip()
+                dl = _parse_date(o.get("deadline"))
+                if o.get("closed") or (dl and dl < today) or not (RELEVANT.search(f"{title} {tags}") or kind in ("grant", "residency", "fellowship") and ARTIST.search(f"{title} {tags}")) \
+                        or STUDENT.search(title) or OFF.search(title):
+                    continue
+                code = (((o.get("country") or {}).get("place") or {}).get("code") or "").lower()
+                it = {"title": title[:200], "organizer": org[:120] or "for9a", "kind": kind,
+                      "field": "film" if re.search(r"أفلام|افلام|فيلم|سينما|وثائقي|film|cinema|documentar", title + tags, re.I) else "both",
+                      "scope": "local" if code == "jo" else "regional" if code in ARAB else "international", "url": o["url"],
+                      "deadline": dl.isoformat() if dl else None, "prize": None, "fee": None, "eligibility": None,
+                      "description": tags[:300] or None, "evidence": None, "source": "for9a"}
+                it["fit"] = fit_score(it)
+                out.append(it)
+            if not (ops.get("paginatorInfo") or {}).get("hasMorePages"):
+                break
+    log(f"radar: for9a {len(out)} relevant open calls")
+    return out
+
+
 def scan(db, model, log=print, limit_queries=None):
     """Run the searches; return the NEW rows that were inserted (duplicates by url are ignored by the database)."""
     found, seen_urls = [], set()
+    for it in for9a(log):
+        if it["url"] not in seen_urls:
+            seen_urls.add(it["url"])
+            found.append(it)
     for n, (field, scope, q) in enumerate(QUERIES):
         if limit_queries and n >= limit_queries:
             break
