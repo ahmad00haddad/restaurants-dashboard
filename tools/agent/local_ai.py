@@ -35,6 +35,9 @@ restaurants, pharmacies, companies, campaigns; behance only for creative agencie
 
 NV_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 NV_SMALL = "nv:nvidia/nemotron-3-super-120b-a12b"
+# Free NVIDIA models tried in order when the chosen one fails (tested 2026-10-17 on an Arabic writing task: fast, clean Arabic, valid JSON).
+# nemotron-3-ultra was overloaded (503); deepseek-v4.1-flash and gemma-4 timed out; glm-5.3 is good but takes ~2 min, so it is last.
+NV_CHAIN = ["nv:nvidia/nemotron-3.5-super-vl-120b-a12b", NV_SMALL, "nv:openai/gpt-oss-20b", "nv:stepfun-ai/step-5-preview", "nv:z-ai/glm-5.3"]
 
 
 def _nv_key():
@@ -85,15 +88,15 @@ def complete(model, system, user, temperature=0.2, as_json=True):
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     if is_nv(model):
         err = RuntimeError("NVIDIA models are resting after failures")
-        for m in dict.fromkeys([model, NV_SMALL]):  # big model first, then the faster NVIDIA one, then local
+        for m in dict.fromkeys([model] + NV_CHAIN):  # the chosen model first, then the other free NVIDIA ones, then local
             if _down.get(m, 0) > time.time():
                 continue  # failed recently: don't wait another 2 minutes on it
             try:
                 return _nv_chat(m, messages, temperature)
             except Exception as e:
                 err = e
-                _down[m] = time.time() + 1800
-                print(f"{m} failed ({type(e).__name__}) — skipping it for 30 min", flush=True)
+                _down[m] = time.time() + 300  # a 503 "overloaded" passes quickly: rest 5 min, not 30
+                print(f"{m} failed ({type(e).__name__}) — skipping it for 5 min", flush=True)
         model = os.environ.get("OLLAMA_MODEL", "qwen2.5:14b")
         if not available(model):
             raise err
@@ -1134,6 +1137,15 @@ def dm_version(text):
     return "\n\n".join(keep + [link])
 
 
+FREE_ASK = re.compile(r"مجان|ببلاش|تبرع|تطوع|بدون مقابل|مقابل (نقود|مادي|أجر|اجر|مبلغ)|بأجر|باجر|for free|free of charge|pro bono|volunteer", re.I)
+# Ahmad's own answer to "is it free or paid?", as he wrote it to Al-Gharaa on 2026-10-17: paid, why, what it brings them, and only if they have a budget.
+FREE_ANSWER = ("تحية طيبة وبعد،\n\n"
+               "أود التوضيح أن هذا العمل يتم تنفيذه عبر فريق إنتاج وصناعة أفلام متخصص وبمعايير احترافية عالية، وبالتالي يتطلب تكاليف إنتاجية وتغطية لنفقات الفريق والتجهيزات.\n\n"
+               "الهدف من طرح الفكرة هو تقديم محتوى وثائقي سينمائي يبرز الأثر الإنساني الكبير لجهودكم والمبادرات التي تقدمونها، بطريقة مؤثرة تخدم أهداف الجمعية وتساعد في تسليط الضوء على قصص النجاح والمستفيدين.\n\n"
+               "في حال كان لدى الجمعية ميزانية مخصصة للإنتاج الإعلامي أو التوثيق الميداني، يسعدني جداً التنسيق معكم لمناقشة التفاصيل والتكلفة التقديرية للعمل بما يتناسب مع تطلعاتكم.\n\n"
+               "وافر الاحترام والتقدير،\nأحمد حداد\nمخرج ومدير تصوير | FAII HOUSE")
+
+
 def write(L, team, history, channel, mode, hint, model):
     """Write, and retry once if the model skipped the idea or cleanup left too little (never queue a hollow message)."""
     if mode == "reply":
@@ -1147,6 +1159,8 @@ def write(L, team, history, channel, mode, hint, model):
             body = (f"السادة في {short_name(L['name'])} المحترمين،\n\nشكراً لردّكم، ويسعدني التعاون معكم.\n\nرقمي {wa_} (واتساب أيضاً)، "
                     "ويسعدني أن تتصلوا بي في الوقت الذي يناسبكم.\n\nمع خالص التقدير،\nأحمد حدّاد")
             return "رقم التواصل", (body if channel == "email" else dm_version(body))
+        if theirs and FREE_ASK.search(theirs):  # "free / donation, or paid?" gets Ahmad's own answer (Al-Gharaa, 2026-10-17)
+            return "عن كلفة العمل", (FREE_ANSWER if channel == "email" else dm_version(FREE_ANSWER))
         if cat in ("question", "meeting_request", "interested"):  # an interested reply gets Ahmad's own playbook, not a model's guess
             wa = os.environ.get("WHATSAPP_NUMBER", "").strip()
             price = bool(re.search(r"تكلف|سعر|كلفة|أسعار|مجان|ببلاش|تبرع|تطوع|مقابل|نقود|فلوس|مصاري|cost|price|quot|budget|free|fee|paid", theirs, re.I))
