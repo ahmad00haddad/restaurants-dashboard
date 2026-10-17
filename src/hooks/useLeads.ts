@@ -59,6 +59,24 @@ export function useLastMessages() {
   });
 }
 
+/** Leads we already wrote to or tried to (any message or draft, also rejected or failed): a batch never picks them again. */
+export function useTouchedLeads() {
+  return useQuery({
+    queryKey: ["touched-leads"],
+    refetchInterval: 60_000,
+    queryFn: async (): Promise<Set<string>> => {
+      const out = new Set<string>();
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await db.from("lead_messages").select("lead_id").range(from, from + 999);
+        if (error) throw error;
+        for (const m of data as { lead_id: string }[]) out.add(m.lead_id);
+        if (!data || data.length < 1000) break;
+      }
+      return out;
+    },
+  });
+}
+
 export interface Approval extends LeadMessage {
   review: string;
   review_note: string | null;
@@ -176,7 +194,7 @@ export function useLeadActions() {
     },
     /** Put a draft in the approval queue — the PC agent sends it to Telegram, then from Gmail once approved. */
     async queueForApproval(leadId: string, channel: Channel, body: string, subject?: string) {
-      await db.from("lead_messages").delete().eq("lead_id", leadId).eq("draft", true);
+      await db.from("lead_messages").delete().eq("lead_id", leadId).eq("draft", true).neq("review", "rejected"); // a rejected draft stays: it marks the lead as tried
       const { error } = await db.from("lead_messages").insert({ lead_id: leadId, channel, direction: "out", draft: true, review: "pending", body, subject: subject || null });
       if (error) throw error;
       qc.invalidateQueries({ queryKey: ["approvals"] });
@@ -184,7 +202,7 @@ export function useLeadActions() {
     },
     /** Ask the PC agent to write the message locally with Ollama (free); it then arrives on Telegram for approval. */
     async requestLocalWrite(leadId: string, channel: Channel, hint?: string) {
-      await db.from("lead_messages").delete().eq("lead_id", leadId).eq("draft", true);
+      await db.from("lead_messages").delete().eq("lead_id", leadId).eq("draft", true).neq("review", "rejected"); // a rejected draft stays: it marks the lead as tried
       const { error } = await db.from("lead_messages").insert({ lead_id: leadId, channel, direction: "out", draft: true, review: "write", body: "", review_note: hint || null });
       if (error) throw error;
       qc.invalidateQueries({ queryKey: ["approvals"] });

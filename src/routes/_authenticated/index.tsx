@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { draftMessage, researchLead } from "@/lib/ai.functions";
-import { useAgentStatus, useApprovals, useLastMessages, useLeadActions, useLeads, type LastMessage } from "@/hooks/useLeads";
+import { useAgentStatus, useApprovals, useLastMessages, useLeadActions, useLeads, useTouchedLeads, type LastMessage } from "@/hooks/useLeads";
 import { useToast } from "@/hooks/useToast";
 import { useAuth } from "@/hooks/useAuth";
 import { LeadPanel } from "@/components/LeadPanel";
@@ -42,6 +42,7 @@ function Home() {
   const research = useServerFn(researchLead);
   const draft = useServerFn(draftMessage);
   const { data: approvals = [] } = useApprovals();
+  const { data: touched = new Set<string>() } = useTouchedLeads();
   const { data: agent } = useAgentStatus();
   const { data: radarOpps = [] } = useOpportunities();
   const radarOpen = radarOpps.filter(isActiveOpp).length;
@@ -89,7 +90,7 @@ function Home() {
   const draftBatch = async (n: number) => {
     const queued = new Set(approvals.map((a) => a.lead_id));
     const targets = [...groups.signals.filter((l) => l.status === "new"), ...groups.fresh.filter((l) => l.score != null)]
-      .filter((l, i, a) => a.indexOf(l) === i && !queued.has(l.id) && !alreadyMailed(l) && reachable(l) && (!kind || l.kind === kind)).slice(0, n);
+      .filter((l, i, a) => a.indexOf(l) === i && !queued.has(l.id) && !touched.has(l.id) && !alreadyMailed(l) && reachable(l) && (!kind || l.kind === kind)).slice(0, n);
     for (let i = 0; i < targets.length; i++) {
       const l = targets[i];
       setBulk(`كتابة ${i + 1}/${targets.length}: ${l.name}`);
@@ -111,7 +112,7 @@ function Home() {
     if (!agent?.online) toast.push("⚠️ الوكيل متوقف — ستُكتب عند تشغيل run.bat", "info");
     const queued = new Set(approvals.map((a) => a.lead_id));
     const targets = [...groups.signals.filter((l) => l.status === "new"), ...groups.fresh]
-      .filter((l, i, a) => a.indexOf(l) === i && !queued.has(l.id) && !alreadyMailed(l) && reachable(l) && (!kind || l.kind === kind)).slice(0, n);
+      .filter((l, i, a) => a.indexOf(l) === i && !queued.has(l.id) && !touched.has(l.id) && !alreadyMailed(l) && reachable(l) && (!kind || l.kind === kind)).slice(0, n);
     for (const l of targets) await act.requestLocalWrite(l.id, channelFor(l));
     toast.push(`💻 ${targets.length} رسائل في طابور جهازك — تصلك على Telegram تباعاً`);
   };
