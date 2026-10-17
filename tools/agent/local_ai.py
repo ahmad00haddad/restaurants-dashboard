@@ -806,20 +806,20 @@ NGO_TOPICS = [  # (key, pattern); the name and category are tested first, then t
 ]
 NGO_IDEAS = {
     "ar": {
-        "disability": "يمكننا تصوير فيلم قصير يتابع شخصاً استفاد من خدماتكم، يروي قصته بصوته ويُظهر قدراته واستقلاليته.",
-        "children": "يمكننا تصوير فيلم قصير يتابع يوماً في حياة طفل أو أسرة تدعمونها، بما يحفظ خصوصية الأطفال وكرامتهم.",
-        "women": "يمكننا تصوير فيلم قصير يتابع امرأة استفادت من برامجكم، يروي رحلتها وأثر هذا الدعم في حياتها وأسرتها بصوتها.",
-        "health": "يمكننا تصوير فيلم قصير يتابع أحد المستفيدين أو أحد أفراد فريقكم، ويُظهر الجهد الإنساني خلف خدماتكم.",
-        "education": "يمكننا تصوير فيلم قصير يتابع طالباً أو معلماً في أحد برامجكم، ويُظهر ما يتغيّر في يومه بفضلها.",
-        "youth": "يمكننا تصوير فيلم قصير يتابع شاباً أو شابة في أحد برامجكم، من أول خطوة حتى ما حققه بعدها.",
-        "environment": "يمكننا تصوير فيلم قصير يتابع العاملين على أحد مشاريعكم في الميدان، ويُظهر أثر العمل على الأرض.",
-        "arts": "يمكننا تصوير فيلم قصير يتابع فناناً أو مشاركاً في أحد برامجكم، من التحضير حتى العرض.",
-        "economic": "يمكننا تصوير فيلم قصير يتابع مشاركاً في أحد برامج التدريب لديكم حتى يطلق مشروعه الصغير.",
-        "rights": "يمكننا تصوير فيلم قصير يتابع أحد المشاركين في أنشطتكم، ويروي كيف أصبح فاعلاً في مجتمعه.",
-        "research": "يمكننا تصوير فيلم قصير يتابع باحثاً أو مستفيداً من عملكم، ويُظهر أثر العمل العلمي في الحياة اليومية.",
-        "relief": "يمكننا تصوير فيلم قصير يتابع أسرة استفادت من برامجكم، ويروي بصوتها ما غيّره هذا الدعم.",
-        "general": "يمكننا تصوير فيلم قصير يتابع أحد المستفيدين من برامجكم، ويروي أثرها من خلال قصته.",
-        "company": "يمكننا تصوير فيلم قصير يتابع فريقكم وهو ينجز أحد مشاريعكم، ويُظهر الناس الذين يقفون خلف الخدمة.",
+        "disability": "يمكننا تصوير فيلم وثائقي قصير يتابع شخصاً استفاد من خدماتكم، يروي قصته بصوته ويُظهر قدراته واستقلاليته.",
+        "children": "يمكننا تصوير فيلم وثائقي قصير يتابع يوماً في حياة طفل أو أسرة تدعمونها، بما يحفظ خصوصية الأطفال وكرامتهم.",
+        "women": "يمكننا تصوير فيلم وثائقي قصير يتابع امرأة استفادت من برامجكم، يروي رحلتها وأثر هذا الدعم في حياتها وأسرتها بصوتها.",
+        "health": "يمكننا تصوير فيلم وثائقي قصير يتابع أحد المستفيدين أو أحد أفراد فريقكم، ويُظهر الجهد الإنساني خلف خدماتكم.",
+        "education": "يمكننا تصوير فيلم وثائقي قصير يتابع طالباً أو معلماً في أحد برامجكم، ويُظهر ما يتغيّر في يومه بفضلها.",
+        "youth": "يمكننا تصوير فيلم وثائقي قصير يتابع شاباً أو شابة في أحد برامجكم، من أول خطوة حتى ما حققه بعدها.",
+        "environment": "يمكننا تصوير فيلم وثائقي قصير يتابع العاملين على أحد مشاريعكم في الميدان، ويُظهر أثر العمل على الأرض.",
+        "arts": "يمكننا تصوير فيلم وثائقي قصير يتابع فناناً أو مشاركاً في أحد برامجكم، من التحضير حتى العرض.",
+        "economic": "يمكننا تصوير فيلم وثائقي قصير يتابع مشاركاً في أحد برامج التدريب لديكم حتى يطلق مشروعه الصغير.",
+        "rights": "يمكننا تصوير فيلم وثائقي قصير يتابع أحد المشاركين في أنشطتكم، ويروي كيف أصبح فاعلاً في مجتمعه.",
+        "research": "يمكننا تصوير فيلم وثائقي قصير يتابع باحثاً أو مستفيداً من عملكم، ويُظهر أثر العمل العلمي في الحياة اليومية.",
+        "relief": "يمكننا تصوير فيلم وثائقي قصير يتابع أسرة استفادت من برامجكم، ويروي بصوتها ما غيّره هذا الدعم.",
+        "general": "يمكننا تصوير فيلم وثائقي قصير يتابع أحد المستفيدين من برامجكم، ويروي أثرها من خلال قصته.",
+        "company": "يمكننا تصوير فيلم وثائقي قصير يتابع فريقكم وهو ينجز أحد مشاريعكم، ويُظهر الناس الذين يقفون خلف الخدمة.",
     },
     "en": {
         "disability": "We could film a short documentary following someone who has benefited from your services, telling their own story and showing their abilities and independence.",
@@ -872,20 +872,112 @@ def ngo_topic(L):
     return best[2] if best[0] >= 3 else "general"  # the site must clearly say it (3+ mentions); otherwise the safe general idea
 
 
-def ngo_first(L, team):
-    """First email to an organisation: who I am, ONE idea chosen for its field from a vetted library, one matching work, the portfolio.
-    Fixed text: no model writes it, so nothing is invented, garbled, or mixed between languages."""
+NGO_HOOK_SYSTEM = """You help a film director write the opening of a first email to ONE organisation, so it shows he really read about them.
+From the SOURCE text (their own website and recent news about them) pick ONE concrete, specific thing: a named programme or project,
+a recent launch, an event, a figure, a place they work in. Then write:
+- "quote": the exact words from SOURCE that contain that thing (copy them character for character, 5 to 25 words).
+- "hook": ONE plain sentence in LANG saying that specific thing about them, as a fact (no praise, no "I was impressed", no adjectives
+  like inspiring/amazing/رائع/ملهم, no question). It must name the specific programme/project/event/figure.
+- "idea": ONE sentence in LANG that MUST start exactly with "IDEA_START" and continues with a short documentary that follows real
+  people of THAT SAME programme/project (a participant, a beneficiary, a team member), ending with the change it shows.
+  Never invent personal names, numbers or places that are not in SOURCE. No film titles.
+In Arabic write every word in Arabic (for "showing" write "ويُظهر"); inside the JSON values use «» for quotation marks, never ".
+Return JSON only: {"quote":"...","hook":"...","idea":"..."}. If SOURCE has nothing specific about this organisation, return {"quote":"","hook":"","idea":""}."""
+IDEA_START = {"ar": "يمكننا تصوير فيلم وثائقي قصير", "en": "We could film a short documentary"}
+
+
+def _norm_ws(t):
+    return re.sub(r"\s+", " ", re.sub(r"[ً-ْـ«»\"“”'‘’]", "", t or "")).strip().lower()
+
+
+def org_sources(L):
+    """What we can quote about an organisation: its own site text and fresh news that names it."""
+    p = L.get("profile") or {}
+    parts = [L.get("about") or "", p.get("summary") or ""]
+    if len(L.get("about") or "") < 600 and L.get("website"):
+        try:
+            import find_emails
+            parts.append(find_emails.fetch(L["website"] if L["website"].startswith("http") else "https://" + L["website"])[0][:4000])
+        except Exception:
+            pass
+    news = p.get("recent") or []
+    if not news:
+        try:
+            news = fresh(L) or []
+        except Exception:
+            news = []
+    parts += [f"{x.get('title', '')}. {x.get('text', '')}" for x in news]
+    return "\n".join(x for x in parts if x).strip()[:7000]
+
+
+HOOK_WHY = []  # why the last ngo_hook() attempts were rejected (debugging, shown in the failure note)
+
+
+def ngo_hook(L, lang, model):
+    """(hook, idea) about THIS organisation, checked in code: the quote must be in what we read, the hook must name what the quote names,
+    the idea must be a short documentary. ('', '') when nothing specific and verifiable was found."""
+    src = org_sources(L)
+    if len(src) < 80 or not model:
+        return "", ""
+    lang_name = "Arabic" if lang == "ar" else "English"
+    system = NGO_HOOK_SYSTEM.replace("LANG", lang_name).replace("IDEA_START", IDEA_START[lang])
+    note = ""
+    HOOK_WHY.clear()
+    for attempt in range(4):  # the model sometimes leaks a foreign word or paraphrases the quote: ask again, a little warmer, with the reason
+        try:
+            txt = complete(model, system, f"ORGANISATION: {L.get('name')}\nLANG: {lang_name}{note}\n\nSOURCE:\n{src}", temperature=0.2 + 0.2 * attempt)
+            out = json.loads(re.search(r"\{.*\}", txt, re.S).group(0), strict=False)
+        except Exception as e:
+            HOOK_WHY.append(f"json: {e}")
+            continue
+        if lang == "ar":  # a model habit: one Spanish/English verb in the middle of Arabic
+            for k in ("hook", "idea"):
+                out[k] = re.sub(r"(mostrando|showing|demostrando|mientras)", "ويُظهر", str(out.get(k) or ""), flags=re.I)
+        bad = foreign_words(str(out.get("hook") or "") + " " + str(out.get("idea") or ""), L) if lang == "ar" else []
+        if bad:
+            HOOK_WHY.append(f"foreign: {bad[:3]}")
+            note = f"\nWrite ONLY in Arabic. Do not use these words: {', '.join(bad[:4])}."
+            continue
+        quote, hook, idea = (str(out.get(k) or "").strip() for k in ("quote", "hook", "idea"))
+        hook, idea = (x if not x or x[-1] in ".؟?!" else x + "." for x in (hook, idea))  # a missing full stop is not a reason to drop it
+        if not (quote and hook and idea) or _norm_ws(quote) not in _norm_ws(src):
+            HOOK_WHY.append("quote not in source")
+            continue  # an invented or paraphrased "fact"
+        key = [w for w in re.findall(r"[\w؀-ۿ]{4,}", _norm_ws(quote)) if w not in STOP_HOOK]
+        translated = lang == "ar" and len(re.findall(r"[A-Za-z]", quote)) > len(re.findall(r"[؀-ۿ]", quote))
+        if not translated and not any(w in _norm_ws(hook) for w in key):  # an English source told in Arabic cannot share words
+            HOOK_WHY.append("hook does not name the quote")
+            continue  # the hook does not name what the quote says
+        if not idea.startswith(IDEA_START[lang]) or not (15 <= len(hook) <= 260) or len(idea) > 320 or hook[-1] not in ".؟?!" or idea[-1] not in ".؟?!":
+            HOOK_WHY.append(f"shape: {idea[:40]!r} {len(hook)}/{len(idea)}")
+            continue
+        if any(n not in src for n in re.findall(r"\d[\d,.]*", hook + " " + idea)):
+            HOOK_WHY.append("number not in source")
+            continue  # a number that is not in what we read
+        if ai_tells(hook + " " + idea) or FLATTERY.search(hook) or (lang == "ar" and foreign_words(hook + " " + idea, L)):
+            HOOK_WHY.append("tells/flattery")
+            continue
+        return hook, idea
+    return "", ""
+
+
+STOP_HOOK = {"that", "this", "with", "from", "their", "they", "have", "will", "which", "about", "jordan", "amman", "الذي", "التي", "هذا", "هذه",
+             "على", "إلى", "الى", "عن", "من", "في", "الأردن", "الاردن", "عمان"}
+
+
+def ngo_first(L, team, model=None):
+    """First email to an organisation: a specific fact about THEM (read from their site / recent news, verified in code), who I am,
+    a short documentary built on that same fact, the portfolio link. No verified fact = no email (never a generic template)."""
     import hashlib
     lang = lang_for(L)
     lang = "ar" if lang == "ar" else "en"
     h = int(hashlib.md5(("nb" + str(L.get("id") or L.get("name"))).encode()).hexdigest(), 16)
-    topic = ngo_topic(L)
-    body = intro_for(L, lang) + "\n\n" + NGO_IDEAS[lang][topic] + "\n\n" + NGO_REST[lang][h % 3]
-    paras = finish(body, L, team, lang, "first").split("\n\n")
-    work = NGO_WORKS.get(topic, NGO_DEFAULT_WORK)
-    paras.insert(len(paras) - 3, f"{NGO_LEAD[lang][(h >> 4) % 3]}\n{work}")
+    hook, idea = ngo_hook(L, lang, model)
+    if not hook:
+        raise ValueError("لم أجد معلومة محددة وموثّقة عن المنظمة في موقعها أو أخبارها: لن أرسل رسالة عامة. أضف موقعهم أو اكتب توجيهاً.")
+    body = hook + "\n\n" + intro_for(L, lang) + "\n\n" + idea + "\n\n" + NGO_REST[lang][h % 3]
     subject = f"عن عمل {short_name(L['name'])}" if lang == "ar" else f"On the work of {short_name(L['name'])}"
-    return subject, "\n\n".join(paras)
+    return subject, finish(body, L, team, lang, "first")
 
 
 def roastery_first(L, team):
@@ -1061,7 +1153,8 @@ def write(L, team, history, channel, mode, hint, model):
             body = reply_playbook(L, theirs, price) + "\n\n" + (f"واتساب : {wa}\n\n" if wa else "") + "مع خالص التقدير،\nأحمد حدّاد"
             return ("الكلفة وموعد اللقاء" if price else "موعد اللقاء"), (body if channel == "email" else dm_version(body))
     if mode == "first" and sector(L) in ("roastery", "pharmacy", "education", "ngo"):
-        subject, text = {"roastery": roastery_first, "pharmacy": pharmacy_first, "education": school_first, "ngo": ngo_first}[sector(L)](L, team)
+        subject, text = (ngo_first(L, team, model) if sector(L) == "ngo" else
+                         {"roastery": roastery_first, "pharmacy": pharmacy_first, "education": school_first}[sector(L)](L, team))
         return subject, (text if channel == "email" else dm_version(text))
     last = None
     for attempt in range(2):
