@@ -202,8 +202,8 @@ def gmail_mark(mids, star=False, archive=False, label=None):
                     box.uid("STORE", uid, "+X-GM-LABELS", f'("{label}")')
                 if star:
                     box.uid("STORE", uid, "+FLAGS", "(\\Flagged)")
-                if archive:
-                    box.uid("STORE", uid, "-X-GM-LABELS", "(\\Inbox)")
+                if archive:  # Gmail ignores "-X-GM-LABELS \Inbox"; moving to All Mail is what archiving is (labels stay), done last: the UID changes
+                    box.uid("MOVE", uid, '"[Gmail]/All Mail"')
                 done += 1
     finally:
         try:
