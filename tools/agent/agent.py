@@ -186,17 +186,45 @@ def archive_patch(L):
     return patch
 
 
-def check_bounces():
-    """Read bounce notices (MAILER-DAEMON) from Gmail over IMAP, remember the failed addresses, mark those leads' email as bad."""
+def gmail_mark(mids, star=False, archive=False, label=None):
+    """Change Gmail itself, only what is asked: add a label, star (\\Flagged), archive (remove from the inbox; never deleted).
+    Messages are found by Message-ID and handled by UID. Nothing is marked read. Returns how many messages were changed."""
+    import imaplib
+    done = 0
+    box = imaplib.IMAP4_SSL("imap.gmail.com", timeout=30)
+    try:
+        box.login(E["GMAIL_USER"], E["GMAIL_APP_PASSWORD"].replace(" ", ""))
+        box.select("INBOX")
+        for mid in dict.fromkeys(m for m in mids if m):
+            _, found = box.uid("SEARCH", None, "HEADER", "Message-ID", f'"{mid}"')
+            for uid in found[0].split():
+                if label:
+                    box.uid("STORE", uid, "+X-GM-LABELS", f'("{label}")')
+                if star:
+                    box.uid("STORE", uid, "+FLAGS", "(\\Flagged)")
+                if archive:
+                    box.uid("STORE", uid, "-X-GM-LABELS", "(\\Inbox)")
+                done += 1
+    finally:
+        try:
+            box.logout()
+        except Exception:
+            pass
+    return done
+
+
+def check_bounces(days=7, limit=100):
+    """Read bounce notices (MAILER-DAEMON) from Gmail over IMAP, remember the failed addresses, mark those leads' email as bad,
+    then move the notices out of the inbox (archive + label 'Bounced'; never deleted) so the inbox only holds real mail."""
     import imaplib, email as _email
-    since = (date.today() - timedelta(days=7)).strftime("%d-%b-%Y")
-    found = {}
+    since = (date.today() - timedelta(days=days)).strftime("%d-%b-%Y")
+    found, bounce_mids = {}, []
     box = imaplib.IMAP4_SSL("imap.gmail.com", timeout=30)
     try:
         box.login(E["GMAIL_USER"], E["GMAIL_APP_PASSWORD"].replace(" ", ""))
         box.select("INBOX", readonly=True)
         _, ids = box.search(None, f'(SINCE {since} OR OR FROM "mailer-daemon" FROM "postmaster" SUBJECT "Undeliverable")')
-        for i in ids[0].split()[-100:]:
+        for i in ids[0].split()[-limit:]:
             _, data = box.fetch(i, "(RFC822)")
             msg = _email.message_from_bytes(data[0][1])
             text = ""
@@ -206,8 +234,11 @@ def check_bounces():
                 elif part.get_content_type() == "message/delivery-status":  # payload = list of header blocks, not text
                     pl = part.get_payload()
                     text += "\n".join(str(x) for x in (pl if isinstance(pl, list) else [pl])) + "\n"
-            for addr in set(re.findall(r"(?:Final-Recipient:\s*rfc822;|wasn['’]t delivered to|to the following address[^\n]*\n+)\s*<?([\w.+-]+@[\w.-]+\.\w+)", text, re.I)):
+            addrs = set(re.findall(r"(?:Final-Recipient:\s*rfc822;|wasn['’]t delivered to|to the following address[^\n]*\n+)\s*<?([\w.+-]+@[\w.-]+\.\w+)", text, re.I))
+            for addr in addrs:
                 found[addr.lower()] = date.today().isoformat()
+            if addrs and msg.get("Message-ID"):  # only notices we understood are moved; anything else stays where it is
+                bounce_mids.append(msg["Message-ID"].strip())
     finally:
         try:
             box.logout()
@@ -227,6 +258,12 @@ def check_bounces():
         cap, rate = current_cap()
         if rate > 0.04:
             say(f"⚠️ ارتدادات البريد {rate:.0%} آخر 7 أيام — جمّدت رفع الحد (الحد اليوم {cap}). راجع قائمة الإيميلات.")
+    save_state()  # the addresses are recorded: only now is it safe to move the notices out of the inbox
+    if bounce_mids:
+        try:
+            log(f"archived {gmail_mark(bounce_mids, archive=True, label='Bounced')} bounce notices in Gmail")
+        except Exception as e:
+            log("could not archive bounce notices:", str(e)[:150])
     save_state()
 
 
@@ -366,7 +403,7 @@ def check_inbox():
     STATE["inbox_seen"] = seen[-3000:]
     save_state()
     for mid, L, addr, subject, body, when, auto in replies:
-        process_reply(L, addr, subject, body, when, auto)
+        process_reply(L, addr, subject, body, when, auto, mid)
         STATE["inbox_seen"].append(mid)  # only once it is saved: a database hiccup means we try again next round
         save_state()
 
@@ -489,12 +526,34 @@ def learn_backlog():
         learn_from_reply(r["leads"], r["id"], r.get("subject"), r.get("body") or "", auto)
 
 
-def process_reply(L, addr, subject, body, when, auto):
+WANTS_CONTACT = re.compile(r"اجتماع|لقاء|نلتقي|موعد|مكالمة|اتصال|اتصل|تواصل معي|رقم|هاتف|جوال|واتس|zoom|meet|call|schedule|phone|number|whatsapp|appointment", re.I)
+STAR_CATEGORIES = {"meeting_request", "interested", "question"}
+
+
+def star_if_hot(L, mid, subject, body, auto, ins):
+    """A real client who asks for a meeting / a call / his number, or whom the study calls interested, gets a star in Gmail."""
+    if auto or not mid:
+        return
+    hot = bool(WANTS_CONTACT.search(f"{subject or ''}\n{body or ''}")) or bool(ins and ins.get("category") in STAR_CATEGORIES)
+    if hot:
+        try:
+            if gmail_mark([mid], star=True, label="Hot lead"):
+                log(f"⭐ starred the reply from {L['name']}")
+        except Exception as e:
+            log("could not star the reply:", str(e)[:150])
+
+
+def _learn_and_star(L, msg_id, subject, body, auto, mid):
+    ins = learn_from_reply(L, msg_id, subject, body, auto)
+    star_if_hot(L, mid, subject, body, auto, ins)
+
+
+def process_reply(L, addr, subject, body, when, auto, mid=None):
     if not body:
         body = "(رسالة بلا نص — افتحها في Gmail)"
     saved = db.req("POST", "lead_messages", body={"lead_id": L["id"], "channel": "email", "direction": "in", "subject": subject or None,
                                                   "body": body, "created_at": when}, prefer="return=representation")
-    threading.Thread(target=learn_from_reply, args=(L, (saved or [{}])[0].get("id"), subject, body, auto), daemon=True).start()
+    threading.Thread(target=_learn_and_star, args=(L, (saved or [{}])[0].get("id"), subject, body, auto, mid), daemon=True).start()
     if auto:  # out-of-office: keep it in the history, but it is not a conversation
         log(f"auto-reply from {L['name']}")
         return
