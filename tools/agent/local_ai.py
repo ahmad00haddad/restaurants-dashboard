@@ -1016,6 +1016,30 @@ def is_local(L):
     return L.get("kind") in LOCAL_KINDS
 
 
+def scoping_questions(women):
+    """Ahmad's five questions that speed the process up (duration, who/which programme, where it is shown, translation, delivery date)."""
+    q2 = "عدد النساء اللواتي ستُروى قصصهنّ، وهل هنّ في عمّان أم في أكثر من محافظة؟" if women else "أي برنامج من برامجكم تودّون إبرازه"
+    return ("1. مدة الفيلم التي تتصورونها (من ثلاث إلى خمس دقائق، أم أطول؟)\n"
+            f"2. {q2}\n3. أين سيُعرض الفيلم: وسائل التواصل، أم فعاليات الجهة، أم جهات داعمة؟\n"
+            "4. هل تحتاجون ترجمة أو نسخة بلغتين للفيلم؟\n5. الموعد الذي تريدونه لتسليم الفيلم.")
+
+
+def phone_reply(L, theirs, wa):
+    """They asked for his number (to call or to set a meeting): give it, ask THEM to call (he never calls first), and list what he
+    wants to know in the conversation so it is short and useful. Fixed text, no model."""
+    t = f"{theirs}\n{L.get('name') or ''}"
+    salam = bool(re.search(r"السلام عليكم", theirs or "")) or bool(re.search(r"جمعية|خير|إغاثة|الاغاثة|zakat|charity|islamic", t, re.I))
+    women = bool(re.search(r"نساء|المرأة|النساء|women", t, re.I))
+    return "\n\n".join([
+        "السلام عليكم ورحمة الله وبركاته،" if salam else "تحية طيبة،",
+        f"السادة في {short_name(L['name'])} المحترمين،",
+        "شكراً لردّكم، ويسعدني التعاون معكم.",
+        f"رقمي {wa} (واتساب أيضاً)، ويسعدني أن تتصلوا بي في الوقت الذي يناسبكم.",
+        "ولتكون المكالمة قصيرة ومفيدة، سأحتاج أن أعرف منكم في أثنائها (أو قبلها كتابةً إن تيسّر):\n\n" + scoping_questions(women),
+        "ثم أرسل لكم عرضاً مفصّلاً بالكلفة خلال يوم إلى يومي عمل، لأن الكلفة تتحدد بحسب الفيلم نفسه.",
+        "مع خالص التقدير،\nأحمد حدّاد"])
+
+
 def reply_playbook(L, theirs, price_asked):
     """The answer to an interested reply (a price question or a request to meet), in Ahmad's own manner:
     greet like they did, thank, a quick online meeting, one concrete commitment if they raised a concern, five scoping questions,
@@ -1030,10 +1054,7 @@ def reply_playbook(L, theirs, price_asked):
              "يسعدني عقد اجتماع بسيط وسريع أونلاين لمناقشة الفيلم معاً، بحسب ما يناسبكم، وأتكيّف مع الموعد الذي تختارونه."]
     if re.search(r"خصوصي|كرام", theirs or ""):
         lines.append("وما أشرتم إليه من خصوصية المستفيدين وكرامتهم أمر أراعيه في هذا النوع من الأفلام: لا يُصوَّر أحد دون موافقته الواضحة، وصاحب القصة هو من يقرر ما يظهر منها.")
-    q2 = "عدد النساء اللواتي ستُروى قصصهنّ، وهل هنّ في عمّان أم في أكثر من محافظة؟" if women else "أي برنامج من برامجكم تودّون إبرازه"
-    lines.append("ولتكون الجلسة مفيدة، سأكون شاكراً إن أخبرتموني قبلها:\n\n1. مدة الفيلم التي تتصورونها (من ثلاث إلى خمس دقائق، أم أطول؟)\n"
-                 f"2. {q2}\n3. أين سيُعرض الفيلم: وسائل التواصل، أم فعاليات الجهة، أم جهات داعمة؟\n"
-                 "4. هل تحتاجون ترجمة أو نسخة بلغتين للفيلم؟\n5. الموعد الذي تريدونه لتسليم الفيلم.")
+    lines.append("ولتكون الجلسة مفيدة، سأكون شاكراً إن أخبرتموني قبلها:\n\n" + scoping_questions(women))
     lines.append("ثم أرسل لكم عرضاً مفصّلاً بالكلفة خلال يوم إلى يومي عمل، لأن الكلفة تتحدد بحسب الفيلم نفسه.")
     works = (["women"] if women else []) + ["social", "long"]
     block = "ومن أقرب الأعمال السابقة في هذا الخط:\n\n" + "\n\n".join(
@@ -1155,9 +1176,8 @@ def write(L, team, history, channel, mode, hint, model):
         except Exception:
             cat = "other"
         wa_ = os.environ.get("WHATSAPP_NUMBER", "").strip()
-        if theirs and PHONE_ASK.search(theirs) and wa_:  # they only asked for a number to call: give it, nothing more
-            body = (f"السادة في {short_name(L['name'])} المحترمين،\n\nشكراً لردّكم، ويسعدني التعاون معكم.\n\nرقمي {wa_} (واتساب أيضاً)، "
-                    "ويسعدني أن تتصلوا بي في الوقت الذي يناسبكم.\n\nمع خالص التقدير،\nأحمد حدّاد")
+        if theirs and PHONE_ASK.search(theirs) and wa_:  # they asked for his number: give it + the questions that speed the process up
+            body = phone_reply(L, theirs, wa_)
             return "رقم التواصل", (body if channel == "email" else dm_version(body))
         if theirs and FREE_ASK.search(theirs):  # "free / donation, or paid?" gets Ahmad's own answer (Al-Gharaa, 2026-10-17)
             return "عن كلفة العمل", (FREE_ANSWER if channel == "email" else dm_version(FREE_ANSWER))
