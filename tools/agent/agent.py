@@ -176,6 +176,16 @@ def current_cap():
     return cap, rate
 
 
+def archive_patch(L):
+    """A bounced address is never deleted (the collector would find the same organisation again and re-add it; the bounce record would be lost).
+    The lead leaves the working lists: no follow-up is due, and when email was its only way in it is archived as 'skip'.
+    A lead that also has a phone or Instagram keeps its status and can still be reached there."""
+    patch = {"next_action_at": None, "needs_reply": False}
+    if not (L.get("phone") or L.get("instagram")) and L.get("status") in ("new", "contacted"):
+        patch.update(status="skip", notes=((L.get("notes") or "") + " | بريد مرتد: أُرشف تلقائياً").strip(" |"))
+    return patch
+
+
 def check_bounces():
     """Read bounce notices (MAILER-DAEMON) from Gmail over IMAP, remember the failed addresses, mark those leads' email as bad."""
     import imaplib, email as _email
@@ -209,9 +219,9 @@ def check_bounces():
         for L in db.get("leads", select="id,profile", **{"profile->contact->>email": f"eq.{addr}"}):
             prof = {k: v for k, v in (L.get("profile") or {}).items() if k != "contact"}  # their address bounced: back to info@
             db.patch("leads", {"id": L["id"]}, {"profile": prof})
-        for L in db.get("leads", select="id,profile", email=f"ilike.{addr}"):
+        for L in db.get("leads", select="id,profile,status,phone,instagram,notes", email=f"ilike.{addr}"):
             prof = {**(L.get("profile") or {}), "email_check": {"ok": False, "role": False, "reason": "ارتدّ البريد (bounce)"}}
-            db.patch("leads", {"id": L["id"]}, {"profile": prof})
+            db.patch("leads", {"id": L["id"]}, {"profile": prof, **archive_patch(L)})
     if new:
         log(f"bounces: {list(new)}")
         cap, rate = current_cap()
