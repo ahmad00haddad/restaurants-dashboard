@@ -7,7 +7,7 @@ Source: official or listing pages read on 19 Oct 2026. Fees and dates can change
 | Festival | Deadline (fee, USD) | Eligibility seen | Fit | Status |
 |---|---|---|---|---|
 | Cinequest (San Jose) | 1 Nov 2026 (35-80) | Shorts and features. Completion and premiere rules not on the listing page | General shorts | Needs Ahmad: film + confirm rules |
-| True/False (Missouri) | 1 Dec 2026 (20-95) | Short and feature documentaries. Rules not on the listing page | Documentary, a good fit for his work | Needs Ahmad: film + confirm rules |
+| True/False (Missouri) | 1 Dec 2026 (20-95) | Documentaries under 40 min (short) or over 40 min (feature). MUST be produced in 2026 or 2027. English subtitles. Submit at truefalse.org/submit/features-shorts/ (not FilmFreeway). Premiere rule not stated | Documentary, a good fit for his work | Needs Ahmad: film + confirm rules |
 | ZagrebDox (Croatia) | 15 Dec 2026 (18-47) | Short and feature documentaries. Rules not on the listing page | Documentary | Needs Ahmad: film + confirm rules |
 | LA Shorts Fest | Early 23 Oct 2026 (49); regular 20 Nov (59); extended 18 Dec (65); late 22 Jan 2027 (70) | Completed after 1 Jan 2026, 40 min max, English subtitles, prefers no LA/online screening | Shorts | Needs Ahmad: a short completed in 2026 |
 | Berlinale shorts | 4 Nov 2026 (listing from search; page returned 503, not confirmed) | Berlinale expects a premiere; rules not read | Prestige, low odds without a premiere | Skip unless Ahmad has a fresh premiere-ready short |
