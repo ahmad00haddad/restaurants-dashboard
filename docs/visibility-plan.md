@@ -11,7 +11,7 @@ Status: targets below are leads to verify on each site's own submission page (se
 
 ## Story angles (pick one per outlet)
 1. **Ten years after the first published photo**: from a Shot magazine #34 print (2016) to a DOP for UN Women, UNICEF and L'Occitane. Personal-journey piece.
-2. **Error 017 / Bakeer**: how a short film shot in Jordan travelled (Marrakech, Kuwait, Arab short films nomination). Craft piece: lighting choices, one scene.
+2. **Films that travelled**: short films shot in Jordan that reached festivals (Marrakech, Kuwait, Arab short films nomination). Craft piece: lighting choices, one scene. Pick the film to match the outlet; no single film is the lead.
 3. **Qalby Etmaan, 5 countries**: shooting a TV show across Tunisia, Morocco, Mauritania, Jordan, UAE. Behind-the-scenes piece.
 4. **Philosophy** (from /about): cinema that breathes the clay of our society, not fast-fame visuals. Interview / opinion piece.
 
@@ -24,8 +24,8 @@ Status: targets below are leads to verify on each site's own submission page (se
 - **Shot magazine itself** (published him in 2016): a short thank-you plus an update is the warmest door he has.
 
 ## Platforms (set up once, then leave alone)
-- **Vimeo**: one clean reel + 2 best films, aim for a Staff Pick later.
-- **Short of the Week / Directors Notes**: submit Error 017 or Bakeer if the film is publicly releasable.
+- **Vimeo**: one clean reel + a few films, aim for a Staff Pick later.
+- **Short of the Week / Directors Notes**: submit a publicly releasable film chosen per platform.
 - **ShotDeck**: frames as a visual reference library; DPs are found through it.
 - **Mandy, ProductionHub, Staff Me Up**: crew listing profiles; free to create. For commercial work abroad.
 - **LinkedIn**: one post a month about one project with its story. No "proud to announce".
@@ -33,6 +33,6 @@ Status: targets below are leads to verify on each site's own submission page (se
 - **Festivals**: submit to Jordan Short Film Festival (Amman), Amman International Film Festival, Fujifilm Short Film Festival Dubai (2026 edition 12–13 Dec, shorts up to 30 min; check FilmFreeway).
 
 ## Next steps
-1. Ahmad confirms which film is the lead story (Error 017 or Bakeer?) and that he has frame grabs.
+1. Ahmad shares frame grabs from several works (no single lead film); each pitch picks the best fit for its outlet.
 2. Build the one-page press kit: 10 frames, 3-line bio, credit list, CV link (`/about`).
 3. Verify submission pages and editor contacts for the top 5 outlets; draft pitches for Ahmad to send.
