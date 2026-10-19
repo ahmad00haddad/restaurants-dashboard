@@ -28,3 +28,8 @@ Status: research only. NOTHING sent, submitted, or applied. Each action waits fo
 ## D. Next
 1. Ahmad: say which watch-list items to track; I set a check on each official site when the call date is known.
 2. Visibility-plan press and platform drafts already exist (docs/press-drafts-round1.md); no new drafts this round because no open call was found.
+
+## E. Check log (19 Oct 2026)
+- aiff.jo: no open call. New lead to verify: Short Film Incubator (AFID + RFC Jordan), Jordanian short projects, no window shown. Pages "Pitching Platforms" and "Rules and Regulations" not read yet.
+- filmfreeway.com (Fujifilm): HTTP 403, not checked. Last known deadline 15 Aug 2026 (closed).
+- rfc.jo: domain not resolved, not checked. Use the official RFC site.
