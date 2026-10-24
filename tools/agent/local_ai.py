@@ -1343,6 +1343,7 @@ FREE_ANSWER = ("تحية طيبة وبعد،\n\n"
 # ---------------- «ناس إربد»: sponsors of the documentary (own voice, own checks) ----------------
 NAS_SITE = "https://nas-irbid.lovable.app"
 NAS_PHONE = "0799256345"
+NAS_CLOSE = "يسعدني الحديث متى ما ناسبكم. وكل التوفيق لكم، وسامحونا على الإزعاج."  # Ahmad's own closing line, fixed (2026-10-24)
 NAS_SYSTEM = """You are Ahmad Haddad, a young filmmaker from Irbid and maker of the documentary «ناس إربد», writing a personal email to ONE person from Irbid, to ask him to support the programme.
 It must read like a real person wrote it by hand, warm and direct, never like an ad or a form letter. Mix plain Modern Arabic with a few natural Jordanian phrases (للتوضيح: إحنا، بدنا، ما بدي أطوّل عليك، بصراحة، يعطيك العافية، مدينتنا، ابن البلد)
 so it sounds spoken. About one colloquial phrase in every two sentences; never slang that is rude; never English words.
@@ -1355,7 +1356,7 @@ The reader does not know us, so the order matters:
 1. WHO WE ARE (first paragraph, 2 sentences): introduce yourself by name as أحمد حدّاد, a filmmaker from Irbid, and say in a human way why you are writing to HIM in particular, starting from LOVE (a real tie to Irbid). Never describe their job back to them; never flatter.
 2. THE SERIES (second paragraph): say plainly that we are working on a series called «ناس إربد» right now. Then put the token [[LINK]] alone on its own line, right after the sentence that names the series (it becomes the link to watch the episodes). After the token, 2 sentences telling what it is, as if to a friend: we sit with the people of old Irbid (the baker, the café owner, the craftsman) and record their story before the place goes; and that أم محمد المصرية reached 713 ألف مشاهدة and قدري 464 ألف, so the people of Irbid really do watch their own city. Say أم محمد المصرية exactly. Only here you talk about the series; the token [[LINK]] appears exactly once in the whole email.
 3. WHAT WE NEED (third paragraph): the ask in plain words, tied to ASK (for example: بدنا شريك من أهل إربد يرعى حلقة أو أكثر من الموسم الجاي). No amounts, prices or packages.
-4. Last line: invite a short online chat or a reply, with a light way out ("وإن ما ناسب الوقت، ولا يهمك").
+4. Do NOT write a closing line, a thank-you or a way out: the closing is added for you. End the third paragraph with the ask, and in the same paragraph one short sentence inviting a short online chat or a reply.
 - 90 to 140 words in total. Short sentences mixed with a longer one. No bullets, bold, emoji, exclamation marks. No "ليس مجرد… بل". No flattery words (رائع، مذهل، ملهم، نثمّن). No inflated words (رحلة، محوري، عميق، إرث).
 Return JSON only: {"subject":"2 to 5 words, human, about Irbid or the episode (never رعاية, طلب دعم, فرصة)","body":"paragraphs separated by a blank line"}"""
 NAS_FOLLOWUP = """You are Ahmad Haddad, maker of «ناس إربد». They did not answer our first email, which is fine. Write ONE very short Arabic note (2 sentences) that adds something: a new reason Irbid's people watch the series
@@ -1393,7 +1394,7 @@ def nas_first(L, model, mode="first", subject_prev=None):
             subject = "إربد وناسها"
         if mode == "followup":
             return subject_prev or subject, f"{n.get('greeting')}،\n\n{body}\n\nأحمد حدّاد\nصانع «ناس إربد»\n{NAS_PHONE}\n{NAS_SITE}"
-        return subject, (f"السلام عليكم {(n.get('greeting') or '').replace('الأستاذ ', 'أستاذ ', 1)}،\n\n{body}\n\n"
+        return subject, (f"السلام عليكم {(n.get('greeting') or '').replace('الأستاذ ', 'أستاذ ', 1)}،\n\n{body}\n\n{NAS_CLOSE}\n\n"
                          f"أحمد حدّاد\nصانع «ناس إربد»\n{NAS_PHONE}")
     raise ValueError(f"ناس إربد: لم تنجح الكتابة بعد 3 محاولات ({last})")
 
