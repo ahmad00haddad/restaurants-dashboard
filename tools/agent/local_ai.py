@@ -1357,7 +1357,7 @@ The reader does not know us, so the order matters:
 2. THE SERIES (second paragraph): say plainly that we are working on a series called «ناس إربد» right now. Then put the token [[LINK]] alone on its own line, right after the sentence that names the series (it becomes the link to watch the episodes). After the token, 2 sentences telling what it is, as if to a friend: we sit with the people of old Irbid (the baker, the café owner, the craftsman) and record their story before the place goes; and that أم محمد المصرية reached 713 ألف مشاهدة and قدري 464 ألف, so the people of Irbid really do watch their own city. Say أم محمد المصرية exactly. Only here you talk about the series; the token [[LINK]] appears exactly once in the whole email.
 3. WHAT WE NEED (third paragraph): the ask in plain words, tied to ASK (for example: بدنا شريك من أهل إربد يرعى حلقة أو أكثر من الموسم الجاي). No amounts, prices or packages.
 4. Do NOT write a closing line, a thank-you or a way out: the closing is added for you. End the third paragraph with the ask, and in the same paragraph one short sentence inviting a short online chat or a reply.
-- 90 to 140 words in total. Short sentences mixed with a longer one. No bullets, bold, emoji, exclamation marks. No "ليس مجرد… بل". No flattery words (رائع، مذهل، ملهم، نثمّن). No inflated words (رحلة، محوري، عميق، إرث).
+- 70 to 130 words in total. Short sentences mixed with a longer one. No bullets, bold, emoji, exclamation marks. No "ليس مجرد… بل". No flattery words (رائع، مذهل، ملهم، نثمّن). No inflated words (رحلة، محوري، عميق، إرث).
 Return JSON only: {"subject":"2 to 5 words, human, about Irbid or the episode (never رعاية, طلب دعم, فرصة)","body":"paragraphs separated by a blank line"}"""
 NAS_FOLLOWUP = """You are Ahmad Haddad, maker of «ناس إربد». They did not answer our first email, which is fine. Write ONE very short Arabic note (2 sentences) that adds something: a new reason Irbid's people watch the series
 (use only EPISODE and the programme facts), then leave the door open without pressure. No reminder words ("أتابع", "للتذكير"), no thanks in advance, no price. Arabic only.
@@ -1375,7 +1375,7 @@ def nas_first(L, model, mode="first", subject_prev=None):
         out = chat(model, NAS_FOLLOWUP if mode == "followup" else NAS_SYSTEM, facts + ("\nWrite it differently from earlier attempts." if attempt else ""))
         body = str(out.get("body") or "").strip()
         words = len(body.split())
-        if mode == "first" and not (70 <= words <= 170):
+        if mode == "first" and not (50 <= words <= 200):
             last = f"{words} words"; continue
         g = (n.get("greeting") or "").strip()
         paras = [x for x in re.split(r"\n\s*\n", body) if x.strip()]
