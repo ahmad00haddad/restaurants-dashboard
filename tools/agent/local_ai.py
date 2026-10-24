@@ -1343,17 +1343,20 @@ FREE_ANSWER = ("تحية طيبة وبعد،\n\n"
 # ---------------- «ناس إربد»: sponsors of the documentary (own voice, own checks) ----------------
 NAS_SITE = "https://nas-irbid.lovable.app"
 NAS_PHONE = "0799256345"
-NAS_SYSTEM = """You are Ahmad Haddad, from Irbid, maker of the documentary «ناس إربد», writing ONE short email in Arabic to a person or institution tied to Irbid, to ask them to support the programme.
-Facts about the programme (the ONLY facts you may state): a documentary series recording Irbid's living memory (crafts, cafés, families, places that are disappearing); 11 episodes, 2.5 مليون مشاهدة;
-independent, no politics; a new season of 8 episodes is being prepared; the archive is open to researchers.
-Rules:
-- You get GREETING, WHO, LOVE (their real tie to Irbid), EPISODE (one episode with its views) and ASK. Use only those and the programme facts. Invent nothing: no numbers, names, dates, partners.
-- Paragraph 1 (1-2 sentences): their real tie to Irbid, taken from LOVE/WHO, said plainly and respectfully. No praise or flattery words (رائع، مذهل، ملهم، نثمّن), no guessing their feelings.
-- Paragraph 2 (2 sentences): what «ناس إربد» is, and that the episode named in EPISODE reached that many views, so people of Irbid do watch their own city. Name the episode exactly as given.
-- Paragraph 3 (1-2 sentences): the ASK in plain words ("نبحث عن شريك من أهل إربد يرعى حلقة من موسمنا القادم"). No amounts, prices or packages. Then one line inviting a short online meeting or a reply, and a gentle way out ("وإن لم يكن التوقيت مناسباً فلا بأس").
-- 80 to 130 words in total. Short plain sentences. No bullets, bold, emoji, exclamation marks, dashes as punctuation, no "ليس مجرد… بل", no inflated words (رحلة، محوري، عميق).
-- Arabic only. Do not write the greeting, the link or the signature: they are added for you.
-Return JSON only: {"subject":"2 to 5 words naming Irbid or the episode; never رعاية or طلب دعم or فرصة","body":"paragraphs separated by a blank line"}"""
+NAS_SYSTEM = """You are Ahmad Haddad, a young filmmaker from Irbid and maker of the documentary «ناس إربد», writing a personal email to ONE person from Irbid, to ask him to support the programme.
+It must read like a real person wrote it by hand, warm and direct, never like an ad or a form letter. Mix plain Modern Arabic with a few natural Jordanian phrases (للتوضيح: إحنا، بدنا، ما بدي أطوّل عليك، بصراحة، يعطيك العافية، مدينتنا، ابن البلد)
+so it sounds spoken. About one colloquial phrase in every two sentences; never slang that is rude; never English words.
+Facts about the programme (the ONLY facts you may state): «ناس إربد» sits with the people of old Irbid and records their stories: the bakers, the café owners, the craftsmen, the families and the places that are disappearing.
+Presented by Basma Al-Thinat, directed by Ahmad. 11 episodes so far, 2.5 مليون مشاهدة in total. The most watched: أم محمد المصرية 713 ألف مشاهدة, then قدري 464 ألف, then سركيس الخباز 334 ألف, then شارع السينما 250 ألف.
+Independent, no politics, nothing controversial. A new season of 8 episodes is being prepared. The archive is open for researchers.
+You get WHO, LOVE (their real tie to Irbid), and ASK. Use only those and the facts above. Invent nothing: no numbers, names, dates, partners, no claims about what they feel or read.
+Structure (no greeting, no link, no signature: they are added for you):
+1. A human opening line, the HOOK: one short sentence that starts from LOVE like a person remembering something about his city, or a short honest question about Irbid. Not "أنت رجل أعمال…". Never describe their job back to them.
+2. Two or three sentences explaining the programme in your own words, as if telling a friend: what we do, who we sit with, and that أم محمد المصرية reached 713 ألف مشاهدة and قدري 464 ألف, so people of Irbid really do watch their own city. Say أم محمد المصرية exactly.
+3. The ask in plain words, tied to ASK (for example: بدنا شريك من أهل إربد يرعى حلقة أو أكثر من الموسم الجاي). No amounts, prices or packages.
+4. One line inviting a short online chat or a reply, and a light way out ("وإن ما ناسب الوقت، ولا يهمك").
+- 90 to 140 words in total. Short sentences mixed with a longer one. No bullets, bold, emoji, exclamation marks. No "ليس مجرد… بل". No flattery words (رائع، مذهل، ملهم، نثمّن). No inflated words (رحلة، محوري، عميق، إرث).
+Return JSON only: {"subject":"2 to 5 words, human, about Irbid or the episode (never رعاية, طلب دعم, فرصة)","body":"paragraphs separated by a blank line"}"""
 NAS_FOLLOWUP = """You are Ahmad Haddad, maker of «ناس إربد». They did not answer our first email, which is fine. Write ONE very short Arabic note (2 sentences) that adds something: a new reason Irbid's people watch the series
 (use only EPISODE and the programme facts), then leave the door open without pressure. No reminder words ("أتابع", "للتذكير"), no thanks in advance, no price. Arabic only.
 Return JSON only: {"subject":"Re: same subject","body":"the two sentences"}"""
@@ -1364,14 +1367,19 @@ def nas_first(L, model, mode="first", subject_prev=None):
     if not n.get("love") or not n.get("episode"):
         raise ValueError("ناس إربد: لا توجد بيانات (ما يحبه وحلقة مناسبة) لهذا العميل")
     facts = f"GREETING: {n.get('greeting')}\nWHO: {n.get('who')}\nLOVE: {n.get('love')}\nEPISODE: {n['episode']}\nASK: {n.get('ask')}"
-    ep = re.sub(r"\s*\(.*", "", n["episode"]).strip()
+    ep = "أم محمد المصرية"
     last = "no attempt"
     for attempt in range(3):
         out = chat(model, NAS_FOLLOWUP if mode == "followup" else NAS_SYSTEM, facts + ("\nWrite it differently from earlier attempts." if attempt else ""))
         body = str(out.get("body") or "").strip()
         words = len(body.split())
-        if mode == "first" and not (60 <= words <= 150):
+        if mode == "first" and not (70 <= words <= 170):
             last = f"{words} words"; continue
+        g = (n.get("greeting") or "").strip()
+        paras = [x for x in re.split(r"\n\s*\n", body) if x.strip()]
+        while paras and (paras[0].strip(" ،:.") == g or paras[0].strip().startswith(g) and len(paras[0]) < len(g) + 25):  # the model sometimes repeats the greeting
+            paras.pop(0)
+        body = "\n\n".join(paras)
         if ep not in body:
             last = "episode not named"; continue
         if re.search(r"https?://|\d+\s*(د\.?أ|دينار)|[A-Za-z]{4,}", body) or ai_tells(body):
@@ -1381,7 +1389,7 @@ def nas_first(L, model, mode="first", subject_prev=None):
             subject = "إربد وناسها"
         if mode == "followup":
             return subject_prev or subject, f"{n.get('greeting')}،\n\n{body}\n\nأحمد حدّاد\nصانع «ناس إربد»\n{NAS_PHONE}\n{NAS_SITE}"
-        return subject, (f"{n.get('greeting')}، تحية طيبة\n\n{body}\n\nحلقات البرنامج كلها هنا:\n{NAS_SITE}\n\n"
+        return subject, (f"السلام عليكم {(n.get('greeting') or '').replace('الأستاذ ', 'أستاذ ', 1)}،\n\n{body}\n\nحلقات البرنامج كلها هنا:\n{NAS_SITE}\n\n"
                          f"أحمد حدّاد\nصانع «ناس إربد»\n{NAS_PHONE}")
     raise ValueError(f"ناس إربد: لم تنجح الكتابة بعد 3 محاولات ({last})")
 
