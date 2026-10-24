@@ -1346,7 +1346,7 @@ NAS_PHONE = "0799256345"
 NAS_CLOSE = "يسعدني الحديث متى ما ناسبكم. وكل التوفيق لكم، وسامحونا على الإزعاج."  # Ahmad's own closing line, fixed (2026-10-24)
 NAS_SYSTEM = """You are Ahmad Haddad, a young filmmaker from Irbid and maker of the documentary «ناس إربد», writing a personal email to ONE person from Irbid, to ask him to support the programme.
 It must read like a real person wrote it by hand, warm and direct, never like an ad or a form letter. Mix plain Modern Arabic with a few natural Jordanian phrases (للتوضيح: إحنا، بدنا، ما بدي أطوّل عليك، بصراحة، يعطيك العافية، مدينتنا، ابن البلد)
-so it sounds spoken. About one colloquial phrase in every two sentences; never slang that is rude; never English words.
+so it sounds spoken. About one colloquial phrase in every two sentences; never rude slang. ABSOLUTE RULE: every single word is written in Arabic letters. Not one English word, not even "ok" or "briefly" or "record". Say سلسلة (never مسلسل).
 Facts about the programme (the ONLY facts you may state): «ناس إربد» sits with the people of old Irbid and records their stories: the bakers, the café owners, the craftsmen, the families and the places that are disappearing.
 Presented by Basma Al-Thinat, directed by Ahmad. 11 episodes so far, 2.5 مليون مشاهدة in total. The most watched: أم محمد المصرية 713 ألف مشاهدة, then قدري 464 ألف, then سركيس الخباز 334 ألف, then شارع السينما 250 ألف.
 Independent, no politics, nothing controversial. A new season of 8 episodes is being prepared. The archive is open for researchers.
@@ -1371,9 +1371,20 @@ def nas_first(L, model, mode="first", subject_prev=None):
     facts = f"GREETING: {n.get('greeting')}\nWHO: {n.get('who')}\nLOVE: {n.get('love')}\nEPISODE: {n['episode']}\nASK: {n.get('ask')}"
     ep = "أم محمد المصرية"
     last = "no attempt"
-    for attempt in range(3):
-        out = chat(model, NAS_FOLLOWUP if mode == "followup" else NAS_SYSTEM, facts + ("\nWrite it differently from earlier attempts." if attempt else ""))
+    models = [model] + [m for m in NV_CHAIN if m != model][:3]  # a different model on each retry: one model's habit (English words inside Arabic) rarely repeats in another
+    fix = ""
+    for attempt in range(5):
+        mdl = models[min(attempt, len(models) - 1)] if is_nv(model) else model
+        try:
+            out = chat(mdl, NAS_FOLLOWUP if mode == "followup" else NAS_SYSTEM, facts + fix)
+        except Exception as e:
+            last = f"model error: {str(e)[:60]}"; continue
         body = str(out.get("body") or "").strip()
+        latin = re.findall(r"[A-Za-z]{3,}", body.replace("[[LINK]]", ""))
+        if latin:
+            fix = f"\nYour previous draft contained English words ({', '.join(latin[:4])}). Write EVERY word in Arabic letters only, even the dialect parts."
+        elif attempt:
+            fix = "\nWrite it differently from the earlier attempt."
         words = len(body.split())
         if mode == "first" and not (50 <= words <= 200):
             last = f"{words} words"; continue
@@ -1384,6 +1395,11 @@ def nas_first(L, model, mode="first", subject_prev=None):
         body = "\n\n".join(paras)
         if ep not in body:
             last = "episode not named"; continue
+        nums = set(re.findall(r"\d+(?:\.\d+)?", body))
+        spelled = re.search(r"مائة|مئة|مئتين|(?:واحد|اثنين|ثلاث\w*|أربع\w*|خمس\w*|ست\w*|سبع\w*|ثمان\w*|تسع\w*|عشر\w*)\s+ألف", body)
+        if nums - {"713", "464", "334", "250", "2.5", "11", "8", "10"} or spelled:
+            fix = "\nYour previous draft had a wrong or spelled-out number. Use ONLY these numbers, as digits: 713 ألف, 464 ألف, 334 ألف, 250 ألف, 2.5 مليون, 11 حلقة, 8 حلقات."
+            last = f"unverified number {sorted(nums - {'713', '464', '334', '250', '2.5', '11', '8', '10'}) or 'spelled out'}"; continue
         if mode == "first" and (body.count("[[LINK]]") != 1 or "حدّاد" not in body.replace("حداد", "حدّاد")):
             last = "missing the series link token or the sender's introduction"; continue
         if re.search(r"https?://|\d+\s*(د\.?أ|دينار)|[A-Za-z]{4,}", body.replace("[[LINK]]", "")) or ai_tells(body):
