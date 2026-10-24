@@ -763,19 +763,30 @@ def school_type(L, models=None):
     return {"verdict": "unknown", "confidence": 0, "evidence": "لا إجماع بين النماذج" if votes else "لا يوجد نموذج متاح", "votes": votes}
 
 
-REPLY_CATEGORIES = ("interested", "question", "meeting_request", "not_now", "no_internal_capacity", "no_budget", "not_relevant", "stop_contact",
-                    "wrong_person", "auto_reply_support_desk", "auto_reply_generic", "out_of_office", "other")
+REPLY_CATEGORIES = ("interested", "question", "meeting_request", "referral", "not_now", "no_internal_capacity", "no_budget", "not_relevant", "stop_contact",
+                    "wrong_person", "auto_reply_support_desk", "auto_reply_generic", "out_of_office", "not_a_reply", "other")
 REPLY_SYSTEM = """You study replies to cold outreach sent by Ahmad Haddad, a director / cinematographer in Jordan, so the sending system can improve.
 You get OUR last message to this organisation and THEIR reply. Return JSON only:
-{"category":"interested|question|meeting_request|not_now|no_internal_capacity|no_budget|not_relevant|stop_contact|wrong_person|auto_reply_support_desk|auto_reply_generic|out_of_office|other",
+{"category":"interested|question|meeting_request|referral|not_now|no_internal_capacity|no_budget|not_relevant|stop_contact|wrong_person|auto_reply_support_desk|auto_reply_generic|out_of_office|not_a_reply|other",
 "objection":"what stands in the way, using their words, one short line in Arabic (empty if none)",
-"lesson":"what this reply teaches about WHO we target, WHAT we wrote, or WHICH ADDRESS we used, one line in Arabic",
-"suggestion":"ONE concrete change to make in the system (a targeting rule, a template change, how an address is chosen, timing), in Arabic; empty if nothing follows",
+"lesson":"what this ONE reply shows about WHO we target, WHAT we wrote, or WHICH ADDRESS we used, one line in Arabic. Say 'ربما' when one reply cannot prove it",
+"suggestion":"ONE concrete change (a targeting rule, a wording change, how an address is chosen), in Arabic; EMPTY unless the reply itself clearly supports it",
 "confidence":0-100}
-Definitions: auto_reply_support_desk = automatic answer from a donor / supporter / customer-service desk or ticket system (the address reaches the wrong team);
-auto_reply_generic = other automatic acknowledgement; out_of_office = away notice; no_internal_capacity = they do this work in-house;
-wrong_person = they say to write to someone else; stop_contact = asks not to be contacted again.
-Only what the text says. Never invent facts about them."""
+Definitions:
+- interested = they say they like it and want to continue; meeting_request = they ask for a meeting, call or our phone number; question = they ask about price, terms or details.
+- referral = they tell us to contact a named person / another desk / colleague (even politely, even with a phone number): the right person is now known.
+- not_now = a polite brush-off that commits to nothing ("we will look at your work and contact you if an opportunity comes", "we keep your details"). This is NOT interest.
+- no_internal_capacity = they do this work in-house; no_budget = no money; not_relevant = outside their work or sensitive for them (procurement plan, privacy rules).
+- auto_reply_support_desk = automatic answer from a donor / supporter / customer-service desk or ticket system (the address reaches the wrong team);
+  auto_reply_generic = other automatic acknowledgement, including "we received your message and will reply soon"; out_of_office = away notice.
+- not_a_reply = a notification or system mail (Facebook, Hugging Face, Google, newsletters, security alerts) that is not an answer to our message.
+- wrong_person = they say to write to someone else AND give no way to reach them; stop_contact = asks not to be contacted again.
+Ahmad's fixed decisions: the first email never contains a price or price range (cost is quoted after a meeting and five scoping questions); his phone is given only after
+they ask; no client names in a first email; messages are in the language of the organisation's own site. NEVER suggest anything that breaks these.
+Judge only what the text says; one reply is an anecdote, not a rule. Never invent facts about them. Write Arabic only (names of tools and organisations may stay Latin);
+never use Chinese, Japanese, Russian or any other script."""
+
+REPLY_BAD_SUGGESTION = re.compile(r"سعر|أسعار|باقات|الكلفة|التكلفة|نطاق سعري|price|pricing|رقم (الهاتف|الواتس|جوال)|اسماء العملاء|أسماء العملاء")
 
 
 def review_reply(model, L, ours, theirs, auto=False):
@@ -788,8 +799,15 @@ def review_reply(model, L, ours, theirs, auto=False):
         conf = int(out.get("confidence") or 0)
     except (TypeError, ValueError):
         conf = 0
-    return {"category": cat if cat in REPLY_CATEGORIES else "other", "objection": str(out.get("objection") or "")[:300] or None,
-            "lesson": str(out.get("lesson") or "")[:400] or None, "suggestion": str(out.get("suggestion") or "")[:400] or None, "confidence": conf}
+    stray = re.compile(r"[぀-ヿ㐀-鿿가-힯Ѐ-ӿ]")  # a model slip into another script: such a line is dropped, not shown
+    def text(k):
+        v = str(out.get(k) or "").strip()
+        return None if not v or stray.search(v) else v[:400]
+    suggestion = text("suggestion")
+    if suggestion and (REPLY_BAD_SUGGESTION.search(suggestion) or conf < 60):
+        suggestion = None  # contradicts a decision of Ahmad's, or the model itself is unsure: do not nag with it
+    return {"category": cat if cat in REPLY_CATEGORIES else "other", "objection": (text("objection") or None) and text("objection")[:300],
+            "lesson": text("lesson"), "suggestion": suggestion, "confidence": conf}
 
 
 # ---------------- First email to an organisation: fixed template, the idea is chosen in code from a vetted library ----------------
@@ -968,9 +986,157 @@ STOP_HOOK = {"that", "this", "with", "from", "their", "they", "have", "will", "w
              "على", "إلى", "الى", "عن", "من", "في", "الأردن", "الاردن", "عمان"}
 
 
+WRITER_EXAMPLES = {  # Ahmad's own first emails (they got replies): the voice the model must imitate, not quote
+    "ar": ["""السادة في جمعية نور الخير المحترمين،
+
+جمعية نور الخير تعمل منذ عام 2017 لتوفير الدعم للأسر الفقيرة والأيتام وطلبة العلم.
+
+أنا أحمد حدّاد، مخرج ومدير تصوير من الأردن، أصنع أفلاماً قصيرة عن الناس الذين يقفون خلف البرامج والمبادرات.
+
+يمكننا تصوير فيلم قصير يتابع قصصاً حقيقية لأشخاص استفادوا من برامج الجمعية.
+
+[[WORK]]
+
+ويسعدني أن نلتقي أونلاين لقاءً بسيطاً نتحدث فيه عن الفكرة ونعدّلها بما يناسبكم. وإن لم يكن هذا وقته فلا بأس أبداً، وبالتوفيق لكم.""",
+           """السادة في جمعية معهد تضامن النساء الأردني المحترمين،
+
+أنا أحمد حدّاد، مخرج ومدير تصوير من الأردن، أصنع أفلاماً قصيرة عن الناس الذين يقفون خلف البرامج والمبادرات.
+
+يمكننا تصوير فيلم قصير يتابع امرأة استفادت من برامجكم، ويروي رحلتها وأثر هذا الدعم في حياتها وأسرتها بصوتها.
+
+[[WORK]]
+
+إن رأيتم أن الفكرة تناسبكم، يسعدني أن نتحدث عنها في لقاء بسيط أونلاين. وإن لم يكن التوقيت مناسباً فلا بأس، ويعطيكم العافية.""",
+           """السادة في مركز عمّان لدراسات حقوق الإنسان المحترمين،
+
+أعلن المركز مؤخراً عن دعوة للتسجيل في دورة «حقوق التضامن» بالشراكة مع الحركة الدولية لحقوق الإنسان في جنيف.
+
+أنا أحمد حدّاد، مخرج ومدير تصوير، وجزء كبير من عملي أفلام وثائقية قصيرة لجهات تعمل في المجتمع.
+
+يمكننا تصوير فيلم قصير يتبع مجموعة من الشباب المشاركين في الدورة ويُظهر كيف يتحولون من متدربين إلى ناشطين.
+
+[[WORK]]
+
+يسعدني أن أسمع رأيكم، ولو في لقاء بسيط أونلاين. وإن لم يكن هذا ما تحتاجونه الآن فلا بأس، وكل التوفيق لكم."""],
+    "en": ["""Dear Human Development Fund team,
+
+HDF has served over 5.2 million hot meals in Gaza over three years of continuous emergency response.
+
+I'm Ahmad Haddad, a director and cinematographer in Jordan; for years I've worked with organisations on films that show their impact through people.
+
+We could film a short documentary following the aid workers and families behind those hot meals.
+
+[[WORK]]
+
+I'd be glad to talk it through in a simple online meeting and shape the idea with you. If this isn't a priority right now, that's perfectly fine."""],
+}
+WRITER_SYSTEM = """You are Ahmad Haddad, a Jordanian documentary director and cinematographer, writing the FIRST email to ONE organisation. Write like a calm, warm
+person writing to a stranger he respects, not like a marketer and not like an assistant. You get a VERIFIED FACT (use it, never add other facts), a suggested IDEA, and
+EXAMPLES of Ahmad's real emails. Imitate their voice, length and plainness, but do NOT copy their sentences: say it in your own words for THIS organisation.
+Rules:
+- Order: the greeting line (exactly as GREETING), one plain sentence about their work (from the fact), one sentence on who Ahmad is, the film idea (one or two sentences:
+  whom the film follows and what changes for them, tied to the SAME programme as the fact), a line containing ONLY the token [[WORK]], a short invitation to a simple
+  online meeting to talk the idea through, and a gentle way out.
+- 70 to 130 words in total. Short sentences. No bullet lists, headings, bold, emoji, or dashes used as punctuation.
+- No praise or flattery (no impressive, inspiring, رائع, ملهم, نثمّن). No "I hope this finds you well". No "not just X but Y". No dramatic closing line.
+- Never mention a price, a client name, a film title, or any number or place that is not in the FACT. Never promise a date.
+- The idea is a possibility ("we could film"), never something already happening.
+- Vary the wording each time; do not reuse the exact closing lines of the examples.
+- Dates and numbers are written in digits, never spelled out. Write the name as أحمد حدّاد (with the shadda) in Arabic.
+- Never end the idea with a clause like "ending with how X changes Y"; stop when the idea is told.
+- Arabic: every word in Arabic (no Latin words except FAII HOUSE). English: plain, natural English.
+- Do not write a signature or any link; they are added for you.
+Return JSON only: {"subject":"2 to 5 words naming their specific programme or topic, no 'opportunity', no 'collaboration'","body":"the email"}"""
+CRITIC_SYSTEM = """You are a sharp editor who hates text that sounds machine-written. You get an email draft from a Jordanian filmmaker to an organisation. Find any phrase a real
+person would not say (stock phrases, inflated words, symmetrical constructions, padding, translated-sounding grammar) and rewrite ONLY those spots plainly.
+Keep the facts, the order, the token [[WORK]] on its own line, the greeting line, and the length (70 to 130 words). Add nothing. Same language as the draft.
+Return JSON only: {"subject":"same or slightly better","body":"the full email after your edits"}"""
+WAY_OUT = re.compile(r"فلا بأس|لا بأس|أتفهّم|أتفهم|بالتوفيق|التوفيق|يعطيكم العافية|no problem|perfectly fine|completely understand|no worries|all the best|wish you well|that's fine", re.I)
+MEETING = re.compile(r"أونلاين|اونلاين|عبر الإنترنت|لقاء|اجتماع|مكالمة|online|meeting|call|chat|talk", re.I)
+OTHER_SCRIPT = re.compile("[぀-ヿ㐀-鿿가-힯Ѐ-ӿ]")
+
+
+def work_for(L):
+    return NGO_WORKS.get(ngo_topic(L), NGO_DEFAULT_WORK)
+
+
+def check_human(body, subject, L, lang, src, facts):
+    """Why a model-written first email must be rejected (empty list = fine). All deterministic."""
+    bad = []
+    if body.count("[[WORK]]") != 1:
+        bad.append("the token [[WORK]] must appear exactly once on its own line")
+    plain = body.replace("[[WORK]]", " ")
+    n = len(re.findall(r"\w+", plain))
+    if not 55 <= n <= 160:
+        bad.append(f"length {n} words, need 70 to 130")
+    if re.search(r"https?://|www\.|\*\*|^#|^\s*[-•]\s", plain, re.M):
+        bad.append("no links or markdown")
+    if ai_tells(plain) or FLATTERY.search(plain):
+        bad.append("machine-sounding or flattering phrase")
+    if lang == "ar" and foreign_words(plain, L):
+        bad.append("Latin words in Arabic: " + ",".join(foreign_words(plain, L)[:3]))
+    if OTHER_SCRIPT.search(plain):
+        bad.append("another script slipped in")
+    if wrong_proof(L, plain):
+        bad.append("a client name")
+    if any(x not in src + facts for x in re.findall(r"\d[\d,.]*", plain)):
+        bad.append("a number not in the fact")
+    if re.search(r"سعر|تكلفة|كلفة|\$|دينار|price|cost|fee", plain, re.I):
+        bad.append("a price word")
+    if not WAY_OUT.search(plain) or not MEETING.search(plain):
+        bad.append("needs the online meeting invitation and a gentle way out")
+    if not (2 <= len(re.findall(r"\w+", subject)) <= 7) or re.search(r"opportunity|collaborat|فرصة|تعاون", subject, re.I):
+        bad.append("subject must be 2 to 5 words about their programme")
+    qa = qa_flags(plain + "\n\nx", L)
+    if qa:
+        bad.append(qa[0])
+    return bad
+
+
+WRITER_WHY = []  # why the last model-written drafts were rejected (debugging)
+
+
+def human_first(L, team, lang, hook, idea, model):
+    """A model writes the whole first email in Ahmad's voice from his real emails, a second pass removes machine-sounding spots, and code
+    rejects anything with a foreign word, an invented number, a price, a client name, or the wrong shape. None = use the fixed template."""
+    if not model:
+        return None
+    src = org_sources(L)
+    facts = hook + " " + idea
+    greeting = f"السادة في {short_name(L['name'])} المحترمين،" if lang == "ar" else f"Dear {short_name(L['name'])} team,"
+    ex = "\n\n=====\n\n".join(WRITER_EXAMPLES["ar" if lang == "ar" else "en"])
+    user = (f"GREETING: {greeting}\nORGANISATION: {L.get('name')}\nVERIFIED FACT ABOUT THEM: {hook}\n"
+            f"SUGGESTED IDEA (rephrase, keep its meaning): {idea}\n\nEXAMPLES OF AHMAD'S REAL EMAILS:\n\n{ex}")
+    WRITER_WHY.clear()
+    for attempt in range(3):
+        try:
+            note = ("\n\nYour previous attempt was rejected: " + WRITER_WHY[-1] + ". Fix that.") if WRITER_WHY else ""
+            out = chat(model, WRITER_SYSTEM, user + note)
+            body, subject = str(out.get("body") or "").strip(), str(out.get("subject") or "").strip()
+            try:  # second pass: remove what still sounds machine-written
+                ed = chat(model, CRITIC_SYSTEM, f"SUBJECT: {subject}\nDRAFT:\n{body}")
+                if isinstance(ed.get("body"), str) and "[[WORK]]" in ed["body"]:
+                    body, subject = ed["body"].strip(), str(ed.get("subject") or subject).strip()
+            except Exception:
+                pass
+            body = re.sub(r"\s*—\s*|\s+–\s+", "، " if lang == "ar" else ", ", body)
+            if lang == "ar":
+                body = body.replace("حدّاد", "حداد").replace("حداد", "حدّاد")
+            body = re.sub(r"^\s*(السادة|Dear)[^\n]*\n+", "", body).strip()  # our own greeting replaces whatever greeting it wrote
+            why = check_human(body, subject, L, lang, src, facts)
+            if why:
+                WRITER_WHY.append("; ".join(why))
+                continue
+            return subject, greeting + "\n\n" + body
+        except Exception as e:
+            WRITER_WHY.append(f"error {type(e).__name__}")
+    return None
+
+
 def ngo_first(L, team, model=None):
     """First email to an organisation: a specific fact about THEM (read from their site / recent news, verified in code), who I am,
-    a short documentary built on that same fact, the portfolio link. No verified fact = no email (never a generic template)."""
+    a short documentary built on that same fact. Written by a model in Ahmad's voice from his real emails and checked in code; if the
+    model cannot produce a clean draft, the fixed template is used. No verified fact = no email (never a generic template)."""
     import hashlib
     lang = lang_for(L)
     lang = "ar" if lang == "ar" else "en"
@@ -978,6 +1144,13 @@ def ngo_first(L, team, model=None):
     hook, idea = ngo_hook(L, lang, model)
     if not hook:
         raise ValueError("لم أجد معلومة محددة وموثّقة عن المنظمة في موقعها أو أخبارها: لن أرسل رسالة عامة. أضف موقعهم أو اكتب توجيهاً.")
+    made = human_first(L, team, lang, hook, idea, model)
+    if made:
+        subject, text = made
+        site = SITES["personal"]
+        sig = (["أحمد حدّاد", "مخرج ومدير تصوير، FAII HOUSE", f"بعض أعمالي ومن عملت معهم: {site}"] if lang == "ar" else
+               ["Ahmad Haddad", f"{team.get('senderRole') or 'Director & Cinematographer'}, {team.get('company') or 'FAII HOUSE'}", f"Selected work: {site}"])
+        return subject, text.replace("[[WORK]]", NGO_LEAD[lang][h % 3] + "\n" + work_for(L)) + "\n\n" + "\n".join(sig)
     body = hook + "\n\n" + intro_for(L, lang) + "\n\n" + idea + "\n\n" + NGO_REST[lang][h % 3]
     subject = f"عن عمل {short_name(L['name'])}" if lang == "ar" else f"On the work of {short_name(L['name'])}"
     return subject, finish(body, L, team, lang, "first")
@@ -1181,7 +1354,7 @@ def write(L, team, history, channel, mode, hint, model):
             return "رقم التواصل", (body if channel == "email" else dm_version(body))
         if theirs and FREE_ASK.search(theirs):  # "free / donation, or paid?" gets Ahmad's own answer (Al-Gharaa, 2026-10-17)
             return "عن كلفة العمل", (FREE_ANSWER if channel == "email" else dm_version(FREE_ANSWER))
-        if cat in ("question", "meeting_request", "interested"):  # an interested reply gets Ahmad's own playbook, not a model's guess
+        if cat in ("question", "meeting_request", "interested", "referral"):  # an interested reply gets Ahmad's own playbook, not a model's guess
             wa = os.environ.get("WHATSAPP_NUMBER", "").strip()
             price = bool(re.search(r"تكلف|سعر|كلفة|أسعار|مجان|ببلاش|تبرع|تطوع|مقابل|نقود|فلوس|مصاري|cost|price|quot|budget|free|fee|paid", theirs, re.I))
             body = reply_playbook(L, theirs, price) + "\n\n" + (f"واتساب : {wa}\n\n" if wa else "") + "مع خالص التقدير،\nأحمد حدّاد"

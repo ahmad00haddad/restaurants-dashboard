@@ -527,7 +527,7 @@ def learn_backlog():
 
 
 WANTS_CONTACT = re.compile(r"اجتماع|لقاء|نلتقي|موعد|مكالمة|اتصال|اتصل|تواصل معي|رقم|هاتف|جوال|واتس|zoom|meet|call|schedule|phone|number|whatsapp|appointment", re.I)
-STAR_CATEGORIES = {"meeting_request", "interested", "question"}
+STAR_CATEGORIES = {"meeting_request", "interested", "question", "referral"}
 
 
 def star_if_hot(L, mid, subject, body, auto, ins):
