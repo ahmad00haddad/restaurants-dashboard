@@ -1366,7 +1366,7 @@ Return JSON only: {"subject":"Re: same subject","body":"the two sentences"}"""
 
 def nas_first(L, model, mode="first", subject_prev=None):
     n = ((L.get("profile") or {}).get("nas")) or {}
-    if not n.get("love") or not n.get("episode"):
+    if not (n.get("hook") and n.get("fit")) and (not n.get("love") or not n.get("episode")):
         raise ValueError("ناس إربد: لا توجد بيانات (ما يحبه وحلقة مناسبة) لهذا العميل")
     if mode == "first":  # built from hand-written paragraphs + two personal sentences (see nas_mail.py)
         import nas_mail
