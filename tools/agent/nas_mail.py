@@ -9,7 +9,8 @@ import re
 
 SITE = "https://nas-irbid.lovable.app"
 PHONE = "0799256345"
-CLOSE = "يسعدني الحديث متى ما ناسبكم. وكل التوفيق لكم، وسامحونا على الإزعاج."  # Ahmad's own closing line
+CLOSE = "وكل التوفيق لكم، وسامحونا على الإزعاج."  # Ahmad's closing line (he cut the first sentence in his own edits, 2026-10-24)
+WORKS = "رابط اعمالي : https://ahmadhaddad.lovable.app/"  # his signature link; replaced the «صانع ناس إربد» line in every draft he edited
 TRUE_NUMBERS = {"713", "464", "334", "250", "2.5", "97.8", "11", "8", "10"}
 
 # one wording per address form: a person is addressed in the singular, an institution in the plural
@@ -18,7 +19,7 @@ FORM = {
     "many": {"you": "إلكم", "want": "حابين", "ok": "ناسبكم", "your": "اسمكم", "yours": "عندكم", "to_you": "لكم", "see": "تشوفوا"},
 }
 
-SERIES = ("إحنا شغالين هالفترة على سلسلة وثائقية اسمها «ناس إربد». بنقعد مع ناس المدينة القدامى، الخبّاز وصاحب المقهى والحرفي، "
+SERIES = ("إحنا شغالين هالفترة على سلسلة وثائقية اسمها «ناس إربد». بنقعد مع ناس المدينة، "
           "وبنسجّل حكايتهم قبل ما تروح مع المكان. بسمة الذينات بتقدّمها وأنا بخرجها. كل الحلقات على هالرابط:\n" + SITE)
 
 NUMBERS = ("وبصراحة النتيجة فاجأتنا: 11 حلقة وصلت 2.5 مليون مشاهدة و97.8 ألف إعجاب، وكلها بجهد مستقل. "
@@ -34,11 +35,11 @@ ASK = {
     "episode": "بدنا شريك من أهل إربد يرعى حلقة أو أكثر من موسمنا الجاي (8 حلقات).",
     "episode_or_season": "بدنا شريك من أهل إربد يرعى حلقة أو أكثر من موسمنا الجاي (8 حلقات)، أو الموسم كله إذا كان أنسب {you}.",
     "meeting": "بنحب نعرّف {to_you} على البرنامج بلقاء قصير، وإذا حبّيتوا تكونوا جزء منه كرعاة حلقة أو أكثر من موسمنا الجاي (8 حلقات) بنرتّب الباقي.",
-    "partnership": "بنحب نعمل شراكة محتوى معكم: الحلقات بتنعرض {yours} وبتوصل لجمهوركم، وبنذكر {your} كشريك للسلسلة.",
+    "partnership": "بنحب نعمل شراكة محتوى معكم، كراعي رسمي للحلقات.",
     "support": "بنحتاج تسهيلات تصوير ودعم لوجستي بأماكن المدينة العامة للموسم الجاي (8 حلقات)، وبنذكر دعمكم بالحلقات.",
 }
 MONEY_ASKS = {"season", "episode", "episode_or_season", "meeting"}
-MEET = "إذا {want}، بنحكي أونلاين عشر دقايق وبشرح {to_you} كل التفاصيل."
+MEET = "إذا مناسب، بنحكي أونلاين عشر دقايق وبشرح {to_you} كل التفاصيل."
 
 PERSONAL_SYSTEM = """You help Ahmad Haddad, a filmmaker from Irbid, write the two PERSONAL sentences of an email to a person or institution from Irbid whom he asks to sponsor his documentary series.
 You get WHO (who they are) and LOVE (their real, public tie to Irbid) and the address form (singular for a person, plural for an institution).
@@ -56,10 +57,10 @@ def _build(n, greeting, f, ask, hook, fit, subject):
     hello = "السلام عليكم " + greeting.replace("الأستاذ ", "أستاذ ", 1) + "،"
     intro = f"أنا أحمد حدّاد، مخرج من إربد، وبكتب {f['to_you']} {hook}" if hook.startswith("لأن") else f"أنا أحمد حدّاد، مخرج من إربد. {hook}"
     paras = [hello, intro, SERIES, NUMBERS]
-    paras.append(fit + " " + GETS if ask in MONEY_ASKS else fit)
+    paras.append(fit)  # he removed the sponsor-perks sentence (GETS) from every draft he edited; kept above in case he wants it back
     paras.append(ASK.get(ask, ASK["episode"]).format(**f) + " " + MEET.format(**f))
     paras.append(CLOSE)
-    paras.append(f"أحمد حدّاد\nصانع «ناس إربد»\n{PHONE}")
+    paras.append(f"أحمد حدّاد\n{WORKS}\n{PHONE}")
     return subject, "\n\n".join(paras)
 
 
@@ -73,7 +74,7 @@ def first(L, model, chat, ai_tells, nv_chain, is_nv):
     models = [model] + [m for m in nv_chain if m != model][:3]
     fix, last = "", "no attempt"
     if n.get("hook") and n.get("fit"):  # hand-written for this sponsor (nas_personal.py): no model involved
-        return _build(n, greeting, f, ask, n["hook"], n["fit"], "إربد وناسها")
+        return _build(n, greeting, f, ask, n["hook"], n["fit"], 'سلسلة "ناس إربد"')
     for attempt in range(5):
         mdl = models[min(attempt, len(models) - 1)] if is_nv(model) else model
         try:
@@ -101,6 +102,6 @@ def first(L, model, chat, ai_tells, nv_chain, is_nv):
             last = f"length {len(hook.split())}/{len(fit.split())}"
             continue
         if not subject or re.search(r"رعاية|دعم|طلب|فرصة|شراكة|[A-Za-z]|\d", subject):
-            subject = "إربد وناسها"
+            subject = 'سلسلة "ناس إربد"'
         return _build(n, greeting, f, ask, hook, fit, subject)
     raise ValueError(f"ناس إربد: لم تنجح الكتابة الشخصية بعد 5 محاولات ({last})")
