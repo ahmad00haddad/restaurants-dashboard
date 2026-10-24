@@ -1368,6 +1368,9 @@ def nas_first(L, model, mode="first", subject_prev=None):
     n = ((L.get("profile") or {}).get("nas")) or {}
     if not n.get("love") or not n.get("episode"):
         raise ValueError("ناس إربد: لا توجد بيانات (ما يحبه وحلقة مناسبة) لهذا العميل")
+    if mode == "first":  # built from hand-written paragraphs + two personal sentences (see nas_mail.py)
+        import nas_mail
+        return nas_mail.first(L, model, chat, ai_tells, NV_CHAIN, is_nv)
     facts = f"GREETING: {n.get('greeting')}\nWHO: {n.get('who')}\nLOVE: {n.get('love')}\nEPISODE: {n['episode']}\nASK: {n.get('ask')}"
     ep = "أم محمد المصرية"
     last = "no attempt"
