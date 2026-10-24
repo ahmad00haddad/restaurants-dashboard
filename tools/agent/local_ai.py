@@ -1351,10 +1351,11 @@ Presented by Basma Al-Thinat, directed by Ahmad. 11 episodes so far, 2.5 ملي�
 Independent, no politics, nothing controversial. A new season of 8 episodes is being prepared. The archive is open for researchers.
 You get WHO, LOVE (their real tie to Irbid), and ASK. Use only those and the facts above. Invent nothing: no numbers, names, dates, partners, no claims about what they feel or read.
 Structure (no greeting, no link, no signature: they are added for you):
-1. A human opening line, the HOOK: one short sentence that starts from LOVE like a person remembering something about his city, or a short honest question about Irbid. Not "أنت رجل أعمال…". Never describe their job back to them.
-2. Two or three sentences explaining the programme in your own words, as if telling a friend: what we do, who we sit with, and that أم محمد المصرية reached 713 ألف مشاهدة and قدري 464 ألف, so people of Irbid really do watch their own city. Say أم محمد المصرية exactly.
-3. The ask in plain words, tied to ASK (for example: بدنا شريك من أهل إربد يرعى حلقة أو أكثر من الموسم الجاي). No amounts, prices or packages.
-4. One line inviting a short online chat or a reply, and a light way out ("وإن ما ناسب الوقت، ولا يهمك").
+The reader does not know us, so the order matters:
+1. WHO WE ARE (first paragraph, 2 sentences): introduce yourself by name as أحمد حدّاد, a filmmaker from Irbid, and say in a human way why you are writing to HIM in particular, starting from LOVE (a real tie to Irbid). Never describe their job back to them; never flatter.
+2. THE SERIES (second paragraph): say plainly that we are working on a series called «ناس إربد» right now. Then put the token [[LINK]] alone on its own line, right after the sentence that names the series (it becomes the link to watch the episodes). After the token, 2 sentences telling what it is, as if to a friend: we sit with the people of old Irbid (the baker, the café owner, the craftsman) and record their story before the place goes; and that أم محمد المصرية reached 713 ألف مشاهدة and قدري 464 ألف, so the people of Irbid really do watch their own city. Say أم محمد المصرية exactly. Only here you talk about the series; the token [[LINK]] appears exactly once in the whole email.
+3. WHAT WE NEED (third paragraph): the ask in plain words, tied to ASK (for example: بدنا شريك من أهل إربد يرعى حلقة أو أكثر من الموسم الجاي). No amounts, prices or packages.
+4. Last line: invite a short online chat or a reply, with a light way out ("وإن ما ناسب الوقت، ولا يهمك").
 - 90 to 140 words in total. Short sentences mixed with a longer one. No bullets, bold, emoji, exclamation marks. No "ليس مجرد… بل". No flattery words (رائع، مذهل، ملهم، نثمّن). No inflated words (رحلة، محوري، عميق، إرث).
 Return JSON only: {"subject":"2 to 5 words, human, about Irbid or the episode (never رعاية, طلب دعم, فرصة)","body":"paragraphs separated by a blank line"}"""
 NAS_FOLLOWUP = """You are Ahmad Haddad, maker of «ناس إربد». They did not answer our first email, which is fine. Write ONE very short Arabic note (2 sentences) that adds something: a new reason Irbid's people watch the series
@@ -1382,14 +1383,17 @@ def nas_first(L, model, mode="first", subject_prev=None):
         body = "\n\n".join(paras)
         if ep not in body:
             last = "episode not named"; continue
-        if re.search(r"https?://|\d+\s*(د\.?أ|دينار)|[A-Za-z]{4,}", body) or ai_tells(body):
+        if mode == "first" and (body.count("[[LINK]]") != 1 or "حدّاد" not in body.replace("حداد", "حدّاد")):
+            last = "missing the series link token or the sender's introduction"; continue
+        if re.search(r"https?://|\d+\s*(د\.?أ|دينار)|[A-Za-z]{4,}", body.replace("[[LINK]]", "")) or ai_tells(body):
             last = "link, price, Latin word or machine tell"; continue
+        body = re.sub(r"\s*\[\[LINK\]\]\s*", "\n" + NAS_SITE + "\n", body).strip() if mode == "first" else body
         subject = str(out.get("subject") or "").strip() or "إربد وناسها"
         if re.search(r"رعاية|طلب دعم|فرصة|collaborat", subject):
             subject = "إربد وناسها"
         if mode == "followup":
             return subject_prev or subject, f"{n.get('greeting')}،\n\n{body}\n\nأحمد حدّاد\nصانع «ناس إربد»\n{NAS_PHONE}\n{NAS_SITE}"
-        return subject, (f"السلام عليكم {(n.get('greeting') or '').replace('الأستاذ ', 'أستاذ ', 1)}،\n\n{body}\n\nحلقات البرنامج كلها هنا:\n{NAS_SITE}\n\n"
+        return subject, (f"السلام عليكم {(n.get('greeting') or '').replace('الأستاذ ', 'أستاذ ', 1)}،\n\n{body}\n\n"
                          f"أحمد حدّاد\nصانع «ناس إربد»\n{NAS_PHONE}")
     raise ValueError(f"ناس إربد: لم تنجح الكتابة بعد 3 محاولات ({last})")
 
