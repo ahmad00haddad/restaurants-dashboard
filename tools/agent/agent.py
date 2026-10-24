@@ -923,7 +923,7 @@ def approve(mid, tg_mid, own_claim=False):
             L = find_email(L)
             to, cc = recipients(L)
         if not to:
-            db.patch("lead_messages", {"id": mid}, {"review": "failed", "review_note": "لا إيميل حتى بعد البحث العميق — أضف الإيميل في صفحة العميل"})
+            db.patch("lead_messages", {"id": mid}, {"review": "rejected", "review_note": "أُغلقت: لا إيميل حتى بعد البحث العميق (أضف الإيميل في صفحة العميل وأعد الطلب)"})
             return "📭 لم تُرسل: لا يوجد إيميل لهذا العميل حتى بعد البحث العميق (الموقع، فيسبوك/إنستغرام عبر البحث، الأدلة). أضفه في صفحته ثم أعد الموافقة."
         send_email(to, m.get("subject"), m["body"], cc=cc, rush=is_rush(m, L))
         STATE["sent_mids"] = (STATE.get("sent_mids", []) + [mid])[-500:]  # remembered before the database is told
@@ -1298,7 +1298,7 @@ def write_requested():
     if m["channel"] == "email" and not recipients(L)[0]:  # outreach is email only: find the address (site, then deep search), never switch channel
         L = find_email(ensure_contact(L))
         if not recipients(L)[0]:
-            db.patch("lead_messages", {"id": m["id"]}, {"review": "failed", "review_note": "لا إيميل حتى بعد البحث العميق — أضف الإيميل في صفحة العميل"})
+            db.patch("lead_messages", {"id": m["id"]}, {"review": "rejected", "review_note": "أُغلقت: لا إيميل حتى بعد البحث العميق (أضف الإيميل في صفحة العميل وأعد الطلب)"})
             return
     hist = db.get("lead_messages", select="direction,channel,subject,body,created_at", lead_id=f"eq.{L['id']}", draft="eq.false", order="created_at")
     history = "\n\n".join(f"[{'THEM' if h['direction'] == 'in' else 'US'} · {h['channel']} · {h['created_at'][:10]}]\n{h['body']}" for h in hist)
