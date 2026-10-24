@@ -27,6 +27,7 @@ export interface LeadProfile {
   decision_maker: string;   // who to address (role) if inferable
   why: string;
   tier?: "A" | "B" | "C";   // A = send first, B = normal, C = low touch (decided by the PC agent)
+  nas?: NasFacts;           // Nas Irbid sponsors only
   email_check?: { ok: boolean | null; role: boolean; reason: string };
   hook_source?: string;
 }
@@ -71,8 +72,16 @@ export interface Lead {
   signal_url: string | null;
   signal_until: string | null;
   deal_value: number | null;
+  program?: "faii" | "nas";     // "nas" = sponsors of the Nas Irbid documentary, written with their own voice
   created_at: string;
 }
+
+/** Facts the Nas Irbid writer may use for one sponsor (profile.nas); it never adds others. */
+export interface NasFacts { who: string; love: string; episode: string; ask: string; greeting: string }
+export const NAS_SITE = "https://nas-irbid.lovable.app";
+export const NAS_ASK_LABEL: Record<string, string> = {
+  season: "رعاية الموسم", episode: "رعاية حلقة", episode_or_season: "حلقة أو موسم", meeting: "لقاء تعريفي", support: "دعم لوجستي", partnership: "شراكة محتوى",
+};
 
 export interface LeadMessage {
   id: string;

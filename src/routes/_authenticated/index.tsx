@@ -11,7 +11,7 @@ import { Radar } from "@/components/Radar";
 import { ReplyLessons } from "@/components/ReplyLessons";
 import { useOpportunities } from "@/hooks/useOpportunities";
 import { daysLeft, isActiveOpp } from "@/lib/opportunities";
-import { KIND_LABEL, STATUS_LABEL, emailBad, irbidFirst, localFirst, tierRank, type Lead, type LeadStatus } from "@/lib/leads";
+import { KIND_LABEL, NAS_ASK_LABEL, NAS_SITE, STATUS_LABEL, emailBad, irbidFirst, localFirst, tierRank, type Lead, type LeadStatus } from "@/lib/leads";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({ meta: [{ title: "FAII — Sales" }] }),
@@ -19,7 +19,7 @@ export const Route = createFileRoute("/_authenticated/")({
 });
 
 /** Four places, one question each: what do I do now / who did we write to / who is next / which tenders are open. */
-type View = "today" | "convos" | "new" | "opps" | "approvals" | "stats";
+type View = "today" | "convos" | "new" | "opps" | "approvals" | "stats" | "nas";
 const today = (plus = 0) => new Date(Date.now() + plus * 864e5).toLocaleDateString("en-CA"); // local date, not UTC
 const daysAgo = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / 864e5);
 const STAGES: { status: LeadStatus; label: string }[] = [
@@ -32,7 +32,8 @@ const STAGES: { status: LeadStatus; label: string }[] = [
 const btn = "px-3 py-1.5 rounded border border-border text-sm";
 
 function Home() {
-  const { data: leads = [], isLoading, error } = useLeads();
+  const { data: allLeads = [], isLoading, error } = useLeads();
+  const leads = allLeads;
   const { data: last = {} } = useLastMessages();
   const act = useLeadActions();
   const toast = useToast();
@@ -53,8 +54,10 @@ function Home() {
   const contactedEmails = useMemo(() => new Set(leads.filter((l) => l.email && ["contacted", "replied", "meeting", "won", "lost"].includes(l.status)).map((l) => l.email!.trim().toLowerCase())), [leads]);
   const alreadyMailed = (l: Lead) => !!l.email && contactedEmails.has(l.email.trim().toLowerCase());
 
+  const nasLeads = useMemo(() => leads.filter((l) => l.program === "nas").sort((a, b) => (a.profile?.tier ?? "C").localeCompare(b.profile?.tier ?? "C") || (b.score ?? 0) - (a.score ?? 0)), [leads]);
   const groups = useMemo(() => {
     const t = today();
+    const leads = allLeads.filter((l) => l.program !== "nas"); // Nas Irbid sponsors have their own tab and their own voice
     const reply = leads.filter((l) => l.needs_reply);
     const followup = leads.filter((l) => l.status === "contacted" && l.next_action_at && l.next_action_at <= t && l.followups < 1);
     const nextStep = leads.filter((l) => ["replied", "meeting"].includes(l.status) && !l.needs_reply && l.next_action_at && l.next_action_at <= t);
@@ -66,7 +69,7 @@ function Home() {
       .sort((a, b) => Number(a.score == null) - Number(b.score == null) || localFirst(a) - localFirst(b) || tierRank(a) - tierRank(b) || irbidFirst(a) - irbidFirst(b) || (b.score ?? 0) - (a.score ?? 0));
     const convos = leads.filter((l) => ["contacted", "replied", "meeting", "won", "lost"].includes(l.status));
     return { reply, followup, nextStep, signals, closing, fresh, convos };
-  }, [leads, contactedEmails]);
+  }, [allLeads, contactedEmails]);
 
   const filtered = (L: Lead[]) => L.filter((l) => !kind || l.kind === kind);
   const found = useMemo(() => {
@@ -176,6 +179,35 @@ function Home() {
         <Radar />
       </>
     );
+    if (view === "nas") {
+      const queued = new Set(approvals.map((a) => a.lead_id));
+      const todo = nasLeads.filter((l) => l.status === "new" && !queued.has(l.id) && !touched.has(l.id));
+      const sent = nasLeads.filter((l) => l.status !== "new");
+      const nasLine = (l: Lead) => (
+        <>
+          <div className="text-xs text-muted-foreground">{l.category}</div>
+          <div className="text-xs">{l.profile?.nas ? `يطلب منه: ${NAS_ASK_LABEL[l.profile.nas.ask] ?? l.profile.nas.ask} · ما يحبه: ${l.profile.nas.love}` : null}</div>
+          <div className="text-xs">{l.email ? `✉️ ${l.email}` : "⚠️ لا إيميل بعد، سيبحث عنه الوكيل عند الكتابة"}</div>
+        </>
+      );
+      return (
+        <>
+          <div className="flex flex-wrap items-center gap-2 p-3 border-b border-border">
+            <button className="px-3 py-1.5 rounded bg-primary text-primary-foreground text-sm" onClick={async () => {
+              const targets = todo.filter((l) => l.profile?.tier !== "C").slice(0, 5);
+              if (!agent?.online) toast.push("⚠️ الوكيل متوقف — ستُكتب عند تشغيل run.bat", "info");
+              for (const l of targets) await act.requestLocalWrite(l.id, "email");
+              toast.push(`💻 ${targets.length} رسائل ناس إربد في طابور جهازك — تصلك على Telegram`);
+            }}>✍️ اكتب لأقوى 5 رعاة</button>
+            <a className="underline text-sm" href={NAS_SITE} target="_blank" rel="noreferrer">موقع البرنامج</a>
+            <span className="text-xs text-muted-foreground">كل رسالة تحمل رابط الموقع وحلقة تناسب صاحبها، ولا يُرسل شيء قبل موافقتك</span>
+          </div>
+          {section("🔥 ردّوا وينتظرون جوابك", nasLeads.filter((l) => l.needs_reply), lastLine)}
+          {section("🎯 لم نراسلهم بعد", todo, nasLine, false)}
+          {section("📤 راسلناهم", sent.filter((l) => !l.needs_reply), lastLine, false)}
+        </>
+      );
+    }
     // view === "new"
     const L = filtered(groups.fresh);
     return (
@@ -228,6 +260,7 @@ function Home() {
         {tab("convos", "💬 المحادثات", groups.convos.length)}
         {tab("new", "🎯 الجدد", groups.fresh.length)}
         {tab("opps", "🔔 الفرص", groups.signals.length + radarOpen)}
+        {tab("nas", "🎬 ناس إربد", nasLeads.length)}
         <div className="flex-1" />
         <input className="rounded border border-border bg-background px-2 py-1.5 text-sm w-48" placeholder="🔍 بحث في كل البيانات" value={q} onChange={(e) => setQ(e.target.value)} />
         {tab("stats", "📊 القياس")}

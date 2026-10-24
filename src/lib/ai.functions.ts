@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { crawlSite, readWebsite } from "@/lib/research.server";
-import { DEFAULT_TEAM, type Lead, type LeadMessage, type LeadProfile, type TeamSettings } from "@/lib/leads";
+import { DEFAULT_TEAM, NAS_SITE, type Lead, type LeadMessage, type LeadProfile, type TeamSettings } from "@/lib/leads";
 
 const MODEL = "openai/gpt-6-astra";
 
@@ -142,6 +142,26 @@ Also remove every sign of machine writing (any language), strongest first:
 If ANY score is below 9, rewrite the message to score 10 on all, keeping the same language, facts, link and signature. Never add new facts, links or client names. Keep exactly one link: the site in the signature; remove any link to a single project.
 Return JSON only: {"scores":{"dignity":n,"specificity":n,"insight":n,"restraint":n,"language":n},"subject":"...","body":"final message"}`;
 
+/** «ناس إربد»: Ahmad asks a person or institution from Irbid to support the documentary. The pull is their own real tie to the city, never flattery. */
+const NAS_PROGRAM = `PROGRAMME FACTS (the only facts you may state about «ناس إربد»):
+- A documentary series that records Irbid's living memory: crafts, cafés, families and places that are disappearing. Directed by Ahmad Haddad, presented by Basma Al-Thinat.
+- 11 episodes published, 2.5 million views, 97.8 thousand likes. Episodes: أم محمد المصرية 713 ألف مشاهدة، قدري 464 ألف، سركيس الخباز 334 ألف، شارع السينما 250 ألف، دركل 209 آلاف.
+- Independent, no politics, safe for any sponsor's name. A new season of 8 episodes is being prepared. Archive is open to researchers.
+- Website with all episodes: ${NAS_SITE}`;
+
+const NAS_VOICE = (t: TeamSettings) => `You write as ${t.senderName}, maker of the documentary «ناس إربد», to ONE person or institution from or tied to Irbid, asking them to support the programme (sponsor an episode or the season, or partner).
+${NAS_PROGRAM}
+HOW IT READS:
+- Arabic, calm and respectful, a Jordanian from Irbid writing to someone he respects. Not an advertisement and not a plea.
+- The pull is the reader's OWN real tie to Irbid, taken only from the LOVE and WHO facts given. Name that tie plainly in one sentence (for example that he financed a square in the city, or that the club carries its name) and connect it to what the series does. Never praise, never flatter, never guess at their feelings, never invent a tie.
+- Tell them ONE episode by name with its views, chosen from the EPISODE fact, as proof that Irbid's people watch this. Do not describe the episode's content beyond its name.
+- The ask is exactly the ASK fact, stated in one plain sentence ("نبحث عن شريك يرعى حلقة من موسمنا القادم"). No amounts, no prices, no packages: those come after they reply.
+- Invite a short online meeting or a reply, one line. One gracious way out ("وإن لم يكن التوقيت مناسباً فلا بأس") without apologising.
+- Mention the website once, on its own line, as: «حلقات البرنامج كلها هنا: ${NAS_SITE}». That is the only link.
+- 90 to 140 words. No bullets, bold, emoji, exclamation marks, dashes as punctuation. Sign: ${t.senderName}، صانع «ناس إربد»، then phone 0799256345.
+- Never invent numbers, people, dates, partners (do not claim the municipality or the ministry support us). Subject: 2 to 5 words naming Irbid or the episode, never "رعاية" or "طلب دعم".
+Return JSON only.`;
+
 // ---------- 1) Research + profile ----------
 export const researchLead = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -205,9 +225,10 @@ export const draftMessage = createServerFn({ method: "POST" })
     const signalRule = lead.signal
       ? "\n- They have a LIVE signal (tender, or hiring for comms/media). You may mention it with tact as context (e.g. that we've seen they're expanding their communications work), offering our work as a resource. Never sound opportunistic."
       : "";
+    const nas = lead.program === "nas" ? lead.profile?.nas : undefined;
     const out = await ask(
-      VOICE(team) + signalRule + "\nReturn JSON only.",
-      `${us(team)}\n\nCLIENT:\n${them(lead)}\n\nWHAT WE KNOW ABOUT THEM:\n${JSON.stringify(lead.profile ?? {}, null, 1)}\n\n` +
+      nas ? NAS_VOICE(team) : VOICE(team) + signalRule + "\nReturn JSON only.",
+      `${nas ? `GREETING: ${nas.greeting}\nWHO: ${nas.who}\nLOVE (their real tie to Irbid): ${nas.love}\nEPISODE to name: ${nas.episode}\nASK: ${nas.ask}` : us(team)}\n\nCLIENT:\n${them(lead)}\n\nWHAT WE KNOW ABOUT THEM:\n${JSON.stringify(lead.profile ?? {}, null, 1)}\n\n` +
         `CONVERSATION SO FAR:\n${history || "(none)"}${learned}\n\nCHANNEL: ${data.channel}\nTASK: ${task}` +
         (data.hint ? `\nEXTRA INSTRUCTION FROM ${team.senderName}: ${data.hint}` : "") +
         `\n\nReturn JSON: {"subject":"${data.channel === "email" ? "short, human, not salesy" : ""}","body":"...",` +
@@ -220,7 +241,7 @@ export const draftMessage = createServerFn({ method: "POST" })
     if (!text) throw new Error(`لم يكتب الذكاء رسالة${out.summary ? ` — ملاحظته: ${out.summary}` : ""}. جرّب مرة أخرى أو أضف توجيهاً.`);
     out.body = text.trim();
     // Editor pass: catch anything needy or generic before Ahmad ever sees it.
-    try {
+    if (!nas) try { // the editor is tuned for FAII's pitch (one portfolio link); sponsor emails keep their own rules
       const ed = await ask(EDITOR, `CLIENT:
 ${them(lead)}
 

@@ -1340,8 +1340,59 @@ FREE_ANSWER = ("تحية طيبة وبعد،\n\n"
                "وافر الاحترام والتقدير،\nأحمد حداد\nمخرج ومدير تصوير | FAII HOUSE")
 
 
+# ---------------- «ناس إربد»: sponsors of the documentary (own voice, own checks) ----------------
+NAS_SITE = "https://nas-irbid.lovable.app"
+NAS_PHONE = "0799256345"
+NAS_SYSTEM = """You are Ahmad Haddad, from Irbid, maker of the documentary «ناس إربد», writing ONE short email in Arabic to a person or institution tied to Irbid, to ask them to support the programme.
+Facts about the programme (the ONLY facts you may state): a documentary series recording Irbid's living memory (crafts, cafés, families, places that are disappearing); 11 episodes, 2.5 مليون مشاهدة;
+independent, no politics; a new season of 8 episodes is being prepared; the archive is open to researchers.
+Rules:
+- You get GREETING, WHO, LOVE (their real tie to Irbid), EPISODE (one episode with its views) and ASK. Use only those and the programme facts. Invent nothing: no numbers, names, dates, partners.
+- Paragraph 1 (1-2 sentences): their real tie to Irbid, taken from LOVE/WHO, said plainly and respectfully. No praise or flattery words (رائع، مذهل، ملهم، نثمّن), no guessing their feelings.
+- Paragraph 2 (2 sentences): what «ناس إربد» is, and that the episode named in EPISODE reached that many views, so people of Irbid do watch their own city. Name the episode exactly as given.
+- Paragraph 3 (1-2 sentences): the ASK in plain words ("نبحث عن شريك من أهل إربد يرعى حلقة من موسمنا القادم"). No amounts, prices or packages. Then one line inviting a short online meeting or a reply, and a gentle way out ("وإن لم يكن التوقيت مناسباً فلا بأس").
+- 80 to 130 words in total. Short plain sentences. No bullets, bold, emoji, exclamation marks, dashes as punctuation, no "ليس مجرد… بل", no inflated words (رحلة، محوري، عميق).
+- Arabic only. Do not write the greeting, the link or the signature: they are added for you.
+Return JSON only: {"subject":"2 to 5 words naming Irbid or the episode; never رعاية or طلب دعم or فرصة","body":"paragraphs separated by a blank line"}"""
+NAS_FOLLOWUP = """You are Ahmad Haddad, maker of «ناس إربد». They did not answer our first email, which is fine. Write ONE very short Arabic note (2 sentences) that adds something: a new reason Irbid's people watch the series
+(use only EPISODE and the programme facts), then leave the door open without pressure. No reminder words ("أتابع", "للتذكير"), no thanks in advance, no price. Arabic only.
+Return JSON only: {"subject":"Re: same subject","body":"the two sentences"}"""
+
+
+def nas_first(L, model, mode="first", subject_prev=None):
+    n = ((L.get("profile") or {}).get("nas")) or {}
+    if not n.get("love") or not n.get("episode"):
+        raise ValueError("ناس إربد: لا توجد بيانات (ما يحبه وحلقة مناسبة) لهذا العميل")
+    facts = f"GREETING: {n.get('greeting')}\nWHO: {n.get('who')}\nLOVE: {n.get('love')}\nEPISODE: {n['episode']}\nASK: {n.get('ask')}"
+    ep = re.sub(r"\s*\(.*", "", n["episode"]).strip()
+    last = "no attempt"
+    for attempt in range(3):
+        out = chat(model, NAS_FOLLOWUP if mode == "followup" else NAS_SYSTEM, facts + ("\nWrite it differently from earlier attempts." if attempt else ""))
+        body = str(out.get("body") or "").strip()
+        words = len(body.split())
+        if mode == "first" and not (60 <= words <= 150):
+            last = f"{words} words"; continue
+        if ep not in body:
+            last = "episode not named"; continue
+        if re.search(r"https?://|\d+\s*(د\.?أ|دينار)|[A-Za-z]{4,}", body) or ai_tells(body):
+            last = "link, price, Latin word or machine tell"; continue
+        subject = str(out.get("subject") or "").strip() or "إربد وناسها"
+        if re.search(r"رعاية|طلب دعم|فرصة|collaborat", subject):
+            subject = "إربد وناسها"
+        if mode == "followup":
+            return subject_prev or subject, f"{n.get('greeting')}،\n\n{body}\n\nأحمد حدّاد\nصانع «ناس إربد»\n{NAS_PHONE}\n{NAS_SITE}"
+        return subject, (f"{n.get('greeting')}، تحية طيبة\n\n{body}\n\nحلقات البرنامج كلها هنا:\n{NAS_SITE}\n\n"
+                         f"أحمد حدّاد\nصانع «ناس إربد»\n{NAS_PHONE}")
+    raise ValueError(f"ناس إربد: لم تنجح الكتابة بعد 3 محاولات ({last})")
+
+
 def write(L, team, history, channel, mode, hint, model):
     """Write, and retry once if the model skipped the idea or cleanup left too little (never queue a hollow message)."""
+    if L.get("program") == "nas":
+        if mode == "reply":
+            raise ValueError("ناس إربد: الرد على الرعاة (أرقام وأسعار) تكتبه أنت من صفحة العميل")
+        subject, text = nas_first(L, model, mode)
+        return subject, (text if channel == "email" else dm_version(text))
     if mode == "reply":
         theirs = last_inbound(history)
         try:

@@ -672,7 +672,7 @@ _allowed = {"t": 0, "urls": set()}
 
 
 # The example works the templates link to, plus the portfolio: always allowed, whatever agent.env says (it only ADDS links).
-BUILTIN_LINKS = ("ahmadhaddad.lovable.app,behance.net/ahmad00haddad,behance.com/ahmad00haddad,"
+BUILTIN_LINKS = ("ahmadhaddad.lovable.app,nas-irbid.lovable.app,behance.net/ahmad00haddad,behance.com/ahmad00haddad,"
                  "behance.net/gallery/243985595/_,behance.net/gallery/243985595,"
                  "behance.net/gallery/248490425/_,behance.net/gallery/248490425,"
                  "behance.net/gallery/242646259/duroub-with-alma,behance.net/gallery/242646259,"
@@ -765,7 +765,7 @@ def gate(m, L):
         wrong = []
     if wrong:
         why.append(f"يذكر أسماء عملاء سابقين (قاعدتك: لا أسماء، الموقع يعرضهم): {', '.join(wrong)}")
-    if L.get("status") in ("new", None) and not re.search(r"فيلم|أفلام|نصوّر|نصور|صوّرت|صورت|ريل|film|shoot|video|reel|documentary", body, re.I):
+    if L.get("program") != "nas" and L.get("status") in ("new", None) and not re.search(r"فيلم|أفلام|نصوّر|نصور|صوّرت|صورت|ريل|film|shoot|video|reel|documentary", body, re.I):
         why.append("لا توضح أنها عرض تصوير/فيلم — قد تُفهم كتعليق أو شكوى")
     if re.search(r"(بعنوان|تحت عنوان|titled|entitled|called)\s*[«\"“'‘]", body, re.I):
         why.append("يقترح اسماً/عنواناً لفيلم — ممنوع")
@@ -1147,7 +1147,7 @@ def analyze_one():
             log("local analysis off: Ollama not running or no model (ollama pull qwen2.5:14b)")
             _local["warned"] = True
         return
-    rows = db.get("leads", select="*", profile="is.null", deleted_at="is.null",
+    rows = db.get("leads", select="*", profile="is.null", deleted_at="is.null", program="neq.nas",
                   **{"or": "(email.not.is.null,phone.not.is.null,instagram.not.is.null)"}, limit="40")
     if not rows:
         refresh_one()
@@ -1190,7 +1190,7 @@ def refresh_one():
     if local_ai.exa_limited():
         return  # Exa is cooling down; the same leads stay due
     cutoff = (date.today() - timedelta(days=int(E.get("REFRESH_DAYS", "14")))).isoformat()
-    rows = db.get("leads", select="*", status="eq.new", deleted_at="is.null", profile="not.is.null",
+    rows = db.get("leads", select="*", status="eq.new", deleted_at="is.null", profile="not.is.null", program="neq.nas",
                   **{"or": f"(profile->>signal_checked.is.null,profile->>signal_checked.lt.{cutoff})"}, order="score.desc.nullslast", limit="40")
     rows = [L for L in rows if (L.get("profile") or {}).get("analysed_by") != "failed" and (L.get("email") or L.get("phone") or L.get("instagram"))]
     if not rows:
@@ -1309,7 +1309,7 @@ def write_requested():
             L = db.get("leads", select="*", id=f"eq.{L['id']}")[0]
         p = L.get("profile") or {}
         general = (p.get("email_check") or {}).get("role") or re.match(r"(info|contact|hello|office|admin|mail|enquiries|inquiries)@", L.get("email") or "", re.I)
-        if mode == "first" and m["channel"] == "email" and general and not p.get("people") and L.get("kind") in local_ai.ORG_KINDS:
+        if mode == "first" and m["channel"] == "email" and general and not p.get("people") and L.get("kind") in local_ai.ORG_KINDS and L.get("program") != "nas":
             people = local_ai.find_people(L, _local["model"])  # who decides there (public sources only)
             if people:
                 p = {**p, "people": people}
