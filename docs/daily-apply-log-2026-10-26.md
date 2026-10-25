@@ -17,3 +17,21 @@ Nothing sent today. Findings per opportunity (studied on the real page):
 - ADEA Rwanda video series (closes 15 Nov): requires legally registered agency, 7 years, Rwanda/Kinyarwanda capacity, 3 references, full USD budget. Not suitable as written.
 - Nonviolent Peaceforce Iraq consultant: position filled (Erbil-based).
 - Bank for Development of Cities and Villages / TendersArabia: not opened (portal tenders, same registration issue).
+
+## Agent: calls (video/film/photo service calls, Jordan and region; nothing sent)
+
+Searched: web search (English and Arabic), ReliefWeb jobs (video, videographer, photographer, multimedia, film), UNjobs, Impactpool, UNGM notices, untalent Jordan consultancies, Hivos, jobs.ps, enicbcmed/Interreg, Bayt. No open call (deadline after 27 Oct) was a plain email to a named address, so no email was sent.
+
+Closed or expired:
+- ILO Jordan photo/video individual (UNGM 314657): closed 30 Sep. IOM Saudi victim-assistance documentary RFQ: closed 8 Oct. IOM Gaza RFQ: closed 29 Jun. UNDP Tanzania, South Sudan, Aqaba LTA (UNDP-JOR-00646/00704): closed. AmCham Jordan RFP 03/2026: closed 4 Jun. JEDCO success-story tender: closed 6 Sep. Anera Amman videographer/photographer/editor (Bayt): expired. Nile Basin photography coordination: closed 25 Oct. UNFPA Jordan videographer: 2024.
+
+Open but not suitable:
+- Nonviolent Peaceforce Indonesia STRIVE documentary (ReliefWeb 4235239, closes 5 Nov): CV + cover letter via NP website portal, work-right in Belgium, 5 years donor-funded docs, Indonesia fieldwork. Skipped.
+- Fondation Hirondelle roster of experts (Syria, closes 30 Nov, first review 12 Nov): online form (https://ee.hirondelle.org/x/nCcO4CWz), needs 2 references, Syrian expertise priority; questions to muaoya.hamoud@mediafh.org. Skipped (form + references).
+- IOM Consultant Videographer, Bangkok (closes 30 Nov): IOM e-Recruitment portal, degree + 5 years Asia-Pacific. Skipped.
+- ITC Videographer, Sierra Leone (UNjobs 1792771315719): Krio, portal. Skipped.
+- Cities and Villages Development Bank Jordan multimedia tender (closes 8 Nov): portal login/signup, email not shown. Skipped.
+- Croix-Rouge Francaise micro-influencer campaign (closes 30 Oct): not film production, Caribbean.
+
+Blocked for Ahmad: none sendable. Possible manual check if he wants: Fondation Hirondelle roster form (needs 2 references).
+Targeting note: open email-only calls for video services in Jordan are rare; most close within days and run through UNGM/e-sourcing portals. Better yield: org outreach to Jordanian NGOs plus tender alerts (TenderJO, Jordan Tenders) checked daily.
