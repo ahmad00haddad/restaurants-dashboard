@@ -35,3 +35,8 @@ Open but not suitable:
 
 Blocked for Ahmad: none sendable. Possible manual check if he wants: Fondation Hirondelle roster form (needs 2 references).
 Targeting note: open email-only calls for video services in Jordan are rare; most close within days and run through UNGM/e-sourcing portals. Better yield: org outreach to Jordanian NGOs plus tender alerts (TenderJO, Jordan Tenders) checked daily.
+
+## Second run, 2026-10-26 (evening)
+- Japan: nothing new; all Japan calls already studied above (TVF/OAFF blocked on English subtitles + rights; Seto fee; L-AIR sent). No change.
+- Sent: Women Future Cities Jordan (womenfuturecities.jo@gmail.com), subject «سيدة من ورشة إلى منصة «بصمة 2026»». Gmail Sent was empty for that address. Not yet marked on the dashboard (lead status).
+- Not done (time): CRP, WADI, BORDA Jordan, Najma, IOM donors visit, UNDP Jordan (Japan-funded Aqaba/Wadi Rum project closing): leads still "new", need contact research. Karak mourning: avoid sensitive pitches this week.
