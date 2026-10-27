@@ -14,8 +14,11 @@ Sending from Gmail was refused by the Claude Code permission classifier in this 
 
 Gmail Sent checked for both addresses: never written before.
 
+Update: Ahmad sent both drafts himself on 2026-10-27.
+
 ## Dashboard
 - Women Future Cities Jordan: marked «تواصلنا» with note (email sent 2026-10-26).
+- Najmah and BORDA Jordan: marked «تواصلنا» with notes after Ahmad sent.
 
 ## Skipped
 - UNDP Jordan (Japan-funded Aqaba/Wadi Rum project): project already concluded on 30 Sep, topic is juvenile crime (sensitive beneficiaries), and UNDP already contacted.
