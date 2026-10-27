@@ -26,3 +26,8 @@ Target list: outreach/gear-targets.csv (19 brands; worker yield low, 100/day not
 ## Forms update
 Submitted: Irix ambassador form (reply within 72h promised), Laowa contact form.
 Not done: Lexar (no application form on page), K&F Concept (showcase only), Tilta (affiliate = account signup, Ahmad must do it), Kase and Think Tank (not reached; account/affiliate style).
+
+## Instagram Insights (read 2026-10-27, last 90 days, @ahmad00haddad)
+Followers 16,009. Views 378,646 (62.6% non-followers; 59% reels). Viewers 20,537. Interactions 19,954. Accounts engaged 9,710. Profile visits 7,762, link taps 79.
+Freewell form used 15,600 followers (estimate); real is 16,009.
+Content format Ahmad prefers: short Reel/post using the product in a real project and talking about it. No long YouTube review.
