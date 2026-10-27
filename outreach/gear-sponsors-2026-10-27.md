@@ -8,3 +8,8 @@
 
 No verified partnership email found (not sent): Viltrox (only info@/usa@), Hollyland, Moza, Tilta, Sirui (old press address), Deity (contact form).
 Follow up once in 2-3 weeks (~2026-11-17).
+
+## Correction (same day)
+First 4 went out from Omar's Gmail (haddadomar793, wrong account). Resent from Ahmad's own Gmail (ahmad000haddad) with a P.S. apologising and explaining. Omar's 4 sent threads moved to trash (does not recall mails already delivered).
+Ahmad's Sent: SmallRig, Zhiyun, Godox, Aputure confirmed.
+Next: larger target list in outreach/gear-targets.csv (built by worker).
