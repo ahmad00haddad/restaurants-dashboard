@@ -22,3 +22,7 @@ Target list: outreach/gear-targets.csv (19 brands; worker yield low, 100/day not
 ## Forms
 - Freewell Creator Program form: submitted from Ahmad (Instagram 15,600 as primary channel, estimate from dashboard screenshot).
 - Not done: Laowa, Irix, Tilta, K&F Concept (brand-creator page is a showcase, no application form found), Kase, Lexar, Think Tank.
+
+## Forms update
+Submitted: Irix ambassador form (reply within 72h promised), Laowa contact form.
+Not done: Lexar (no application form on page), K&F Concept (showcase only), Tilta (affiliate = account signup, Ahmad must do it), Kase and Think Tank (not reached; account/affiliate style).
