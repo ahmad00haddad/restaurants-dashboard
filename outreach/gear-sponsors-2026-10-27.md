@@ -31,3 +31,10 @@ Not done: Lexar (no application form on page), K&F Concept (showcase only), Tilt
 Followers 16,009. Views 378,646 (62.6% non-followers; 59% reels). Viewers 20,537. Interactions 19,954. Accounts engaged 9,710. Profile visits 7,762, link taps 79.
 Freewell form used 15,600 followers (estimate); real is 16,009.
 Content format Ahmad prefers: short Reel/post using the product in a real project and talking about it. No long YouTube review.
+
+## Strategy (Ahmad, 2026-10-27)
+Ask brands for their NEWEST products he does not own (loan unit), then post a short Reel using it in a real project.
+New products found: Blazar Sentinel 35-60 (Jun 2026), Remus II 50 (Sep 2026), Talon AF; Sigma 85mm f/1.2 Art and 20-60mm (Sep 2026); DJI Osmo Pocket 4P, Mic Mini 2S, Osmo 360 II; Atomos Sumo PRO-19; Zhiyun Crane 4; Amaran Halo; SmallRig S70 mic kit.
+Sent: Blazar marketing@blazarlens.com (asked Sentinel 35-60, Sony E). Real stats used: 16K followers, 378K views/90d.
+Open programs seen: Nanlite US influencer free-light form (nanliteus.com/nanlite-usa-influencers-program), Boya influencer page (boyamic.com/community/influence), SanDisk ambassadors, Insta360 Rising Talents.
+Follow-up round (10-14 days, ~2026-11-10): name each brand's newest product in the ask.
