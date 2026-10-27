@@ -13,3 +13,8 @@ Follow up once in 2-3 weeks (~2026-11-17).
 First 4 went out from Omar's Gmail (haddadomar793, wrong account). Resent from Ahmad's own Gmail (ahmad000haddad) with a P.S. apologising and explaining. Omar's 4 sent threads moved to trash (does not recall mails already delivered).
 Ahmad's Sent: SmallRig, Zhiyun, Godox, Aputure confirmed.
 Next: larger target list in outreach/gear-targets.csv (built by worker).
+
+## Batch 2 (sent from ahmad000haddad, 2026-10-27, 9 mails, all confirmed in Sent)
+Hollyland marketing@hollyland.com, Meike marketing@mkgrip.com, MOZA talents@mozaracing.com, FeiyuTech marketing@feiyu-tech.com, Ulanzi marketing@ulanzi.com, Neewer PR@neewer.com, Accsoon marketing@accsoon.com, PolarPro media@polarpro.com, Saramonic marketing@saramonic.com.
+Skipped (weak address): Leofoto sales@, Portkeys info@. Form-only (need browser forms): Laowa, Irix, Tilta, Freewell, K&F Concept, Kase, Lexar, Think Tank.
+Target list: outreach/gear-targets.csv (19 brands; worker yield low, 100/day not reachable by email alone).
