@@ -18,3 +18,7 @@ Next: larger target list in outreach/gear-targets.csv (built by worker).
 Hollyland marketing@hollyland.com, Meike marketing@mkgrip.com, MOZA talents@mozaracing.com, FeiyuTech marketing@feiyu-tech.com, Ulanzi marketing@ulanzi.com, Neewer PR@neewer.com, Accsoon marketing@accsoon.com, PolarPro media@polarpro.com, Saramonic marketing@saramonic.com.
 Skipped (weak address): Leofoto sales@, Portkeys info@. Form-only (need browser forms): Laowa, Irix, Tilta, Freewell, K&F Concept, Kase, Lexar, Think Tank.
 Target list: outreach/gear-targets.csv (19 brands; worker yield low, 100/day not reachable by email alone).
+
+## Forms
+- Freewell Creator Program form: submitted from Ahmad (Instagram 15,600 as primary channel, estimate from dashboard screenshot).
+- Not done: Laowa, Irix, Tilta, K&F Concept (brand-creator page is a showcase, no application form found), Kase, Lexar, Think Tank.
