@@ -38,3 +38,10 @@ New products found: Blazar Sentinel 35-60 (Jun 2026), Remus II 50 (Sep 2026), Ta
 Sent: Blazar marketing@blazarlens.com (asked Sentinel 35-60, Sony E). Real stats used: 16K followers, 378K views/90d.
 Open programs seen: Nanlite US influencer free-light form (nanliteus.com/nanlite-usa-influencers-program), Boya influencer page (boyamic.com/community/influence), SanDisk ambassadors, Insta360 Rising Talents.
 Follow-up round (10-14 days, ~2026-11-10): name each brand's newest product in the ask.
+
+## Forms round 3 (2026-10-27)
+Submitted: Boya influencer campaign form, SanDisk Ambassador (start form + full questionnaire, Instagram/YouTube/X/Facebook, no TikTok: Ahmad has none).
+Skipped: Nanlite USA influencer program (US-based creators only).
+Real audience (checked live): Instagram 16,009; YouTube 863 subs; Facebook 6.2K; X @ahmad00haddad about 11K (estimate from dashboard image).
+Note: SanDisk "verify email" marketing mail opened an opt-in page by accident; harmless newsletter subscription.
+Ask style going forward: general request for brand's latest releases, nothing expensive, short Reel in a real project.
