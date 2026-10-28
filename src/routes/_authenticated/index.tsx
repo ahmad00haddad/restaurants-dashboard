@@ -91,7 +91,7 @@ function Home() {
 
   const importFile = async (f: File) => {
     try {
-      const rows = JSON.parse(await f.text());
+      const rows = JSON.parse((await f.text()).replace(/\u00(?:0[0-8bcBC]|0[eEfF]|1[0-9a-fA-F])/g, "")); // Postgres text cannot hold NUL / control chars
       const r = await act.importRows(Array.isArray(rows) ? rows : rows.leads);
       toast.push(`أُضيف ${r.inserted} جديد، ودُمج ${r.merged} مكرر`);
     } catch (e) {
