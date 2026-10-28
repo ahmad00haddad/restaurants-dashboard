@@ -61,7 +61,8 @@ function Home() {
     const reply = leads.filter((l) => l.needs_reply);
     const followup = leads.filter((l) => l.status === "contacted" && l.next_action_at && l.next_action_at <= t && l.followups < 1);
     const nextStep = leads.filter((l) => ["replied", "meeting"].includes(l.status) && !l.needs_reply && l.next_action_at && l.next_action_at <= t);
-    const signals = leads.filter((l) => l.signal && (!l.signal_until || l.signal_until >= t) && !["won", "lost", "skip"].includes(l.status))
+    // Only leads nobody has written to yet: once contacted they live in the conversations tab, not here.
+    const signals = leads.filter((l) => l.signal && (!l.signal_until || l.signal_until >= t) && l.status === "new" && !alreadyMailed(l))
       .sort((a, b) => (a.signal_until ?? "9").localeCompare(b.signal_until ?? "9"));
     const closing = signals.filter((l) => l.status === "new" && l.signal_until && l.signal_until <= today(7));
     // "New" = never written to. Analysed first (tier A, then score), then the not-yet-analysed; a proven-bad email is not a way in.
