@@ -410,7 +410,7 @@ def ask(prompt, default):
 
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
-    print("Kinds:", ", ".join(PRESETS), "| signals = organisations hiring media people / tendering video work now")
+    print("Kinds:", ", ".join(PRESETS), "| lookalike = places like a past client | signals = organisations hiring media people / tendering video work now")
     kind = ask("Kind", "ngo")
     if kind == "signals":
         rows = signals(ask("Country", "Jordan"))
@@ -418,7 +418,16 @@ if __name__ == "__main__":
         json.dump(rows, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
         print(f"\n✅ {len(rows)} live opportunities → {path}\nUpload it in the site: ⬆️ استيراد من الجامع")
         sys.exit()
-    cities = [c.strip() for c in ask("Cities (comma separated, or 'all'; Irbid first)", "Irbid").split(",")]
+    seg = None
+    if kind == "lookalike":  # places like a past client: the first email shows that client's film (tools/agent/lookalike.py)
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "agent"))
+        import lookalike
+        print("Segments:", ", ".join(lookalike.SEGMENTS))
+        key = ask("Segment", "wedding_hall")
+        seg = lookalike.SEGMENTS[key]
+        kind = f"lookalike-{key}"
+        PRESETS[kind] = seg["terms"]
+    cities = [c.strip() for c in ask("Cities (comma separated, or 'all'; Irbid first)", ",".join(seg["cities"]) if seg else "Irbid").split(",")]
     cities = CITIES if cities == ["all"] else cities
     custom = ask("Custom search terms (comma separated, empty = presets)", "")
     terms = [t.strip() for t in custom.split(",") if t.strip()] or PRESETS[kind]
@@ -441,6 +450,9 @@ if __name__ == "__main__":
         rows = list(ex.map(read_site, rows))
     if deep:
         rows = deepen(rows)
+    if seg:
+        for r in rows:
+            r.update(kind=seg["kind"], source=f"lookalike:{key}")
     path = f"leads-{kind}-{date.today()}.json"
     json.dump(rows, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     if len(ck["queries_done"]) >= len(qs):

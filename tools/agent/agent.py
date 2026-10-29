@@ -688,7 +688,8 @@ BUILTIN_LINKS = ("ahmadhaddad.lovable.app,nas-irbid.lovable.app,behance.net/ahma
 def allowed_urls():
     """Only Ahmad's own bodies of work may be linked: his site, his Behance profile and the example projects in the templates."""
     if not _allowed["urls"]:
-        links = BUILTIN_LINKS + "," + (E.get("ALLOWED_LINKS") or "")
+        import lookalike
+        links = BUILTIN_LINKS + "," + ",".join(s["work"] for s in lookalike.SEGMENTS.values()) + "," + (E.get("ALLOWED_LINKS") or "")
         _allowed["urls"] = {u.strip().lower().replace("https://", "").replace("http://", "").replace("www.", "").rstrip("/") for u in links.split(",") if u.strip()}
     return _allowed["urls"]
 

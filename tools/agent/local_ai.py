@@ -1418,6 +1418,23 @@ def nas_first(L, model, mode="first", subject_prev=None):
     raise ValueError(f"ناس إربد: لم تنجح الكتابة بعد 3 محاولات ({last})")
 
 
+def lookalike_first(L, team, seg):
+    """First email to a lead found as a lookalike of a past client: who I am, the similar film we made (described by type, never by client
+    name), a short bridge to them, a calm way out. Fixed template, no model."""
+    lang = "ar" if lang_for(L) == "ar" else "en"
+    similar, bridge = seg[lang]
+    name = short_name(L["name"])
+    if lang == "ar":
+        body = [f"السادة في {name} المحترمين،", "أنا أحمد حدّاد، مخرج ومدير تصوير من إربد، أعمل مع فريقي على أفلام وفيديوهات للمؤسسات والشركات.",
+                f"{similar}\n{seg['work']}", bridge, "وإن لم يكن هذا وقته فلا بأس، وكل التوفيق لكم.",
+                f"أحمد حدّاد\nمخرج ومدير تصوير، FAII HOUSE\nبعض أعمالي: {SITES['personal']}"]
+        return f"فيديو لـ {name}", "\n\n".join(body)
+    body = [f"Dear {name} team,", "I'm Ahmad Haddad, a director and cinematographer from Irbid, Jordan; with my team I make films and videos for organisations and companies.",
+            f"{similar}\n{seg['work']}", bridge, "If the timing isn't right, no problem at all, and all the best.",
+            f"Ahmad Haddad\n{team.get('senderRole') or 'Director & Cinematographer'}, {team.get('company') or 'FAII HOUSE'}\nSelected work: {SITES['personal']}"]
+    return f"A film for {name}", "\n\n".join(body)
+
+
 def write(L, team, history, channel, mode, hint, model):
     """Write, and retry once if the model skipped the idea or cleanup left too little (never queue a hollow message)."""
     if L.get("program") == "nas":
@@ -1442,6 +1459,11 @@ def write(L, team, history, channel, mode, hint, model):
             price = bool(re.search(r"تكلف|سعر|كلفة|أسعار|مجان|ببلاش|تبرع|تطوع|مقابل|نقود|فلوس|مصاري|cost|price|quot|budget|free|fee|paid", theirs, re.I))
             body = reply_playbook(L, theirs, price) + "\n\n" + (f"واتساب : {wa}\n\n" if wa else "") + "مع خالص التقدير،\nأحمد حدّاد"
             return ("الكلفة وموعد اللقاء" if price else "موعد اللقاء"), (body if channel == "email" else dm_version(body))
+    import lookalike
+    seg = lookalike.segment(L)
+    if mode == "first" and seg:  # found as a lookalike of a past client: show that same film
+        subject, text = lookalike_first(L, team, seg)
+        return subject, (text if channel == "email" else dm_version(text))
     if mode == "first" and sector(L) in ("roastery", "pharmacy", "education", "ngo"):
         subject, text = (ngo_first(L, team, model) if sector(L) == "ngo" else
                          {"roastery": roastery_first, "pharmacy": pharmacy_first, "education": school_first}[sector(L)](L, team))
