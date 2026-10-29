@@ -46,7 +46,7 @@ Work: https://www.behance.net/ahmad00haddad , https://ahmadhaddad.lovable.app , 
 Kind regards,
 Ahmad Haddad
 Director and cinematographer, FAII HOUSE
-0962799256345 | ahmad000haddad@gmail.com
+0799256345 | ahmad000haddad@gmail.com
 
 (Check that it fits on one page. If it is too long, drop point 5 into one line.)
 
