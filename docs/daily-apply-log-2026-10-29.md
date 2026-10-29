@@ -20,3 +20,9 @@ Roberto Cimetta, ChangemakerXchange ×2, La Rotllana, ifa, ADKX.
 
 ## Sent
 None.
+
+## Board cleanup asked by Ahmad (same day)
+Hidden with ✖ تجاهل / status تجاهل, not deleted: they still show under «الكل».
+- 🏆 went from 92 to 21. Hidden: Chinese university exchanges (BIT, SWUFE, SUFE), Korea and AYFN exchanges, Projects Abroad, Hansen, IREX, IIE, Pollock-Krasner, all Pulitzer, IWMF, Rainforest, WAN-IFRA and FASPE journalism grants, design, illustration and AI contests (ICMA, iJungle, London Design, Indigo, Ruskin, Hopper, AI Art), paid niche photo contests (Anthology, Caminos de Hierro, insects, SKM, landscape, Monaco, sports, NY Photo ×2, Annual Photo, NHM, FIBA, Exposure One, birds, food, Communication Arts, Van Gogh, CEWE ×2), Sony youth contest and duplicate Sony cards, festival film entries (Clermont-Ferrand, El Gouna, Fujifilm, Alexandria, Kristiansand, Sony Future Filmmaker, Cresta), ADMAF, Culture Moves Europe (Goethe).
+- Kept: A4 ×2, Art Explora, ILO RFQ, IOM, TU Dresden (blocked for Ahmad), Pro Helvetia, Royal Film Commission, AFAC, DFI, Ford, Red Sea, Hubert Bals, Al-Mawred ×2, Awesome Foundation, Magnum ×2, Sony World Photography (free), World Press Photo, Nikon.
+- 🔔 leads went from 22 to 1. Set to تجاهل: restaurants, schools, nurseries, Norvia Tech, Mindset, WOMOTIVE, Oxfam, Nonviolent Peaceforce (filled), Dar Karama (sensitive). Kept: جمعية الخير الخيرية.
