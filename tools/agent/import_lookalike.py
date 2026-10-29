@@ -24,8 +24,23 @@ def find(r):
 
 
 for path in [p for a in sys.argv[1:] for p in glob.glob(a)]:
-    rows = agent.clean(json.load(open(path, encoding="utf-8")))
-    res = db.req("POST", "rpc/ingest_leads", None, {"rows": rows})
+    rows, doms = [], set()
+    for r in agent.clean(json.load(open(path, encoding="utf-8"))):  # one row per website: the same domain twice in a batch breaks the unique key
+        m = re.match(r"^(?:https?://)?(?:www\.)?([^/:?#]+)", (r.get("website") or "").lower())
+        if m and m.group(1) in doms:
+            continue
+        doms.add(m.group(1)) if m else None
+        rows.append(r)
+    try:
+        res = db.req("POST", "rpc/ingest_leads", None, {"rows": rows})
+    except RuntimeError:  # a merge that would give a lead another lead's website: go row by row and skip only that one
+        res = {"inserted": 0, "merged": 0}
+        for r in rows:
+            try:
+                x = db.req("POST", "rpc/ingest_leads", None, {"rows": [r]})
+                res["inserted"] += x["inserted"]; res["merged"] += x["merged"]
+            except RuntimeError:
+                pass
     tagged = 0
     for r in rows:
         L = find(r)
