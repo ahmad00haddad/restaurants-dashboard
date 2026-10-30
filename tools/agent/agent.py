@@ -610,6 +610,18 @@ def send_email(to, subject, body, cc=None, rush=False):
     if to.lower() in STATE.get("bounces", {}):
         raise RuntimeError(f"هذا الإيميل ارتدّ سابقاً: {to}")
     msg = build_mime(body)
+    if "nas-irbid.lovable.app" in body:  # Nas Irbid sponsor mail carries the media kit (the text says it is attached): never send it without
+        kit = Path(__file__).parent / "NasIrbid_MediaKit.pdf"
+        if not kit.exists():
+            raise RuntimeError("ملف NasIrbid_MediaKit.pdf غير موجود في tools/agent — لن تُرسل رسالة تقول إنه مرفق")
+        from email.mime.application import MIMEApplication
+        from email.mime.multipart import MIMEMultipart
+        mixed = MIMEMultipart("mixed")
+        mixed.attach(msg)
+        att = MIMEApplication(kit.read_bytes(), _subtype="pdf")
+        att.add_header("Content-Disposition", "attachment", filename="NasIrbid_MediaKit.pdf")
+        mixed.attach(att)
+        msg = mixed
     msg["Subject"] = subject or E.get("SENDER_NAME", "")
     msg["From"] = formataddr((E.get("SENDER_NAME", ""), E["GMAIL_USER"]))
     msg["To"] = to
