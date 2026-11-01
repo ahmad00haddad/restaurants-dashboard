@@ -162,6 +162,8 @@ def _valid(it, batch, today, kinds):
     if it["kind"] == "news_signal":
         if not (pub and date.fromisoformat(pub) >= today - timedelta(days=45)):
             return None  # a signal must be news from the last 45 days
+        if deadline and deadline < today:
+            return None  # the event the news is about (written date) already took place
     elif it["kind"] != "tender":
         if not deadline or deadline < today:
             return None  # an opening / event / commission must carry a written FUTURE date
@@ -262,7 +264,7 @@ def scan(db, model, seen, log=print, max_new=40):
         c = _contact(o["org"], o["country"])
         sig = ("🇯🇴 " if o.get("jo") else "") + f"{LABEL[o['kind']]}: {o['what']}" + (f" — ⚠ {o['eligibility']}" if o["eligibility"] else "") + ("" if o["deadline"] or o["kind"] == "news_signal" else " — الموعد النهائي غير مذكور، راجع الرابط") + (f" — للتقديم: {o['apply']}" if o["apply"] else "")
         kind = o["org_type"] if o["kind"] == "news_signal" and o.get("org_type") in ("ngo", "org", "hotel", "restaurant", "brand", "event") else KIND_OF[o["kind"]]
-        until = o["deadline"] or (date.fromisoformat(o["pub"]) + timedelta(days=45) if o["kind"] == "news_signal" and o.get("pub") else today + timedelta(days=14))
+        until = o["deadline"] or (date.fromisoformat(o["pub"]) + timedelta(days=45) if o["kind"] == "news_signal" and o.get("pub") else today + timedelta(days=14))  # a written event date wins over pub+45
         rows.append({"name": o["org"], "kind": kind, "city": o["country"], "source": "opportunities",
                      "signal": sig[:500], "signal_url": o["url"],
                      "signal_until": until.isoformat(),
