@@ -11,3 +11,8 @@ Still waiting on Ahmad (from applications.md):
 - TU Dresden Schaufler, deadline 9 Nov 2026.
 - Seto Art Residency (USD 25 fee), deadline 30 Apr 2027.
 - IOM Videographer, deadline 30 Nov 2026.
+
+## Rerun, Brave connected
+Dashboard 🏆 list: all open items already sent/blocked or without a deadline-bound easy channel (ILO closed 31 Oct; IOM, TU Dresden, A4 need Ahmad). 🔔 leads: Jordan National Gallery event already passed; others weak (see applications.md).
+Wider search (Japan, regional tenders, residencies): every call found was closed, paid, or restricted. Nothing sent.
+Open for review: Nawat Fes (Morocco, 7 Jan 2027).
