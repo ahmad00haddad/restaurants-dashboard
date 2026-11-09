@@ -1133,6 +1133,28 @@ def human_first(L, team, lang, hook, idea, model):
     return None
 
 
+NGO_PLAIN = {
+    "ar": ("يمكن أن نصوّر لكم فيلماً قصيراً عن أحد الناس الذين تخدمهم برامجكم، يروي أثر عملكم بصوته.",
+           "إن رأيتم أن الفكرة تناسبكم، يسعدني أن نتحدث عنها في لقاء قصير أونلاين. وإن لم يكن هذا وقته فلا بأس، وكل التوفيق لكم."),
+    "en": ("We could film a short story about one of the people your programmes serve, telling your impact in their own voice.",
+           "If the idea suits you, I'd be glad to talk about it in a short online call. If the timing isn't right, no problem at all."),
+}
+
+
+def ngo_plain(L, team, lang, h):
+    """First email when no specific, verified fact about the organisation was found: who I am, one film from their field, a plain idea.\n    Fixed template, no model, nothing claimed about them."""
+    idea, close = NGO_PLAIN[lang]
+    name = short_name(L["name"])
+    site = SITES["personal"]
+    if lang == "ar":
+        parts = [f"السادة في {name} المحترمين،", intro_for(L, lang), idea, NGO_LEAD[lang][h % 3] + "\n" + work_for(L), close,
+                 f"أحمد حدّاد\nمخرج ومدير تصوير، FAII HOUSE\nبعض أعمالي ومن عملت معهم: {site}"]
+        return f"فيلم قصير عن عمل {name}", "\n\n".join(parts)
+    parts = [f"Dear {name} team,", intro_for(L, lang), idea, NGO_LEAD[lang][h % 3] + "\n" + work_for(L), close,
+             f"Ahmad Haddad\n{team.get('senderRole') or 'Director & Cinematographer'}, {team.get('company') or 'FAII HOUSE'}\nSelected work: {site}"]
+    return f"A short film about {name}'s work", "\n\n".join(parts)
+
+
 def ngo_first(L, team, model=None):
     """First email to an organisation: a specific fact about THEM (read from their site / recent news, verified in code), who I am,
     a short documentary built on that same fact. Written by a model in Ahmad's voice from his real emails and checked in code; if the
@@ -1142,8 +1164,8 @@ def ngo_first(L, team, model=None):
     lang = "ar" if lang == "ar" else "en"
     h = int(hashlib.md5(("nb" + str(L.get("id") or L.get("name"))).encode()).hexdigest(), 16)
     hook, idea = ngo_hook(L, lang, model)
-    if not hook:
-        raise ValueError("لم أجد معلومة محددة وموثّقة عن المنظمة في موقعها أو أخبارها: لن أرسل رسالة عامة. أضف موقعهم أو اكتب توجيهاً.")
+    if not hook:  # nothing verified to open with: show one film from their field instead of an invented hook
+        return ngo_plain(L, team, lang, h)
     made = human_first(L, team, lang, hook, idea, model)
     if made:
         subject, text = made

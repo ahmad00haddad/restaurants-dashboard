@@ -928,7 +928,8 @@ def approve(mid, tg_mid, own_claim=False):
         return f"🚫 لم تُرسل — {m.get('review_note') or 'المسودة مرفوضة'}"
     problems = gate(m, L)
     if problems:
-        db.patch("lead_messages", {"id": mid}, {"review": "failed", "review_note": " · ".join(problems)[:300]})
+        dup = any("راسلنا هذا الإيميل سابقاً" in x for x in problems)  # nothing to fix: one first message per address, close it
+        db.patch("lead_messages", {"id": mid}, {"review": "rejected" if dup else "failed", "review_note": ("أُغلقت: " if dup else "") + " · ".join(problems)[:290]})
         return "🛑 لم تُرسل — الفحص أوقفها:\n• " + "\n• ".join(problems) + "\nعدّلها (✏️ من الموقع) ثم أعد إرسالها للموافقة."
     if m["channel"] == "email":
         to, cc = recipients(L)
@@ -974,7 +975,8 @@ def enqueue(mid, rush=False):
         return approve(mid, None)  # default: send as soon as it is approved (the daily limit still applies); PACED=1 brings the queue back
     problems = gate(m, L)
     if problems:
-        db.patch("lead_messages", {"id": mid}, {"review": "failed", "review_note": " · ".join(problems)[:300]})
+        dup = any("راسلنا هذا الإيميل سابقاً" in x for x in problems)  # nothing to fix: one first message per address, close it
+        db.patch("lead_messages", {"id": mid}, {"review": "rejected" if dup else "failed", "review_note": ("أُغلقت: " if dup else "") + " · ".join(problems)[:290]})
         return "🛑 لم تُرسل — الفحص أوقفها:\n• " + "\n• ".join(problems) + "\nعدّلها (✏️ من الموقع) ثم أعد إرسالها للموافقة."
     db.patch("lead_messages", {"id": mid}, {"review": "approved", "review_note": "⏳ في طابور الإرسال"})
     n = len(db.get("lead_messages", select="id", review="eq.approved", channel="eq.email"))
