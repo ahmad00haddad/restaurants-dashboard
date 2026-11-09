@@ -747,6 +747,17 @@ def email_site_mismatch(L):
 PLATFORM_MAIL = re.compile(r"@([a-z0-9-]+\.)*(google|googlemail|facebook|instagram|youtube|linkedin|tiktok|whatsapp|wix|wixpress|godaddy|cloudflare|squarespace|shopify|microsoft|apple|twitter|sentry)\.[a-z.]+$", re.I)
 
 
+# Addresses that never lead to work by cold email: UN / big INGOs buy through tenders, government mail is closed, link pages and news sites are not the org.
+WRONG_DOOR = re.compile(r"@([\w.-]+\.)?(unicef|unwomen|unrwa|unhcr|unfpa|undp|wfp|who|iom|ilo|unops|medair|rescue|mercycorps|savethechildren|care)\.(org|int)$"
+                        r"|\.gov\.jo$|@(linktr\.ee|alghad\.jo|petra\.gov\.jo|ammonnews\.net|google\.com)$", re.I)
+
+
+def wrong_door(L):
+    """Why this lead's address is a dead end for a first cold email (empty = fine)."""
+    e = (L.get("email") or "").strip()
+    return "أُغلقت: جهة تشتري بالمناقصات أو عنوان غير مناسب للمراسلة" if e and WRONG_DOOR.search(e) and L.get("status") in ("new", None) and not L.get("signal") else ""  # a live signal (named person, campaign) is worth a try
+
+
 def gate(m, L):
     """Returns a list of reasons to block. Empty list = safe to send. Any doubt → block."""
     body, subj = m.get("body") or "", m.get("subject") or ""
@@ -1303,6 +1314,14 @@ def write_requested():
         return
     if local_ai.is_blocked(L):
         db.patch("lead_messages", {"id": m["id"]}, {"review": "failed", "review_note": "على قائمة الاستبعاد: لا نراسله"})
+        return
+    if wrong_door(L):
+        db.patch("lead_messages", {"id": m["id"]}, {"review": "rejected", "review_note": wrong_door(L)})
+        return
+    twins = sorted(db.get("lead_messages", select="id,created_at", lead_id=f"eq.{L['id']}", draft="eq.true",
+                          review="in.(write,pending,approved,sending)"), key=lambda x: (x["created_at"], x["id"]))
+    if twins and twins[0]["id"] != m["id"]:  # the same lead was queued twice (double click, two batches): one draft is enough
+        db.patch("lead_messages", {"id": m["id"]}, {"review": "rejected", "review_note": "أُغلقت: مسودة مكررة لنفس العميل"})
         return
     if L.get("kind") == "school" and _local["model"] and school_gate(L) is None:
         db.patch("lead_messages", {"id": m["id"]}, {"review": "failed", "review_note": "مدرسة حكومية: لا ميزانية للتصوير السينمائي"})
