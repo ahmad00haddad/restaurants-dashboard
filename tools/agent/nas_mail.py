@@ -68,9 +68,30 @@ def _build(n, greeting, f, ask, hook, fit, subject):
     return subject, "\n\n".join(paras)
 
 
+FORMAL = """سعادة مدير الاتصال المؤسسي والمسؤولية الاجتماعية المحترم،
+تحية طيبة وبعد،
+
+أنا أحمد حدّاد، مخرج ومدير تصوير من إربد. أعمل مع فريقي على «ناس إربد»، سلسلة وثائقية تسجّل ذاكرة المدينة الحيّة: حرفها ومقاهيها وعائلاتها وأماكنها التي تختفي، وتقدّمها بسمة الذينات. الحلقات متاحة على:
+{site}
+
+حققت الحلقات الإحدى عشرة 2.5 مليون مشاهدة و97.8 ألف إعجاب بنشر مستقل، وبلغت حلقة أم محمد المصرية 713 ألف مشاهدة. تُصوَّر الحلقات كاملة وتُختصر للسوشال ميديا، ولها نسخ أطول لليوتيوب والتلفزيون. المحتوى محلي وإيجابي بلا سياسة ولا جدل.
+
+نعمل على موسم جديد من ثماني حلقات، ويشرّفنا أن تكون {org} شريكاً للسلسلة، {tie} مرفق ملف تعريفي بالبرنامج والفريق وحاجته للدعم.
+
+أتشرف بلقاء قصير، حضورياً أو عبر الإنترنت، لعرض الفكرة. وكل التوفيق لكم، وسامحونا على الإزعاج.
+
+مع خالص الاحترام،
+أحمد حدّاد
+{works}
+{phone}"""  # approved by Ahmad 2026-11-09 (خطة_الكتب_الرسمية.md)
+FORMAL_SUBJECT = "سلسلة «ناس إربد» الوثائقية، طلب لقاء للتعريف والشراكة"
+
+
 def first(L, model, chat, ai_tells, nv_chain, is_nv):
     n = (L.get("profile") or {}).get("nas") or {}
     ask = n.get("ask") or "episode"
+    if n.get("formal"):  # big institutions: a formal letter, not the conversational email
+        return FORMAL_SUBJECT, FORMAL.format(site=SITE, works=WORKS, phone=PHONE, org=n.get("org") or L["name"], tie=n.get("tie") or "")
     greeting = (n.get("greeting") or "").strip()
     many = greeting.startswith(("السادة", "السيد رئيس"))
     f = FORM["many" if many else "one"]
