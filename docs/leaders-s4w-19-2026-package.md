@@ -1,6 +1,6 @@
 # Leaders International, Skills4Work II: Video Production Specialist (ToR/S4W/19/2026)
 
-Prepared 2026-11-12. Gmail draft ready (ahmad000haddad), NOT SENT: waiting for Ahmad. Final price 3,860 + VAT 617.60 = 4,477.60 JOD (lean crew: DOP, AC, sound; 2nd camera, gaffer, photographer optional). Files: applications/leaders-s4w-19-2026/
+Prepared 2026-11-12. SENT 2026-11-12 16:34 from ahmad000haddad to jordanprocurement@leadersinternational.org. Final price 3,860 + VAT 617.60 = 4,477.60 JOD (lean crew: DOP, AC, sound; 2nd camera, gaffer, photographer optional). Files: applications/leaders-s4w-19-2026/
 
 ## Facts from the ToR
 - ToR: https://leadersinternational.org/wp-content/uploads/2026/11/TOR_S4W_Videography-ToR-S4W-19-2026.pdf (announced 2026-11-10).
